@@ -1,0 +1,6 @@
+openai>=2,<3
+rich>=13.7.0,<16
+prompt_toolkit>=3.0.43,<4
+# Direct dep: private mode (default) imports httpx in providers.py for the
+# trust_env=False proxy defense + IP-pinning. Pinned to openai's range.
+httpx>=0.23,<1

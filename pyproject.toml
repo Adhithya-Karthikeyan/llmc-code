@@ -1,0 +1,79 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "llmcli"
+dynamic = ["version"]
+description = "A lightweight, personal Claude Code-style agentic CLI for LOCAL LLMs (LM Studio)."
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Adhithya Karthikeyan", email = "skadhithya95@gmail.com" }]
+keywords = [
+    "llm",
+    "cli",
+    "agent",
+    "agentic",
+    "lm-studio",
+    "local-llm",
+    "tool-use",
+    "repl",
+    "coding-agent",
+    "openai-compatible",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Software Development",
+    "Topic :: Software Development :: Code Generators",
+    "Topic :: Utilities",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+    # Upper bounds cap major-version drift. The streaming/tool_calls code in
+    # providers.py is verified against the openai 2.x SDK (the installed line).
+    "openai>=2,<3",
+    "rich>=13.7.0,<16",
+    "prompt_toolkit>=3.0.43,<4",
+    # httpx is openai's own HTTP client; private mode (the DEFAULT) imports it
+    # DIRECTLY in providers.py — trust_env=False + IP-pinning is the load-bearing
+    # proxy-tunneling / DNS-rebinding defense, not an accident of openai's tree.
+    # Declared explicitly, pinned to openai's supported range, so the default
+    # path never relies on it being present only transitively.
+    "httpx>=0.23,<1",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[project.urls]
+Homepage = "https://github.com/Adhithya-Karthikeyan/llm-cli"
+Repository = "https://github.com/Adhithya-Karthikeyan/llm-cli"
+Issues = "https://github.com/Adhithya-Karthikeyan/llm-cli/issues"
+Documentation = "https://github.com/Adhithya-Karthikeyan/llm-cli#readme"
+
+[project.scripts]
+llmc = "llmcli.__main__:main"
+
+[tool.setuptools]
+packages = ["llmcli"]
+
+# Single-source the version from llmcli/__init__.py (__version__) so the
+# installed runtime version can never drift from the published metadata.
+[tool.setuptools.dynamic]
+version = { attr = "llmcli.__version__" }
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

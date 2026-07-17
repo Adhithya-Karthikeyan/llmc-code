@@ -1,0 +1,22 @@
+# Source distribution contents. The wheel is controlled by
+# [tool.setuptools] packages = ["llmcli"] (ships only llmcli/*.py); this file
+# keeps the sdist clean and guarantees runtime/operational junk never ships.
+
+include LICENSE
+include README.md
+include pyproject.toml
+include requirements.txt
+recursive-include tests *.py
+
+# Never ship bytecode, caches, build output, envs, or leaked agent state.
+global-exclude *.py[cod]
+global-exclude *$py.class
+recursive-exclude * __pycache__
+prune llmcli/.omc
+prune .omc
+prune .venv
+prune .pytest_cache
+prune build
+prune dist
+prune llm-cli
+exclude hello.py
