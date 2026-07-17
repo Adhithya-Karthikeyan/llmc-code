@@ -17,6 +17,21 @@ Providers:
 
 ## Install
 
+Install it as a **global command** with [pipx](https://pipx.pypa.io) (or `uv tool`).
+This puts the `llmc` command on your PATH inside an isolated environment, so it
+runs from any directory with no venv to activate:
+
+```bash
+pipx install git+https://github.com/Adhithya-Karthikeyan/llm-cli.git
+# or:  uv tool install git+https://github.com/Adhithya-Karthikeyan/llm-cli.git
+```
+
+Then run `llmc` anywhere. Upgrade later with `pipx upgrade llmcli`.
+
+**Requires Python ≥ 3.10.**
+
+### Development install
+
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
