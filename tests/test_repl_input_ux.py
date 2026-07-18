@@ -400,7 +400,7 @@ def test_status_hud_toks_is_hero_style(monkeypatch, tmp_path):
 
 
 def test_status_hud_lock_badge_is_honest(monkeypatch, tmp_path):
-    """The ⬡ lock badge is honest: 'offline' only in private mode, else 'local'
+    """The ◈ lock badge is honest: 'offline' only in private mode, else 'local'
     (a networked local model is never 'offline'), rendered in the success token."""
     monkeypatch.setattr(r.shutil, "get_terminal_size",
                         lambda *a, **k: os.terminal_size((120, 24)))
@@ -409,13 +409,13 @@ def test_status_hud_lock_badge_is_honest(monkeypatch, tmp_path):
 
     repl.config.private = True
     repl._refresh_status_bar()
-    off = _find_frag(repl, "⬡ offline")
+    off = _find_frag(repl, "◈ offline")
     assert off is not None and off[0] == "#9ece6a"  # success
-    assert "⬡ local" not in _bar_text(repl)
+    assert "◈ local" not in _bar_text(repl)
 
     repl.config.private = False
     repl._refresh_status_bar()
-    loc = _find_frag(repl, "⬡ local")
+    loc = _find_frag(repl, "◈ local")
     assert loc is not None and loc[0] == "#9ece6a"
     assert "offline" not in _bar_text(repl)  # never claim offline when networked
 
@@ -428,7 +428,35 @@ def test_status_hud_badge_dropped_when_too_narrow(monkeypatch, tmp_path):
     repl.config.theme = "clean"
     repl.provider.model = "some-long-model-name"
     repl._refresh_status_bar()
-    assert "⬡" not in _bar_text(repl)  # badge dropped, no overflow
+    assert "◈" not in _bar_text(repl)  # badge dropped, no overflow
+
+
+def test_status_hud_badge_and_branch_coexist_at_width(monkeypatch, tmp_path):
+    """Regression: on a WIDE terminal in a git repo, the right-aligned lock badge
+    AND the git branch both render (the badge previously "vanished" because
+    ambiguous-width glyphs — ◆/⬤/▸/· — are under-measured by prompt_toolkit, so
+    the right-flushed badge overflowed the true line and got clipped). The
+    conservative _bar_cwidth measurement keeps the badge within bounds."""
+    import llmcode.gitint as gitint
+    monkeypatch.setattr(r.shutil, "get_terminal_size",
+                        lambda *a, **k: os.terminal_size((120, 24)))
+    monkeypatch.setattr(gitint, "is_repo", lambda root: True)
+    monkeypatch.setattr(gitint, "current_branch", lambda root: "main")
+    monkeypatch.setattr(gitint, "is_dirty", lambda root: True)
+    repl = _make_repl(monkeypatch, tmp_path)
+    repl.config.theme = "clean"
+    repl.config.private = False
+    repl.provider.model = "qwen3.6-35b-a3b"
+    _set_ctx(monkeypatch, repl, 40)
+    repl.agent.last_turn_stats = {"toks_per_sec": 71.0, "elapsed": 7.91}
+    repl._refresh_status_bar()
+    text = _bar_text(repl)
+    assert "◈ local" in text          # honest lock badge present at width
+    assert "main*" in text            # git branch (dirty) present
+    assert "71 tok/s" in text
+    # The conservatively-measured bar never exceeds the terminal width (the badge
+    # is placed with headroom, so a symbol-font terminal cannot clip it).
+    assert r._bar_cwidth(_bar_frags(repl)) <= 120
 
 
 def test_status_hud_ascii_fallback_cells(monkeypatch, tmp_path):
@@ -446,7 +474,7 @@ def test_status_hud_ascii_fallback_cells(monkeypatch, tmp_path):
     assert "[##---] 40%" in text          # ASCII gauge cells
     assert "⬤" not in text and "⬜" not in text
     assert "* m" in text                  # ◆ core -> *
-    assert "# " in text                   # ⬡ lock -> #
+    assert "# " in text                   # ◈ lock -> #
 
 
 def test_interactive_agent_suppresses_footer(monkeypatch, tmp_path):

@@ -401,26 +401,62 @@ def _box_for(name: str):
     return getattr(box, (name or "ROUNDED").upper(), box.ROUNDED)
 
 
+# Symbol glyphs whose display width prompt_toolkit under-measures. Many
+# geometric / ambiguous-width symbols the reactor status bar emits — the ◆ core,
+# ⬤/⬜ gauge cells, ▸ arrow, · separators, ◈ lock badge — render DOUBLE-width in
+# terminals using an emoji/symbol font, yet ``get_cwidth`` counts them as 1.
+# Measuring the bar with that undercount let the right-flushed lock badge overflow
+# the true line and get clipped ("the badge vanished" on a wide terminal).
+_BAR_WIDE_GLYPHS = frozenset("◆▸◈⬤⬜●·")
+
+
+def _bar_cwidth(fragments) -> int:
+    """Conservative display width of prompt_toolkit ``(style, text)`` fragments.
+
+    Like ``fragment_list_width`` but counts the ambiguous-width symbol glyphs the
+    reactor bar emits (``_BAR_WIDE_GLYPHS``) as double-width, so the right-aligned
+    lock badge is placed with enough headroom to survive the widest rendering and
+    is never clipped — on a narrow-rendering font it merely sits a hair left of
+    the edge. Never raises (a status bar must not break input)."""
+    try:
+        from prompt_toolkit.utils import get_cwidth
+    except Exception:  # noqa: BLE001 - degrade to a plain char count
+        return sum(len(t) for _s, t in fragments)
+    total = 0
+    for _style, text in fragments:
+        for ch in text:
+            total += 2 if ch in _BAR_WIDE_GLYPHS else get_cwidth(ch)
+    return total
+
+
 # --------------------------------------------------------------------------- #
 # Startup wordmark
 # --------------------------------------------------------------------------- #
-# STATIC, pre-rendered "llmc-code" block wordmark (figlet 'ANSI Shadow' style),
-# embedded verbatim so we ship ZERO figlet dependency (deps stay tiny). Six rows;
-# widest line is 74 columns (measured). It is shown ONLY on a wide, UTF-8-capable
-# real terminal — every other context (narrow tty, piped/non-tty, LANG=C console)
-# falls back to the compact framed banner, so narrow/scripted/legacy runs never
-# see broken art or stray ANSI. Regenerate via scratchpad/gen_wordmark.py if the
-# product name ever changes; keep _WORDMARK_WIDTH in sync with the widest line.
+# STATIC, pre-rendered "llmc-code" wordmark — a fine half-block logotype (figlet
+# 'pagga' style), embedded verbatim so we ship ZERO figlet dependency (deps stay
+# tiny). Three compact rows, 36 columns wide. This deliberately replaces the old
+# heavy ANSI-Shadow "wall of █" with a sleeker, high-resolution mark: solid
+# ``█`` strokes lifted by ``▀``/``▄`` half-blocks and a soft ``░`` light-shade
+# field, so the per-cell diagonal gradient reads like a premium foil logotype
+# rather than blocky retro art. Every glyph is from the Block Elements range
+# (``█ ▀ ▄ ░`` — the most universally-supported non-ASCII set in terminals).
+#
+# Shown ONLY on a wide, UTF-8-capable real terminal — every other context
+# (narrow tty, piped/non-tty, LANG=C console) falls back to the compact framed
+# banner, so narrow/scripted/legacy runs never see broken art or stray ANSI.
+# Regenerate via `pyfiglet -f pagga "llmc-code"` (throwaway; NOT a dep) if the
+# product name ever changes; keep _WORDMARK_GLYPHS covering every glyph used.
 _WORDMARK = (
-    "██╗     ██╗     ███╗   ███╗ ██████╗       ██████╗ ██████╗ ██████╗ ███████╗\n"
-    "██║     ██║     ████╗ ████║██╔════╝      ██╔════╝██╔═══██╗██╔══██╗██╔════╝\n"
-    "██║     ██║     ██╔████╔██║██║     █████╗██║     ██║   ██║██║  ██║█████╗  \n"
-    "██║     ██║     ██║╚██╔╝██║██║     ╚════╝██║     ██║   ██║██║  ██║██╔══╝  \n"
-    "███████╗███████╗██║ ╚═╝ ██║╚██████╗      ╚██████╗╚██████╔╝██████╔╝███████╗\n"
-    "╚══════╝╚══════╝╚═╝     ╚═╝ ╚═════╝       ╚═════╝ ╚═════╝ ╚═════╝ ╚══════╝"
+    "░█░░░█░░░█▄█░█▀▀░░░░░█▀▀░█▀█░█▀▄░█▀▀\n"
+    "░█░░░█░░░█░█░█░░░▄▄▄░█░░░█░█░█░█░█▀▀\n"
+    "░▀▀▀░▀▀▀░▀░▀░▀▀▀░░░░░▀▀▀░▀▀▀░▀▀░░▀▀▀"
 )
-_WORDMARK_WIDTH = 74            # widest wordmark line (measured) — gate tty width on this
-_WORDMARK_GLYPHS = "█╗║═╝╚╔"    # encoding-guard probe: every block/box char the art uses
+# Minimum terminal width to render the hero. The art itself is only 36 cols, but
+# we require a generous margin so a compact terminal falls back to the framed
+# banner (a cramped hero reads worse than the clean compact one). 56 comfortably
+# rejects ~40-col terminals and accepts the common 80+ col case.
+_WORDMARK_WIDTH = 56
+_WORDMARK_GLYPHS = "█▀▄░"       # encoding-guard probe: every block glyph the art uses
 
 
 def _hex_to_rgb(token) -> tuple[int, int, int] | None:
@@ -1764,11 +1800,13 @@ class Repl:
         self.console.print(_HELP_FOOTER, style=pal.dim)
 
     def _print_banner(self) -> None:
-        """Startup banner. On a wide, UTF-8-capable terminal it opens with a bold
-        block-letter ``llmc-code`` wordmark for a strong first impression; on a
-        narrow, piped/non-tty, or LANG=C console it falls back to the compact
+        """Startup banner. On a wide, UTF-8-capable terminal it opens with the
+        sleek half-block ``llmc-code`` wordmark hero for a strong first impression;
+        on a narrow, piped/non-tty, or LANG=C console it falls back to the compact
         framed banner (provider/model + a green ``ready`` dot + theme/privacy
-        line). Both paths then print the shared privacy/help/first-run footer.
+        line). The first-run hero folds the privacy posture into its ribbon badge
+        and closes with ONE affordance line; the compact fallback prints the
+        shared privacy + single-hint footer.
 
         Gating the wordmark on ALL of {real terminal, enough width, encodable
         glyphs} guarantees narrow terminals, piped/non-tty runs (byte-clean,
@@ -1789,8 +1827,13 @@ class Repl:
             if self._seen_before():
                 self._print_returning_ribbon(pal)
             else:
+                # Calm first-run rhythm: wordmark -> tagline -> ribbon (which
+                # CARRIES the honest privacy badge) -> ONE affordance line. No
+                # duplicate "/help" hints, no separate privacy paragraph.
                 self._print_wordmark_header(pal)
-                self._print_banner_tail(pal)
+                self.console.print()            # gap: ribbon -> hint
+                self._print_startup_hint(pal)   # the single affordance line
+                self.console.print()            # trailing breathing room
                 self._mark_seen()
         else:
             self._print_compact_header(pal)   # the historic framed banner (fallback)
@@ -1824,11 +1867,11 @@ class Repl:
         """Compressed returning-run startup: a single ``◆ llmc-code  <model>
         <badge>   /help · @ files`` ribbon (the prompt is the second line). Skips
         the big wordmark + verbose teaser/footer. Same tty/encoding gates as the
-        hero; ◆/⬡ degrade to */# on a legacy console."""
+        hero; ◆/◈ degrade to */# on a legacy console."""
         from rich.text import Text
 
         core = pal.banner_glyph if _enc_can(self.console, pal.banner_glyph) else "*"
-        lock = "⬡" if _enc_can(self.console, "⬡") else "#"
+        lock = "◈" if _enc_can(self.console, "◈") else "#"
         short_model = (self.config.model or "").rsplit("/", 1)[-1]
         line = Text()
         line.append(core + " llmc-code", style=pal.accent)
@@ -1929,12 +1972,12 @@ class Repl:
 
         ``<short-model>`` (bright) · ``◆ core ready`` (success) · the HONEST lock
         badge. HONESTY: the model is ALWAYS local, but we only claim offline when
-        private mode is on — ``⬡ offline · no egress`` (private) vs ``⬡ local``
-        (network on). ``◆``/``⬡`` degrade to ``*``/``#`` on a legacy console."""
+        private mode is on — ``◈ offline · no egress`` (private) vs ``◈ local``
+        (network on). ``◆``/``◈`` degrade to ``*``/``#`` on a legacy console."""
         from rich.text import Text
 
         core = pal.banner_glyph if _enc_can(self.console, pal.banner_glyph) else "*"
-        lock = "⬡" if _enc_can(self.console, "⬡") else "#"
+        lock = "◈" if _enc_can(self.console, "◈") else "#"
         short_model = (self.config.model or "").rsplit("/", 1)[-1]
         ribbon = Text()
         if short_model:
@@ -1996,35 +2039,49 @@ class Repl:
             expand=False,  # hug the content instead of spanning the full width
         )))
 
+    def _print_startup_hint(self, pal) -> None:
+        """ONE calm affordance line shared by the first-run hero and the compact
+        fallback: ``try   › explain this repo   › /help   › @ file`` — centered,
+        the chevrons in the accent, the labels dim. This replaces the old stacked
+        pair of "/help" hints (one is enough) for a premium, uncongested startup.
+
+        ``›`` degrades to ``>`` via ``_enc_can`` on a legacy console. Callers only
+        invoke this on a real terminal, so piped/one-shot/sub-agent runs never see
+        it and stay byte-clean."""
+        from rich.text import Text
+
+        chev = "›" if _enc_can(self.console, "›") else ">"
+        hint = Text()
+        hint.append("try   ", style=pal.dim)
+        for i, label in enumerate(("explain this repo", "/help", "@ file")):
+            if i:
+                hint.append("   ")
+            hint.append(chev + " ", style=pal.accent)   # subtle accent guidance
+            hint.append(label, style=pal.dim)
+        self.console.print(hint, justify="center")
+
     def _print_banner_tail(self, pal) -> None:
-        """Shared banner footer for BOTH paths: the privacy posture, the /help
-        hint, a first-run example (tty only), and trailing breathing room. Piped/
-        non-tty runs stay byte-clean — the console emits no ANSI off a real
-        terminal and the example line is tty-gated."""
+        """Compact-fallback footer: the privacy posture on ONE dim line + the
+        single consolidated affordance line (tty only) + trailing breathing room.
+        (The first-run hero does NOT use this — its ribbon badge already carries
+        the privacy posture; see ``_print_banner``.) Piped/non-tty runs stay
+        byte-clean — the console emits no ANSI off a real terminal and the hint is
+        tty-gated."""
         # Keep the privacy posture visible on startup (security transparency),
-        # compact and dim under the frame.
-        # Kept short enough to fit ~80 cols without wrapping under the frame.
+        # compact and dim under the frame. Short enough to fit ~80 cols.
         if self.config.private:
             privacy = "offline lockdown · no external egress"
         else:
             privacy = ("network on · web_fetch SSRF-safe+gated · "
                        "run_bash gated (full FS access)")
-        # Centered to match the centered header block above (justify="center"
-        # centers plain text within the terminal width). Sub-lines use the theme's
-        # muted token (still recessive, now theme-tinted rather than flat grey).
+        # Centered to match the centered header block above; the theme's muted
+        # token keeps it recessive (theme-tinted, not flat grey).
         self.console.print(privacy, style=pal.dim, justify="center")
-        self.console.print(
-            "Type /help for commands · Ctrl+O reveals tool detail",
-            style=pal.dim, justify="center",
-        )
-        # First-run affordance: ONE quiet example line so a new user has an obvious
-        # first move. Gated on is_terminal so piped/one-shot/sub-agent runs stay
-        # byte-clean (never printed off a real terminal).
+        # ONE affordance line so a new user has an obvious first move — no
+        # duplicate "/help" hints. Gated on is_terminal so piped/one-shot/sub-agent
+        # runs stay byte-clean (never printed off a real terminal).
         if getattr(self.console, "is_terminal", False):
-            self.console.print(
-                "try: explain this repo · /help for commands",
-                style=pal.dim, justify="center",
-            )
+            self._print_startup_hint(pal)
         # Breathing room: a blank line below the banner so the first prompt and
         # answer box are not glued to the header (clean, uncongested startup).
         self.console.print()
@@ -3379,7 +3436,7 @@ class Repl:
 
         Segmented powerline, core-led + lock-trailing::
 
-            ◆ qwen3.6-35b-a3b · ⬤⬤⬤⬜⬜ 58% · main* · ▸ 226 tok/s · 0.42s   ⬡ offline
+            ◆ qwen3.6-35b-a3b · ⬤⬤⬤⬜⬜ 58% · main* · ▸ 226 tok/s · 0.42s   ◈ offline
 
         The DATA + per-turn caching are unchanged (this runs once at startup and
         once per completed turn — NOT per keystroke — so git + the token estimate
@@ -3393,14 +3450,14 @@ class Repl:
         - tok/s as the HERO: a ``▸`` prefix + the number in the brightest accent
           tier, unit dim — the one metric that is *yours*;
         - the git branch + time dim; everything unlabelled reads dim;
-        - a right-aligned, HONEST ``⬡`` lock badge — ``offline`` only in private
+        - a right-aligned, HONEST ``◈`` lock badge — ``offline`` only in private
           mode, else ``local`` (a networked local model is never "offline").
 
         Every glyph degrades to ASCII via ``_enc_can`` (``◆``→``*``, ``⬤/⬜``→``#/-``,
-        ``▸``→``>``, ``⬡``→``#``). Every segment is guarded so the bar can never
+        ``▸``→``>``, ``◈``→``#``). Every segment is guarded so the bar can never
         raise; the badge is DROPPED (never wrapped) when the toolbar is too narrow.
         """
-        from prompt_toolkit.formatted_text import FormattedText, fragment_list_width
+        from prompt_toolkit.formatted_text import FormattedText
 
         pal = palette_for(self.config.theme)
         con = self.console
@@ -3423,7 +3480,7 @@ class Repl:
         core = "◆" if _enc_can(con, "◆") else "*"
         cells_ok = _enc_can(con, "⬤⬜")
         arrow = "▸" if _enc_can(con, "▸") else ">"
-        lock = "⬡" if _enc_can(con, "⬡") else "#"
+        lock = "◈" if _enc_can(con, "◈") else "#"
         sep = (muted, " · ")
 
         left: list[tuple[str, str]] = []
@@ -3500,15 +3557,17 @@ class Repl:
         frags: list[tuple[str, str]] = [(muted, " ")]
         frags.extend(left)
 
-        # ⬡ lock badge, RIGHT-aligned + HONEST: "offline" only in private mode; a
+        # ◈ lock badge, RIGHT-aligned + HONEST: "offline" only in private mode; a
         # networked (non-private) local model reads "local", never "offline". The
-        # badge is DROPPED (not wrapped) when the toolbar cannot fit it.
+        # badge is DROPPED (not wrapped) when the toolbar cannot fit it. Widths are
+        # measured CONSERVATIVELY (_bar_cwidth, wide-glyph aware) so the badge is
+        # placed with headroom and never overflows/clips on a symbol-font terminal.
         try:
             private = bool(getattr(self.config, "private", False))
             badge = (ok_c, f"{lock} " + ("offline" if private else "local"))
             width = shutil.get_terminal_size(fallback=(80, 24)).columns
-            left_w = fragment_list_width(frags)
-            badge_w = fragment_list_width([badge])
+            left_w = _bar_cwidth(frags)
+            badge_w = _bar_cwidth([badge])
             gap = 3  # minimum spaces between the left group and the badge
             # -1 keeps the last column free so the toolbar never wraps to a 2nd row.
             if width and left_w + gap + badge_w <= width - 1:

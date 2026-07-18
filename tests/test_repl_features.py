@@ -527,11 +527,13 @@ def test_banner_degrades_glyphs_under_ascii_console(repl):
 # Startup block-letter wordmark (big "llmc-code") + its gating
 # --------------------------------------------------------------------------- #
 
-# A row of the embedded ANSI-Shadow art — a substring no other banner text emits,
-# so its presence/absence cleanly proves whether the big wordmark rendered. The
-# gradient hero colours each cell individually, so the raw ANSI stream splits the
-# row with escapes; strip ANSI first to check the underlying glyphs.
-_WORDMARK_MARK = "╚══════╝╚══════╝"
+# A slice of the embedded half-block ('pagga') art — a glyph run no other banner
+# text emits (only the wordmark uses Block Elements), so its presence/absence
+# cleanly proves whether the big wordmark rendered. The gradient hero colours each
+# cell individually, so the raw ANSI stream splits the row with escapes; strip
+# ANSI first to check the underlying glyphs.
+_WORDMARK_MARK = "█▄█░█▀▀"          # the "m c" junction of the top row
+_WORDMARK_LL = "░█░░░█░░░"          # the leading "l l" strokes (top row)
 
 _ANSI_RE = __import__("re").compile(r"\x1b\[[0-9;]*m")
 
@@ -560,7 +562,7 @@ def test_banner_wordmark_on_wide_truecolor_tty(repl):
     flat = _strip_ansi(out)
     # The wordmark art renders (its glyphs survive once ANSI is stripped).
     assert _WORDMARK_MARK in flat
-    assert "██████" in flat
+    assert _WORDMARK_LL in flat
     # The gradient is a per-cell RGB lerp: MANY distinct truecolor codes appear
     # (a flat wordmark would repeat a single 38;2;r;g;b run).
     codes = set(__import__("re").findall(r"38;2;\d+;\d+;\d+", out))
@@ -568,14 +570,14 @@ def test_banner_wordmark_on_wide_truecolor_tty(repl):
     # Tagline + reactor ribbon (contiguous single-style runs -> survive raw too).
     assert "a coding agent that runs on your machine" in out
     assert "◆ core ready" in out
-    assert "⬡ local" in out                # network on -> "local", NOT "offline"
+    assert "◈ local" in out                # network on -> "local", NOT "offline"
     assert "no egress" not in out          # honesty: no offline claim when networked
     assert "qwen3.6-35b-a3b" in out
     assert "\x1b[" in out                  # a real tty is styled (ANSI present)
 
 
 def test_banner_hero_badge_honest_offline_when_private(repl):
-    """HONESTY: only when private mode is on does the ribbon claim ``⬡ offline ·
+    """HONESTY: only when private mode is on does the ribbon claim ``◈ offline ·
     no egress``; the model is always local but we never claim offline on network."""
     import io
     from rich.console import Console
@@ -587,7 +589,7 @@ def test_banner_hero_badge_honest_offline_when_private(repl):
     repl.config.model = "m"
     repl._print_banner()
     out = buf.getvalue()
-    assert "⬡ offline · no egress" in out
+    assert "◈ offline · no egress" in out
     assert "◆ core ready" in out
 
 
@@ -613,10 +615,10 @@ def test_banner_returning_run_skips_wordmark(repl):
     out = buf.getvalue()
     flat = _strip_ansi(out)
     assert _WORDMARK_MARK not in flat          # big wordmark skipped
-    assert "██████" not in flat
+    assert _WORDMARK_LL not in flat
     assert "◆ llmc-code" in out                # compressed ribbon shown
     assert "qwen3.6-35b-a3b" in out
-    assert "⬡ offline" in out
+    assert "◈ offline" in out
 
 
 def test_banner_first_run_writes_marker(repl):
@@ -644,7 +646,7 @@ def test_banner_narrow_terminal_falls_back_to_compact(repl):
     from rich.console import Console
 
     buf = io.StringIO()
-    # Width below _WORDMARK_WIDTH (74): the wordmark gate must reject this.
+    # Width below _WORDMARK_WIDTH (56): the wordmark gate must reject this.
     repl.console = Console(file=buf, force_terminal=True, width=40,
                            color_system="truecolor")
     assert repl.console.size.width < r._WORDMARK_WIDTH
@@ -652,7 +654,7 @@ def test_banner_narrow_terminal_falls_back_to_compact(repl):
     repl._print_banner()
     out = buf.getvalue()
     assert _WORDMARK_MARK not in out       # NO big wordmark on a narrow terminal
-    assert "██████" not in out             # no block art at all
+    assert _WORDMARK_LL not in out         # no block art at all
     assert "llmc-code" in out              # compact framed banner (its title) shown
     assert "ready" in out
 
@@ -673,13 +675,13 @@ def test_banner_non_terminal_no_wordmark_and_ansi_free(repl):
     repl._print_banner()
     out = buf.getvalue()
     assert _WORDMARK_MARK not in out       # no big art off a real terminal
-    assert "██████" not in out
+    assert _WORDMARK_LL not in out
     assert "\x1b[" not in out              # byte-clean, ANSI-free (piped guarantee)
     assert "ready" in out                  # compact banner content still present
     # The reactor hero's new glyphs/gradient never leak into the piped path — the
-    # ⬡ lock badge lives only on the wide-tty hero/ribbon (the compact fallback is
-    # unchanged and carries no ⬡).
-    assert "⬡" not in out
+    # ◈ lock badge lives only on the wide-tty hero/ribbon (the compact fallback is
+    # unchanged and carries no ◈).
+    assert "◈" not in out
 
 
 # --------------------------------------------------------------------------- #
