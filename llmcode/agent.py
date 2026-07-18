@@ -166,6 +166,45 @@ def _tool_summary(name: str, args: dict) -> str:
     return ""
 
 
+def _reactor_pulse_to(palette) -> str | None:
+    """The brightest accent hex for the reactor-pulse PEAK: ``accent_bright`` if
+    the palette exposes it, else ``bright``. ``None`` when there's no palette (so
+    the spinner stays on the classic braille frame — no behaviour change)."""
+    if palette is None:
+        return None
+    return getattr(palette, "accent_bright", None) or getattr(palette, "bright", None)
+
+
+def _spinner_verb(name: str, args: dict) -> str:
+    """A short, plain-ASCII activity verb for the reactor spinner while a tool
+    runs — ``reading providers.py`` / ``running <cmd>`` / ``searching <pat>`` /
+    ``editing <file>`` — so the pulse says what the machine is doing, not just
+    "working". Falls back to ``running <tool>`` for anything unmapped."""
+    a = args if isinstance(args, dict) else {}
+
+    def _base(p: str) -> str:
+        p = str(p)
+        return os.path.basename(p.rstrip("/")) or p
+
+    if name == "read_file":
+        return f"reading {_base(a.get('path', ''))}".strip()
+    if name == "write_file":
+        return f"writing {_base(a.get('path', ''))}".strip()
+    if name == "edit_file":
+        return f"editing {_base(a.get('path', ''))}".strip()
+    if name == "run_bash":
+        cmd = str(a.get("command", "")).replace("\n", " ").strip()
+        return f"running {cmd[:24]}".strip() if cmd else "running"
+    if name in ("grep", "code_search"):
+        return f"searching {str(a.get('pattern', a.get('query', ''))).strip()}".strip()
+    if name == "glob":
+        return f"globbing {str(a.get('pattern', '')).strip()}".strip()
+    if name == "spawn_agent":
+        return f"delegating {str(a.get('role', '')).strip()}".strip()
+    friendly = name.split("__")[-1] if name.startswith("mcp__") else name
+    return f"running {friendly}".strip()
+
+
 # Friendly, Claude-Code-like tool display names. Anything not listed keeps its
 # raw registry name (so a novel/local tool still renders intelligibly).
 _DISPLAY_NAMES = {
@@ -1364,35 +1403,91 @@ class Agent:
         })
 
     def _print_activity_summary(self) -> None:
-        """One dim line summarizing the turn's tool work, e.g.
-        "⏺ 23 tools · Ctrl+O to expand". Hidden when no tools ran. Ctrl+O expands
-        it into the full ⏺/⎿ tree (render_details). Sub-agents (non-empty
-        line_prefix) drop the Ctrl+O hint — only the orchestrator's buffer is
-        revealable."""
+        """Reactor tool summary: a persistent, outcome-at-a-glance one-liner that
+        always conveys pass/fail counts, plus an auto-expanded tree so work is
+        never hidden behind Ctrl+O.
+
+        One-liner: ``◆ N tools · ✓x ✗y · <first failure reason>`` — ``◆`` in the
+        accent, ``✓x`` in the success token, ``✗y`` + the first failure reason in
+        the error token, and a dim ``ctrl-o details`` hint. The full ⏺/⎿ tree is
+        then rendered inline (``render_details``) UNLESS a large batch (>5) all
+        succeeded — i.e. it auto-expands whenever any call failed OR the batch is
+        modest (≤5), and collapses to just the one-liner only for a big all-green
+        batch. Auto-expand + the hint are orchestrator-only (empty ``line_prefix``,
+        matching the Ctrl+O reveal, which only the orchestrator's buffer honours);
+        sub-agents keep the compact counts line so they never flood the parent.
+
+        Built as rich ``Text`` (spans, never markup) and TTY-gated via the console:
+        on a non-terminal (piped / sub-agent) rich strips styling, so the output
+        stays byte-clean and ANSI-free. ``◆``/``✓``/``✗`` degrade to ``*``/``v``/``x``
+        on a legacy-encoded console."""
         if self.console is None or not self.last_turn_details:
             return
-        n = len(self.last_turn_details)
-        failed = sum(1 for r in self.last_turn_details if r.get("ok") is not True)
-        label = f"{n} tool{'s' if n != 1 else ''}"
+        details = self.last_turn_details
+        n = len(details)
+        failed = sum(1 for r in details if r.get("ok") is not True)
+        ok = n - failed
+
+        # First failure's reason for the one-liner tail, e.g. "run_bash exit 1".
+        reason = ""
         if failed:
-            label += f" ({failed} failed)"
-        hint = "" if self.line_prefix else " · Ctrl+O to expand"
-        head_glyph = self._tree_glyphs()[0]  # ⏺ (or ASCII "* ") — mojibake-safe
+            for r in details:
+                if r.get("ok") is not True:
+                    reason = (
+                        f"{r.get('name', '')} {error_summary(r.get('result'))}".strip()
+                    )
+                    break
+
+        # Signature glyphs; each degrades to ASCII on a console that can't encode
+        # it (mirrors _tree_glyphs / the banner), keeping piped/LANG=C byte-clean.
+        core = "◆" if self._console_can_encode("◆") else "*"
+        ok_g = "✓" if self._console_can_encode("✓") else "v"
+        fail_g = "✗" if self._console_can_encode("✗") else "x"
+
+        label = f"{n} tool{'s' if n != 1 else ''}"
+        hint = "" if self.line_prefix else " · ctrl-o details"
+
         if self.accent:
-            # Accent the "⏺" glyph (accent on success, error-red when any call
-            # failed) so the activity line reads at a glance; the label stays muted.
-            # error/muted come from the theme Palette when threaded, else the
-            # historic "red"/"dim" literals (palette-less agents stay identical).
+            # Semantic tokens from the theme Palette when threaded, else the
+            # historic literals so a palette-less agent (sub-agents / tests) stays
+            # byte-identical. The ◆ core is ALWAYS the accent now — pass/fail reads
+            # from the ✓x/✗y counts, not from re-tinting the glyph.
             from rich.text import Text
 
-            fail_style = self.palette.error if self.palette else "red"
-            muted = self.palette.dim if self.palette else "dim"
+            pal = self.palette
+            muted = pal.dim if pal else "dim"
+            succ = pal.success if pal else "green"
+            err = pal.error if pal else "red"
+
             line = Text(self.line_prefix)
-            line.append(head_glyph, style=fail_style if failed else self.accent)
-            line.append(f"{label}{hint}", style=muted)
+            line.append(f"{core} ", style=self.accent)
+            line.append(label, style=muted)
+            line.append(" · ", style=muted)
+            line.append(f"{ok_g}{ok}", style=succ)
+            if failed:
+                line.append(f" {fail_g}{failed}", style=err)
+                if reason:
+                    line.append(" · ", style=muted)
+                    line.append(reason, style=err)
+            if hint:
+                line.append(hint, style=muted)
             self.console.print(line)
         else:
-            self.console.print(self.line_prefix + f"{head_glyph}{label}{hint}", style="dim")
+            tail = f" {fail_g}{failed}" if failed else ""
+            reason_txt = f" · {reason}" if (failed and reason) else ""
+            self.console.print(
+                self.line_prefix
+                + f"{core} {label} · {ok_g}{ok}{tail}{reason_txt}{hint}",
+                style="dim",
+            )
+
+        # Auto-expand: never hide the work. Render the full ⏺/⎿ tree inline unless
+        # a large all-green batch (>5 tools, no failures) — so any failure OR a
+        # modest batch (≤5) always shows its detail. Orchestrator-only: sub-agent
+        # trees would flood the parent, and only the orchestrator buffer is
+        # Ctrl+O-revealable, so their summary stays the compact counts line.
+        if not self.line_prefix and not (n > 5 and failed == 0):
+            self.render_details(self.console)
 
     def render_details(self, console) -> None:
         """Expand the collapsed activity line into the full ⏺/⎿ tool tree."""
@@ -1607,7 +1702,16 @@ class Agent:
             self.console,
             color=self.palette.spinner if self.palette else None,
             timer_color=self.palette.spinner_timer if self.palette else None,
+            # Reactor pulse: ◆ core breathes color between spinner (valley) and the
+            # brightest accent (peak); verb starts "thinking" (awaiting the model)
+            # and flips to "forging" on the first token; set_rate feeds live tok/s.
+            pulse_to=_reactor_pulse_to(self.palette),
+            verb="thinking",
         )
+        # Running character tally for the live tok/s estimate (chars/4, matching
+        # tokens.estimate_text_tokens). Kept as a single int incremented per chunk
+        # so the rate snapshot is O(1) per event (no O(n^2) re-sum of text_acc).
+        chars_acc = 0
         # Hold the provider iterator so the finally can close() it: on a break
         # (done) or KeyboardInterrupt the suspended generator is finalized here,
         # which runs the provider's own finally and deterministically releases its
@@ -1659,10 +1763,24 @@ class Agent:
                     chunk = event.get("text", "")
                     if chunk and t_first is None:
                         t_first = time.perf_counter()
+                        # First token in: the model is now generating, not waiting.
+                        spinner.set_verb("forging")
                     text_acc.append(chunk)  # buffered; rendered once at turn end
+                    # Live tok/s: publish a thread-safe snapshot (est tokens / gen
+                    # window) for the reactor frame. Best-effort — a rough chars/4
+                    # estimate that ticks up as your GPU decodes; the footer's real
+                    # provider token count stays authoritative. Gated so tiny/early
+                    # turns never flash a bogus number (set_rate(None) hides it).
+                    if chunk and t_first is not None:
+                        chars_acc += len(chunk)
+                        _gen = time.perf_counter() - t_first
+                        _toks = chars_acc // 4
+                        if _gen > 0.2 and _toks > 0:
+                            spinner.set_rate(_toks / _gen)
                 elif etype == "tool_call":
                     if t_first is None:
                         t_first = time.perf_counter()
+                        spinner.set_verb("forging")
                     tool_calls.append(event)
                 elif etype == "done":
                     output_tokens = event.get("output_tokens")
@@ -2341,6 +2459,11 @@ class Agent:
                                 timer_color=(
                                     self.palette.spinner_timer if self.palette else None
                                 ),
+                                # Reactor pulse while the tool runs, with the verb set
+                                # to what it's actually doing (reading providers.py /
+                                # running <cmd> / editing <file>).
+                                pulse_to=_reactor_pulse_to(self.palette),
+                                verb=_spinner_verb(name, args),
                             )
                             tool_spinner.start()
                             try:

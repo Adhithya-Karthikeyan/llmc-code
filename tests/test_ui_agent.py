@@ -179,15 +179,18 @@ def test_success_check_on_tool_head_when_tty(tmp_workspace):
 
 
 def test_no_check_on_non_tty(tmp_workspace):
-    """Piped/non-terminal output stays byte-identical: NO "✓" is added, and the
-    ⏺/⎿ glyphs are preserved (utf-8 console)."""
+    """Piped/non-terminal output stays ANSI-free, the ⏺/⎿ glyphs are preserved
+    (utf-8 console), and the TTY-only per-head "✓" check-mark is NOT added to any
+    tool tree HEAD line (the ◆ summary's ✓N count glyph is separate and expected)."""
     buf = io.StringIO()
     agent = _agent(_nontty_console(buf))
     agent.run("go")
     agent.render_details(agent.console)
 
     text = buf.getvalue()
-    assert "✓" not in text          # check-mark is TTY-only
+    assert "\x1b[" not in text           # ANSI-free when piped
+    head_lines = [ln for ln in text.splitlines() if "⏺ " in ln]
+    assert all("✓" not in ln for ln in head_lines)  # head check-mark is TTY-only
     assert "⏺ Write(hello.py)" in text  # historic head line, unchanged
     assert "⎿" in text                  # historic connector, unchanged
 

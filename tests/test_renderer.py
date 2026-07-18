@@ -221,12 +221,14 @@ def _run_capture_with_details(capsys, provider, **kw):
 def test_live_tree_read_and_bash(tmp_workspace, capsys):
     # 'hello' scenario: write_file then run_bash, then a final text answer.
     run_out, details_out, agent = _run_capture_with_details(capsys, MockProvider(scenario="hello"))
-    # run() emits the collapsed summary line, NOT the per-tool tree.
-    assert "⏺" in run_out
-    assert "tool" in run_out  # "2 tools · Ctrl+O to expand"
-    assert "Ctrl+O" in run_out
-    # The per-tool tree is NOT present in run()'s output (before render_details).
-    assert "⎿" not in run_out
+    # run() emits the ◆ counts one-liner (✓2, no failures) + the dim ctrl-o hint.
+    assert "◆" in run_out
+    assert "2 tools" in run_out
+    assert "✓2" in run_out
+    assert "ctrl-o" in run_out
+    # A modest all-green batch (≤5) AUTO-EXPANDS the tree inline (never hidden).
+    assert "⏺ Write(hello.py)" in run_out
+    assert "⎿" in run_out
     # render_details() reveals the full two-line tree per tool.
     assert "⏺ Write(hello.py)" in details_out
     assert "⎿  Wrote" in details_out
@@ -1059,6 +1061,128 @@ def test_activity_summary_glyph_uses_error_token_on_failure(tmp_workspace):
     ]
     agent._print_activity_summary()
     assert "38;2;255;85;85" in buf.getvalue()  # error #ff5555 glyph
+
+
+# ----- build item 5: outcome counts + auto-expand ---------------------------
+
+def _summary_agent(buf, *, tty=False, prefix="", details=None):
+    """Agent wired to render its activity summary into ``buf``."""
+    from rich.console import Console
+    from llmcode.repl import palette_for
+
+    pal = palette_for("neon")
+    console = Console(
+        markup=False, highlight=False, file=buf, width=100,
+        force_terminal=tty, color_system="truecolor" if tty else None,
+    )
+    agent = Agent(provider=MockProvider(), system_prompt="s", tool_names=[],
+                  console=console, accent=pal.accent, palette=pal,
+                  line_prefix=prefix)
+    agent.last_turn_details = details or []
+    return agent
+
+
+def _detail(name, ok, **result):
+    return {"name": name, "args": {"path": "a.py"} if name == "read_file"
+            else {"command": "false"}, "result": result, "ok": ok, "elapsed": 0.1}
+
+
+def test_activity_summary_shows_pass_fail_counts(tmp_workspace):
+    """The collapsed one-liner shows ◆ N tools · ✓x ✗y + the first failure reason
+    + a dim ctrl-o hint (plain text on a non-tty)."""
+    import io
+
+    details = [
+        _detail("read_file", True, result="x\ny"),
+        _detail("run_bash", False, result={"exit_code": 1}),
+    ]
+    buf = io.StringIO()
+    agent = _summary_agent(buf, tty=False, details=details)
+    agent._print_activity_summary()
+    text = buf.getvalue()
+    assert "◆ 2 tools" in text
+    assert "✓1" in text and "✗1" in text
+    assert "run_bash exit 1" in text   # first failure reason
+    assert "ctrl-o details" in text
+
+
+def test_activity_summary_counts_carry_success_and_error_styles(tmp_workspace):
+    """On a real terminal the ✓x count reads in the success token and ✗y + reason
+    in the error token."""
+    import io
+
+    details = [
+        _detail("read_file", True, result="x"),
+        _detail("run_bash", False, result={"exit_code": 1}),
+    ]
+    buf = io.StringIO()
+    agent = _summary_agent(buf, tty=True, details=details)
+    agent._print_activity_summary()
+    out = buf.getvalue()
+    assert "38;2;80;250;123" in out    # neon success #50fa7b on ✓1
+    assert "38;2;255;85;85" in out     # neon error #ff5555 on ✗1 + reason
+
+
+def test_activity_summary_auto_expands_on_failure(tmp_workspace):
+    """A failure forces the full ⏺/⎿ tree inline even for a LARGE batch (>5) — the
+    failed tool's detail is never hidden behind Ctrl+O."""
+    import io
+
+    details = [_detail("read_file", True, result="x") for _ in range(7)]
+    details.append(_detail("run_bash", False, result={"exit_code": 1}))
+    buf = io.StringIO()
+    agent = _summary_agent(buf, tty=False, details=details)
+    agent._print_activity_summary()
+    text = buf.getvalue()
+    assert "✓7" in text and "✗1" in text
+    assert "⏺" in text and "⎿" in text          # tree auto-expanded
+    assert "⏺ Bash(false)" in text              # the failed tool is visible
+
+
+def test_activity_summary_expands_small_all_green(tmp_workspace):
+    """A modest all-green batch (≤5) still auto-expands the tree inline."""
+    import io
+
+    details = [_detail("read_file", True, result="x\ny") for _ in range(3)]
+    buf = io.StringIO()
+    agent = _summary_agent(buf, tty=False, details=details)
+    agent._print_activity_summary()
+    text = buf.getvalue()
+    assert "✓3" in text
+    assert "⏺" in text and "⎿" in text
+
+
+def test_activity_summary_collapses_large_all_green(tmp_workspace):
+    """A large all-green batch (>5, no failures) collapses to JUST the one-liner —
+    the tree stays behind Ctrl+O."""
+    import io
+
+    details = [_detail("read_file", True, result="x") for _ in range(6)]
+    buf = io.StringIO()
+    agent = _summary_agent(buf, tty=False, details=details)
+    agent._print_activity_summary()
+    text = buf.getvalue()
+    assert "◆ 6 tools" in text and "✓6" in text
+    assert "ctrl-o details" in text
+    assert "⏺" not in text and "⎿" not in text  # NOT expanded
+
+
+def test_activity_summary_failed_batch_piped_stays_ansi_free(tmp_workspace):
+    """Piped (non-tty) tool output — one-liner AND auto-expanded tree — is ANSI-free,
+    palette notwithstanding."""
+    import io
+
+    details = [
+        _detail("read_file", True, result="x"),
+        _detail("run_bash", False, result={"exit_code": 1}),
+    ]
+    buf = io.StringIO()
+    agent = _summary_agent(buf, tty=False, details=details)
+    agent._print_activity_summary()
+    text = buf.getvalue()
+    assert "\x1b[" not in text          # no ANSI escapes when piped
+    assert "✓1" in text and "✗1" in text
+    assert "⏺" in text                  # tree still rendered as plain text
 
 
 def test_build_orchestrator_threads_accent_and_gutter():

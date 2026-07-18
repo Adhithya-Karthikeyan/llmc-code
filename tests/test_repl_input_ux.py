@@ -8,6 +8,7 @@ state is touched. The Repl is constructed exactly like tests/test_repl_slash.py.
 
 from __future__ import annotations
 
+import os
 import signal
 
 import pytest
@@ -261,7 +262,8 @@ def test_status_bar_resting_form(monkeypatch, tmp_path):
     repl._refresh_status_bar()
     text = _bar_text(repl)
     assert "m" in text  # the short model name
-    assert "ctx" in text and "%" in text
+    # The context gauge replaces "ctx N%" with colour-shifting cells + NN%.
+    assert "%" in text and ("⬤" in text or "⬜" in text)
     assert "tok/s" not in text  # no turn yet -> no speed/time
     assert " · " in text  # segments joined with " · "
 
@@ -331,6 +333,122 @@ def test_status_bar_never_raises_on_bad_agent(monkeypatch, tmp_path):
     assert "tok/s" not in _bar_text(repl)
 
 
+# ------------------------------------------- reactor status HUD (build item 6)
+
+def _bar_frags(repl):
+    """The cached status bar's (style, text) fragments (empty list when blank)."""
+    cache = repl._status_cache
+    return [] if isinstance(cache, str) else list(cache)
+
+
+def _find_frag(repl, needle):
+    """First (style, text) fragment whose text contains ``needle`` (or None)."""
+    for style, text in _bar_frags(repl):
+        if needle in text:
+            return (style, text)
+    return None
+
+
+def _set_ctx(monkeypatch, repl, pct):
+    """Force the context gauge to land at ``pct`` percent (used=pct, ceiling=100)."""
+    monkeypatch.setattr(r.Agent, "_estimate_tokens", staticmethod(lambda msgs: pct))
+    monkeypatch.setattr(r, "_effective_soft_limit", lambda provider, config: 100)
+
+
+def test_status_hud_model_reads_in_accent(monkeypatch, tmp_path):
+    """The leading ◆ + model segment reads in the theme accent (status_num_ptk)."""
+    repl = _make_repl(monkeypatch, tmp_path)
+    repl.config.theme = "clean"
+    repl.provider.model = "qwen3.6"
+    repl._refresh_status_bar()
+    frag = _find_frag(repl, "◆ qwen3.6")
+    assert frag is not None
+    assert frag[0] == "#7aa2f7 bold"  # clean's status_num_ptk accent
+
+
+def test_status_hud_gauge_colour_shifts_by_fill(monkeypatch, tmp_path):
+    """The FILLED gauge cells read success (<60%) -> warning (60-85%) -> error
+    (85%+); empty cells stay muted."""
+    repl = _make_repl(monkeypatch, tmp_path)
+    repl.config.theme = "clean"
+
+    _set_ctx(monkeypatch, repl, 30)  # success band
+    repl._refresh_status_bar()
+    assert _find_frag(repl, "⬤")[0] == "#9ece6a"   # success
+    assert _find_frag(repl, "⬜")[0] == "#565f89"   # empty cells muted
+
+    _set_ctx(monkeypatch, repl, 70)  # warning band
+    repl._refresh_status_bar()
+    assert _find_frag(repl, "⬤")[0] == "#e0af68"   # warning
+
+    _set_ctx(monkeypatch, repl, 90)  # error band
+    repl._refresh_status_bar()
+    assert _find_frag(repl, "⬤")[0] == "#f7768e"   # error
+    assert "90%" in _bar_text(repl)                # the NN% is kept
+
+
+def test_status_hud_toks_is_hero_style(monkeypatch, tmp_path):
+    """tok/s is the hero: a ▸ prefix + the number in the brightest accent tier
+    (accent_bright bold), the unit dim."""
+    repl = _make_repl(monkeypatch, tmp_path)
+    repl.config.theme = "clean"
+    repl.agent.last_turn_stats = {"toks_per_sec": 226.0, "elapsed": 0.42}
+    repl._refresh_status_bar()
+    assert _find_frag(repl, "▸ ") is not None            # hero prefix present
+    assert _find_frag(repl, "226")[0] == "#bb9af7 bold"  # clean accent_bright bold
+    assert _find_frag(repl, " tok/s")[0] == "#565f89"    # unit dim
+
+
+def test_status_hud_lock_badge_is_honest(monkeypatch, tmp_path):
+    """The ⬡ lock badge is honest: 'offline' only in private mode, else 'local'
+    (a networked local model is never 'offline'), rendered in the success token."""
+    monkeypatch.setattr(r.shutil, "get_terminal_size",
+                        lambda *a, **k: os.terminal_size((120, 24)))
+    repl = _make_repl(monkeypatch, tmp_path)
+    repl.config.theme = "clean"
+
+    repl.config.private = True
+    repl._refresh_status_bar()
+    off = _find_frag(repl, "⬡ offline")
+    assert off is not None and off[0] == "#9ece6a"  # success
+    assert "⬡ local" not in _bar_text(repl)
+
+    repl.config.private = False
+    repl._refresh_status_bar()
+    loc = _find_frag(repl, "⬡ local")
+    assert loc is not None and loc[0] == "#9ece6a"
+    assert "offline" not in _bar_text(repl)  # never claim offline when networked
+
+
+def test_status_hud_badge_dropped_when_too_narrow(monkeypatch, tmp_path):
+    """A too-narrow toolbar DROPS the badge rather than wrapping/overflowing."""
+    monkeypatch.setattr(r.shutil, "get_terminal_size",
+                        lambda *a, **k: os.terminal_size((12, 24)))
+    repl = _make_repl(monkeypatch, tmp_path)
+    repl.config.theme = "clean"
+    repl.provider.model = "some-long-model-name"
+    repl._refresh_status_bar()
+    assert "⬡" not in _bar_text(repl)  # badge dropped, no overflow
+
+
+def test_status_hud_ascii_fallback_cells(monkeypatch, tmp_path):
+    """A console whose encoding can't represent the glyphs degrades the gauge to
+    [###--] and the core/arrow/lock to */>/# (no mojibake)."""
+    import types
+    monkeypatch.setattr(r.shutil, "get_terminal_size",
+                        lambda *a, **k: os.terminal_size((120, 24)))
+    repl = _make_repl(monkeypatch, tmp_path)
+    repl.config.theme = "clean"
+    repl.console = types.SimpleNamespace(encoding="ascii")
+    _set_ctx(monkeypatch, repl, 40)  # filled=2 -> [##---]
+    repl._refresh_status_bar()
+    text = _bar_text(repl)
+    assert "[##---] 40%" in text          # ASCII gauge cells
+    assert "⬤" not in text and "⬜" not in text
+    assert "* m" in text                  # ◆ core -> *
+    assert "# " in text                   # ⬡ lock -> #
+
+
 def test_interactive_agent_suppresses_footer(monkeypatch, tmp_path):
     """The REPL orchestrator (_new_agent) suppresses its own footer line — the
     pinned bar owns those stats — while the one-shot default keeps it False."""
@@ -357,6 +475,60 @@ def test_banner_shows_short_model_no_provider_prefix(monkeypatch, tmp_path, caps
     assert "qwen/" not in out          # org prefix stripped
     assert "mock ·" not in out         # provider prefix dropped
     assert "ready" in out
+
+
+# ---------------------------------------------------- core caret prompt (◆ ❯)
+
+def _msg_text(msg) -> str:
+    """Flatten a FormattedText (list of (style, text)) to its plain text."""
+    return "".join(t for _, t in msg)
+
+
+def test_core_caret_message_has_diamond_and_caret(monkeypatch, tmp_path):
+    import io
+
+    from rich.console import Console
+
+    repl = _make_repl(monkeypatch, tmp_path)
+    repl.console = Console(file=io.StringIO(), force_terminal=True, width=100,
+                           color_system="truecolor")
+    pal = r.palette_for(repl.config.theme)
+    text = _msg_text(repl._core_caret_message(pal))
+    assert "◆" in text          # the core signs the prompt
+    assert "❯" in text          # the caret
+
+
+def test_core_caret_mode_tints_the_diamond(monkeypatch, tmp_path):
+    """The ◆ core IS the permission indicator: plan/read-only -> warning,
+    full-auto -> success, else the accent."""
+    import io
+
+    from rich.console import Console
+
+    repl = _make_repl(monkeypatch, tmp_path)
+    repl.console = Console(file=io.StringIO(), force_terminal=True, width=100,
+                           color_system="truecolor")
+    pal = r.palette_for(repl.config.theme)
+
+    repl.config.permission_mode = "plan"
+    assert repl._core_caret_message(pal)[0][0] == pal.warning
+    repl.config.permission_mode = "read-only"
+    assert repl._core_caret_message(pal)[0][0] == pal.warning
+    repl.config.permission_mode = "full-auto"
+    assert repl._core_caret_message(pal)[0][0] == pal.success
+    repl.config.permission_mode = "default"
+    assert repl._core_caret_message(pal)[0][0] == pal.ptk
+
+
+def test_placeholder_rotates_with_turn_count():
+    """The action-oriented ghost placeholder cycles by turn count (not a single
+    generic 'Ask anything' string)."""
+    n = len(r._PLACEHOLDER_ROTATION)
+    seen = [r._placeholder_for_turn(i) for i in range(n)]
+    assert len(set(seen)) == n                        # every entry distinct
+    assert r._placeholder_for_turn(0) != r._placeholder_for_turn(1)
+    assert r._placeholder_for_turn(n) == r._placeholder_for_turn(0)   # wraps
+    assert "Ask anything · / commands · @ files" not in seen
 
 
 # ---------------------------------------------------- live macro routing

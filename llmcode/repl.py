@@ -423,6 +423,41 @@ _WORDMARK_WIDTH = 74            # widest wordmark line (measured) — gate tty w
 _WORDMARK_GLYPHS = "█╗║═╝╚╔"    # encoding-guard probe: every block/box char the art uses
 
 
+def _hex_to_rgb(token) -> tuple[int, int, int] | None:
+    """Parse a ``#rrggbb`` palette token to an ``(r, g, b)`` tuple.
+
+    Returns None for anything that is NOT a plain 6-digit hex (an ANSI colour
+    NAME like ``"yellow"``, an empty string, or ``None``) so callers can fall
+    back to a flat style instead of crashing on the ``ansi`` theme. A trailing
+    style attr (e.g. ``"#7aa2f7 bold"``) is tolerated by taking the first word.
+    """
+    if not isinstance(token, str):
+        return None
+    t = token.strip().split(" ", 1)[0] if token.strip() else ""
+    if not t.startswith("#") or len(t) != 7:
+        return None
+    try:
+        return (int(t[1:3], 16), int(t[3:5], 16), int(t[5:7], 16))
+    except ValueError:
+        return None
+
+
+# Rotating, action-oriented input ghost placeholders keyed to turn count (fixes
+# the generic "Ask anything · …" ghost). Cycled by ``_placeholder_for_turn`` so
+# each fresh prompt nudges a different concrete first move.
+_PLACEHOLDER_ROTATION = (
+    "what should we build next?",
+    "ask, or / for commands",
+    "@file to attach context",
+    "describe a bug to hunt",
+)
+
+
+def _placeholder_for_turn(n: int) -> str:
+    """Ghost placeholder text for turn ``n`` (cycles ``_PLACEHOLDER_ROTATION``)."""
+    return _PLACEHOLDER_ROTATION[n % len(_PLACEHOLDER_ROTATION)]
+
+
 def make_ptk_confirm(session, config=None):
     """A prompt_toolkit-compatible y/N confirm_fn (no builtin input()).
 
@@ -1527,6 +1562,9 @@ class Repl:
         # _refresh_status_bar (once at startup + once per completed turn) — never
         # per keystroke (which would run git + re-estimate tokens on each key).
         self._status_cache = ""
+        # Rotating input-ghost placeholder index (see _placeholder_for_turn):
+        # advanced once per prompt shown so each turn nudges a different action.
+        self._placeholder_i = 0
         self.agent = self._new_agent()
 
     def _persist_config(self) -> None:
@@ -1742,30 +1780,129 @@ class Repl:
             and _enc_can(self.console, _WORDMARK_GLYPHS)
         )
         if show_wordmark:
-            self._print_wordmark_header(pal)
+            # Returning-run compression (fixes audit #2): once the first-run hero
+            # has been seen (a ~/.llmcode/seen marker), subsequent launches collapse
+            # to a two-line ribbon + prompt — fast entry, no wall of text. First run
+            # shows the full hero (wordmark + tagline + ribbon + tail) then writes
+            # the marker. Only the wide-tty wordmark path branches on the marker;
+            # piped/narrow/LANG=C stays the unchanged compact/clean path below.
+            if self._seen_before():
+                self._print_returning_ribbon(pal)
+            else:
+                self._print_wordmark_header(pal)
+                self._print_banner_tail(pal)
+                self._mark_seen()
         else:
             self._print_compact_header(pal)   # the historic framed banner (fallback)
-        self._print_banner_tail(pal)
+            self._print_banner_tail(pal)
 
-    def _print_wordmark_header(self, pal) -> None:
-        """Bold ANSI-Shadow ``llmc-code`` wordmark + one tight info line.
+    def _seen_marker_path(self) -> str:
+        """Path to the first-run marker in the app config dir (``~/.llmcode/seen``)."""
+        return os.path.expanduser("~/.llmcode/seen")
 
-        Only reached for a wide UTF-8 terminal (see ``_print_banner`` gating). The
-        art is centered and two-toned top-to-bottom (``pal.accent`` over
-        ``accent_secondary``/``bright``); a single compact line (model · ready ·
-        theme · privacy) replaces the framed head/sub of the compact banner. One
-        blank line of breathing room sits above and below the art."""
-        from rich.align import Align
+    def _seen_before(self) -> bool:
+        """True when a prior run already showed the first-run hero. Best-effort:
+        an unreadable dir reads as first-run (never crashes startup)."""
+        try:
+            return os.path.exists(self._seen_marker_path())
+        except OSError:
+            return False
+
+    def _mark_seen(self) -> None:
+        """Record that the first-run hero has been shown (best-effort). An
+        unwritable config dir is swallowed — the user just keeps the first-run
+        look, we never error on startup."""
+        try:
+            path = self._seen_marker_path()
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            with open(path, "w", encoding="utf-8") as fh:
+                fh.write("1")
+        except OSError:
+            pass
+
+    def _print_returning_ribbon(self, pal) -> None:
+        """Compressed returning-run startup: a single ``◆ llmc-code  <model>
+        <badge>   /help · @ files`` ribbon (the prompt is the second line). Skips
+        the big wordmark + verbose teaser/footer. Same tty/encoding gates as the
+        hero; ◆/⬡ degrade to */# on a legacy console."""
         from rich.text import Text
 
-        lower = getattr(pal, "accent_secondary", pal.bright)  # Palette may lack it
+        core = pal.banner_glyph if _enc_can(self.console, pal.banner_glyph) else "*"
+        lock = "⬡" if _enc_can(self.console, "⬡") else "#"
+        short_model = (self.config.model or "").rsplit("/", 1)[-1]
+        line = Text()
+        line.append(core + " llmc-code", style=pal.accent)
+        line.append("   ")
+        if short_model:
+            line.append(short_model, style=pal.bright)
+            line.append("   ")
+        # Honest lock badge: only claim offline when private mode is on.
+        line.append(lock + (" offline" if self.config.private else " local"),
+                    style=pal.success)
+        line.append("      ")
+        line.append("/help · @ files", style=pal.dim)
+        self.console.print()
+        self.console.print(line)
+
+    def _core_caret_message(self, pal):
+        """FormattedText for the ``◆ ❯`` core-caret input prompt.
+
+        The ◆ core carries the permission indicator (zero extra chrome): plan/
+        read-only → ``pal.warning``, full-auto → ``pal.success``, else the accent
+        (``pal.ptk``). The ❯ caret uses the completion accent. ◆/❯ degrade to */>
+        on a console whose encoding can't represent them."""
+        from prompt_toolkit.formatted_text import FormattedText
+
+        core_glyph = "◆ " if _enc_can(self.console, "◆") else "* "
+        caret = pal.prompt if _enc_can(self.console, pal.prompt) else ">"
+        mode = getattr(self.config, "permission_mode", "default")
+        if mode in ("plan", "read-only"):
+            core_style = pal.warning
+        elif mode == "full-auto":
+            core_style = pal.success
+        else:
+            core_style = pal.ptk
+        caret_style = pal.completion_ptk or pal.ptk
+        return FormattedText([(core_style, core_glyph), (caret_style, caret + " ")])
+
+    def _print_wordmark_header(self, pal) -> None:
+        """The "Local Reactor" startup hero: a diagonal-gradient ``llmc-code``
+        wordmark + a value-prop tagline + the reactor ribbon.
+
+        Only reached for a wide UTF-8 terminal (see ``_print_banner`` gating).
+        Each wordmark cell is coloured by lerping RGB ``pal.accent`` →
+        ``accent_secondary`` across ``(col+row)`` for a static diagonal gradient
+        (built ONCE, no per-frame loop). The tagline sells the local pitch and the
+        ribbon shows ``<model> · ◆ core ready · <honest lock badge>``. Every new
+        glyph degrades to ASCII via ``_enc_can`` and this whole path is tty-gated,
+        so piped/narrow/LANG=C runs never reach it."""
+        from rich.align import Align
+        from rich.style import Style
+        from rich.text import Text
+
+        # Diagonal gradient endpoints. Palette may lack ``accent_secondary`` (it
+        # rides on the ThemeSpec, not the chrome Palette), so fall back to bright.
+        c0 = _hex_to_rgb(pal.accent)
+        c1 = _hex_to_rgb(getattr(pal, "accent_secondary", pal.bright))
         lines = _WORDMARK.split("\n")
-        n = len(lines)
+        maxrow = max(len(lines) - 1, 1)
+        maxcol = max((len(ln) for ln in lines), default=1) - 1
+        denom = (maxcol + maxrow) or 1
         art = Text(no_wrap=True)
-        for i, line in enumerate(lines):
-            color = pal.accent if i < n // 2 else lower  # upper rows accent, lower two-tone
-            art.append(line, style=f"bold {color}")
-            if i < n - 1:
+        for row, line in enumerate(lines):
+            if c0 is not None and c1 is not None:
+                # Per-cell RGB lerp — one Text, computed once at startup.
+                for col, ch in enumerate(line):
+                    t = (col + row) / denom
+                    rr = round(c0[0] + (c1[0] - c0[0]) * t)
+                    gg = round(c0[1] + (c1[1] - c0[1]) * t)
+                    bb = round(c0[2] + (c1[2] - c0[2]) * t)
+                    art.append(ch, style=Style(color=f"#{rr:02x}{gg:02x}{bb:02x}",
+                                               bold=True))
+            else:
+                # Non-hex palette (e.g. the ansi theme): flat accent, never crash.
+                art.append(line, style=f"bold {pal.accent}")
+            if row < len(lines) - 1:
                 art.append("\n")
         self.console.print()          # breathing room above the wordmark
         # Align.center (not Text.justify) is what actually centers a renderable
@@ -1773,20 +1910,43 @@ class Repl:
         # uses for its panel. Every art line is the same width, so they stay aligned.
         self.console.print(Align.center(art))
         self.console.print()          # breathing room below the wordmark
-        # One tight info line stands in for the compact banner's framed head/sub.
-        ready_dot = pal.ready_glyph if _enc_can(self.console, pal.ready_glyph) else "o"
+        # Value-prop tagline (the differentiator, not "ready"): the core glyph in
+        # the accent, the pitch in bright. ◆ degrades to * on a legacy console.
+        core = pal.banner_glyph if _enc_can(self.console, pal.banner_glyph) else "*"
+        tagline = Text()
+        tagline.append(core + "  ", style=pal.accent)
+        tagline.append(
+            "a coding agent that runs on your machine — private, local, yours",
+            style=pal.bright,
+        )
+        self.console.print(tagline, justify="center")
+        self.console.print()
+        # Reactor ribbon: <short-model> · ◆ core ready · honest lock badge.
+        self.console.print(self._reactor_ribbon(pal), justify="center")
+
+    def _reactor_ribbon(self, pal):
+        """The one-line reactor ribbon shared by the first-run hero.
+
+        ``<short-model>`` (bright) · ``◆ core ready`` (success) · the HONEST lock
+        badge. HONESTY: the model is ALWAYS local, but we only claim offline when
+        private mode is on — ``⬡ offline · no egress`` (private) vs ``⬡ local``
+        (network on). ``◆``/``⬡`` degrade to ``*``/``#`` on a legacy console."""
+        from rich.text import Text
+
+        core = pal.banner_glyph if _enc_can(self.console, pal.banner_glyph) else "*"
+        lock = "⬡" if _enc_can(self.console, "⬡") else "#"
         short_model = (self.config.model or "").rsplit("/", 1)[-1]
-        info = Text()
-        info.append(short_model, style=pal.bright)   # make the model pop
-        info.append("   ")
-        info.append(ready_dot + " ", style=pal.success)
-        info.append("ready", style=pal.dim)
-        info.append("   ·   ", style=pal.dim)
-        info.append(f"theme {self.config.theme}", style=pal.dim)
-        info.append("   ·   ", style=pal.dim)
-        info.append("private on" if self.config.private else "private off",
-                    style=pal.dim)
-        self.console.print(info, justify="center")
+        ribbon = Text()
+        if short_model:
+            ribbon.append(short_model, style=pal.bright)   # make the model pop
+            ribbon.append("   ")
+        ribbon.append(core + " core ready", style=pal.success)
+        ribbon.append("   ")
+        if self.config.private:
+            ribbon.append(lock + " offline · no egress", style=pal.success)
+        else:
+            ribbon.append(lock + " local", style=pal.success)
+        return ribbon
 
     def _print_compact_header(self, pal) -> None:
         """The compact framed banner (fallback path): a boxed provider/model +
@@ -3215,32 +3375,87 @@ class Repl:
         return self._status_cache
 
     def _refresh_status_bar(self) -> None:
-        """Recompute the pinned bottom status bar and store it in ``_status_cache``.
+        """Recompute the pinned "reactor" status HUD and cache it in ``_status_cache``.
 
-        The bar reads ``model · ctx N% · <branch>[*] · <rate> tok/s · <time>``,
-        e.g. `` qwen3.6-35b-a3b · ctx 37% · main* · 223 tok/s · 0.42s``. Called
-        once at startup and at the end of each turn (NOT per keystroke) so git +
-        the token estimate are hit at most once per turn. Every segment is guarded
-        so the bar can never raise; the rate/time segments are omitted until a
-        turn has populated ``self.agent.last_turn_stats``.
+        Segmented powerline, core-led + lock-trailing::
+
+            ◆ qwen3.6-35b-a3b · ⬤⬤⬤⬜⬜ 58% · main* · ▸ 226 tok/s · 0.42s   ⬡ offline
+
+        The DATA + per-turn caching are unchanged (this runs once at startup and
+        once per completed turn — NOT per keystroke — so git + the token estimate
+        are hit at most once per turn; ``_status_bar`` just reads the cache). Only
+        the styling is rebuilt into explicit prompt_toolkit fragments:
+
+        - a leading ``◆`` core + the active model in the accent;
+        - a colour-shifting context gauge — five ``⬤/⬜`` cells whose FILLED cells
+          read success (0-60%) → warning (60-85%) → error (85%+), empty cells dim,
+          plus the ``NN%`` (ASCII: ``[###--] NN%``);
+        - tok/s as the HERO: a ``▸`` prefix + the number in the brightest accent
+          tier, unit dim — the one metric that is *yours*;
+        - the git branch + time dim; everything unlabelled reads dim;
+        - a right-aligned, HONEST ``⬡`` lock badge — ``offline`` only in private
+          mode, else ``local`` (a networked local model is never "offline").
+
+        Every glyph degrades to ASCII via ``_enc_can`` (``◆``→``*``, ``⬤/⬜``→``#/-``,
+        ``▸``→``>``, ``⬡``→``#``). Every segment is guarded so the bar can never
+        raise; the badge is DROPPED (never wrapped) when the toolbar is too narrow.
         """
-        from prompt_toolkit.formatted_text import FormattedText
+        from prompt_toolkit.formatted_text import FormattedText, fragment_list_width
 
-        segments: list[str] = []
-        # model — short form (strip any "org/" prefix, e.g. qwen/qwen3.6 -> qwen3.6)
+        pal = palette_for(self.config.theme)
+        con = self.console
+        # prompt_toolkit-vocabulary style tokens ONLY (hex or ptk/ansi names —
+        # never a rich-only spelling like "bright_yellow", which ptk's colour
+        # parser rejects). accent/muted reuse the existing ptk tokens.
+        muted = pal.muted_ptk or "fg:ansibrightblack"
+        accent = pal.status_num_ptk or pal.ptk or "fg:ansiyellow bold"
+        # tok/s hero = the brightest tier. accent_bright (pal.bright) only when it
+        # is a hex value ptk can parse; else a bold accent (the ansi theme, whose
+        # accent_bright is the rich-only name "bright_yellow", falls here).
+        _bright = pal.bright if (isinstance(pal.bright, str)
+                                 and pal.bright.startswith("#")) else pal.accent
+        hero = f"{_bright} bold"
+        # success/warning/error are hex or W3C/ANSI names in every theme -> ptk-safe.
+        ok_c = pal.success or "ansigreen"
+        warn_c = pal.warning or "ansiyellow"
+        err_c = pal.error or "ansired"
+
+        core = "◆" if _enc_can(con, "◆") else "*"
+        cells_ok = _enc_can(con, "⬤⬜")
+        arrow = "▸" if _enc_can(con, "▸") else ">"
+        lock = "⬡" if _enc_can(con, "⬡") else "#"
+        sep = (muted, " · ")
+
+        left: list[tuple[str, str]] = []
+        # model — short form (strip any "org/" prefix, qwen/qwen3.6 -> qwen3.6).
         try:
             model = getattr(self.provider, "model", "") or self.config.model or ""
             short = model.rsplit("/", 1)[-1] if model else ""
-            if short:
-                segments.append(short)
         except Exception:  # noqa: BLE001 - never let the bar break input
-            pass
-        # ctx N% — reuse the SAME estimator + ceiling as the (removed) gauge line.
+            short = ""
+        if short:
+            left.append((accent, f"{core} {short}"))
+        # context gauge — 5 colour-shifting cells + NN%.
         try:
             used = Agent._estimate_tokens(self.agent.messages)
             ceiling = _effective_soft_limit(self.provider, self.config)
             if ceiling > 0:
-                segments.append(f"ctx {int(round(100 * used / ceiling))}%")
+                pct = int(round(100 * used / ceiling))
+                clamped = max(0, min(100, pct))
+                filled = max(0, min(5, int(round(clamped / 100 * 5))))
+                level = ok_c if clamped < 60 else (warn_c if clamped < 85 else err_c)
+                if left:
+                    left.append(sep)
+                if cells_ok:
+                    if filled:
+                        left.append((level, "⬤" * filled))
+                    if filled < 5:
+                        left.append((muted, "⬜" * (5 - filled)))
+                    left.append((level, f" {pct}%"))
+                else:
+                    left.append((level, "[" + "#" * filled))
+                    left.append((muted, "-" * (5 - filled)))
+                    left.append((level, f"] {pct}%"))
         except Exception:  # noqa: BLE001
             pass
         # git — branch (+ "*" when dirty); omit the whole segment when not a repo.
@@ -3254,39 +3469,54 @@ class Repl:
                             branch += "*"
                     except Exception:  # noqa: BLE001
                         pass
-                    segments.append(branch)
+                    if left:
+                        left.append(sep)
+                    left.append((muted, branch))
         except Exception:  # noqa: BLE001
             pass
-        # tok/s + time — only once a turn has populated last_turn_stats.
+        # tok/s HERO + time — only once a turn has populated last_turn_stats.
         try:
             stats = getattr(self.agent, "last_turn_stats", None)
             if stats:
                 rate = stats.get("toks_per_sec")
                 if rate is not None:
-                    segments.append(f"{rate:.0f} tok/s")
+                    if left:
+                        left.append(sep)
+                    left.append((muted, f"{arrow} "))
+                    left.append((hero, f"{rate:.0f}"))
+                    left.append((muted, " tok/s"))
                 elapsed = stats.get("elapsed")
                 if elapsed is not None:
-                    segments.append(f"{elapsed:.2f}s")
+                    if left:
+                        left.append(sep)
+                    left.append((muted, f"{elapsed:.2f}s"))
         except Exception:  # noqa: BLE001
             pass
 
-        text = " · ".join(segments)
-        if not text:
+        if not left:
             self._status_cache = ""
             return
-        # Style: muted base with a subtle accent on the NUMBERS. re.split's capture
-        # group puts digit-runs at odd indices; they read in the theme's ptk number
-        # token (status_num_ptk), the rest in the theme's muted ptk grey. Both fall
-        # back to their historic spellings when a theme leaves them unset (the ansi
-        # spec), so ansi keeps its 16-colour base.
-        pal = palette_for(self.config.theme)
-        num_style = pal.status_num_ptk or pal.ptk
-        base_style = pal.muted_ptk or "fg:ansibrightblack"
-        frags = []
-        for i, seg in enumerate(re.split(r"(\d[\d.]*)", " " + text)):
-            if not seg:
-                continue
-            frags.append(((num_style if i % 2 == 1 else base_style), seg))
+        # Leading pad space (the bar historically starts with a space).
+        frags: list[tuple[str, str]] = [(muted, " ")]
+        frags.extend(left)
+
+        # ⬡ lock badge, RIGHT-aligned + HONEST: "offline" only in private mode; a
+        # networked (non-private) local model reads "local", never "offline". The
+        # badge is DROPPED (not wrapped) when the toolbar cannot fit it.
+        try:
+            private = bool(getattr(self.config, "private", False))
+            badge = (ok_c, f"{lock} " + ("offline" if private else "local"))
+            width = shutil.get_terminal_size(fallback=(80, 24)).columns
+            left_w = fragment_list_width(frags)
+            badge_w = fragment_list_width([badge])
+            gap = 3  # minimum spaces between the left group and the badge
+            # -1 keeps the last column free so the toolbar never wraps to a 2nd row.
+            if width and left_w + gap + badge_w <= width - 1:
+                frags.append((muted, " " * (width - 1 - left_w - badge_w)))
+                frags.append(badge)
+        except Exception:  # noqa: BLE001 - badge is optional; never break the bar
+            pass
+
         self._status_cache = FormattedText(frags)
 
     def _run_shell_passthrough(self, cmd: str) -> None:
@@ -3580,9 +3810,12 @@ class Repl:
         # cached string via _status_bar (recomputed per turn, never per keystroke).
         from prompt_toolkit.formatted_text import FormattedText
 
+        # Rotating action-oriented ghost (replaces the generic "Ask anything · …"):
+        # the loop advances _placeholder_i and re-sets .placeholder before every
+        # prompt, so this initial value is just turn 0's affordance.
         placeholder = FormattedText(
             [(pal.muted_ptk or "fg:ansibrightblack",
-              "Ask anything · / commands · @ files")]
+              _placeholder_for_turn(self._placeholder_i))]
         )
         ptk_session = PromptSession(
             key_bindings=kb,
@@ -3670,15 +3903,24 @@ class Repl:
                 )
         except Exception:  # noqa: BLE001
             pass
-        # Styled input glyph (accent "❯"). HTML drives the prompt_toolkit style
-        # class defined above; falls back cleanly to plain text on a dumb term.
-        from prompt_toolkit.formatted_text import HTML
+        # The core caret prompt: ◆ ❯ where ◆ IS the permission indicator (recoloured
+        # per mode) and ❯ the caret. Rebuilt per turn (below) so a mid-session /mode
+        # or /theme switch retints without touching session.style. FormattedText is
+        # already imported above (placeholder build); only patch_stdout is new here.
         from prompt_toolkit.patch_stdout import patch_stdout
 
-        prompt_glyph = HTML(f"<prompt>{pal.prompt}</prompt> ")
         try:
             while True:
                 try:
+                    # Rotate the action-oriented ghost placeholder by turn count
+                    # (keeps the prior gotcha: a FormattedText value, never None —
+                    # the confirm still saves/restores + suppresses with "").
+                    ptk_session.placeholder = FormattedText(
+                        [(pal.muted_ptk or "fg:ansibrightblack",
+                          _placeholder_for_turn(self._placeholder_i))]
+                    )
+                    self._placeholder_i += 1
+                    prompt_message = self._core_caret_message(pal)
                     # patch_stdout coordinates ANY stdout write that lands while
                     # the prompt is displayed (the background MCP-connect daemon
                     # thread's "mcp: … connected" line, and the first rich tool-tree
@@ -3694,7 +3936,7 @@ class Repl:
                     # prompt. Scoped to the read only, so a turn's rich output during
                     # generation (outside this block) is untouched.
                     with patch_stdout(raw=True):
-                        line = ptk_session.prompt(prompt_glyph)
+                        line = ptk_session.prompt(prompt_message)
                 except KeyboardInterrupt:
                     self.console.print("\n(Ctrl-D or /exit to quit)", style="dim")
                     continue

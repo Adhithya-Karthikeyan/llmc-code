@@ -9,13 +9,17 @@ from __future__ import annotations
 
 import io
 
+import re
+
 from llmcode.spinner import (
     _ASCII_FRAMES,
     _BRAILLE_FRAMES,
+    _PULSE_PERIOD,
     AntSpinner,
     DuckSpinner,
     Spinner,
     _frame,
+    _parse_hex,
     _sgr,
 )
 
@@ -334,3 +338,137 @@ def test_start_is_idempotent_while_alive(monkeypatch):
     finally:
         sp.stop()
     assert sp._thread is None
+
+
+# ----- reactor pulse: breathing ◆ core + verb + live tok/s ----------------
+
+def test_parse_hex_valid_and_invalid():
+    """_parse_hex returns (r,g,b) for #rrggbb and None for anything else — the
+    endpoints the pulse interpolates between (a bad endpoint => no truecolor)."""
+    assert _parse_hex("#7aa2f7") == (122, 162, 247)
+    for bad in (None, "", "yellow", "#12", "#gggggg", "7aa2f7"):
+        assert _parse_hex(bad) is None
+
+
+def test_disabled_reactor_spinner_with_color_verb_and_rate_writes_nothing():
+    """A DISABLED reactor spinner (non-tty) with color + pulse_to + verb + a live
+    rate set must emit ZERO bytes — the byte-clean piped-output guarantee. No SGR,
+    no ◆, nothing: start()/stop() are no-ops when disabled."""
+    console = _FakeConsole(is_terminal=False)
+    sp = Spinner(
+        console, enabled=False, color="#7aa2f7", timer_color="#565f89",
+        pulse_to="#bb9af7", verb="forging",
+    )
+    sp.set_rate(226.0)
+    sp.set_verb("reading providers.py")
+    assert sp.enabled is False
+    sp.start()
+    sp.stop()
+    out = console.file.getvalue()
+    assert out == ""            # nothing written when disabled
+    assert "\x1b" not in out    # in particular, no SGR / ANSI at all
+    assert "◆" not in out and "◇" not in out
+
+
+def test_reactor_frame_emits_truecolor_core_and_pulses_across_frames():
+    """An ENABLED reactor spinner (both color + pulse_to hex, unicode stream) draws
+    the ◆/◇ core in a 38;2; truecolor SGR, shows the verb + tok/s, and the pulse
+    changes the core colour across the breathing cycle."""
+    console = _FakeConsole(is_terminal=True)
+    sp = Spinner(
+        console, enabled=True, color="#101010", timer_color="#565f89",
+        pulse_to="#f0f0f0", verb="forging",
+    )
+    sp.set_rate(226.0)
+    frames = [sp._frame_reactor(i, 4.0) for i in range(_PULSE_PERIOD)]
+    joined = "".join(frames)
+    assert "38;2;" in joined                         # truecolor SGR for the core
+    assert ("◆" in joined) or ("◇" in joined)         # the reactor core glyph
+    assert "forging" in joined                        # the activity verb
+    assert "226" in joined and "tok/s" in joined      # live decode rate
+    # The pulse BREATHES: the core colour is not constant across the cycle.
+    core_colors = set(re.findall(r"38;2;\d+;\d+;\d+m[◆◇]", joined))
+    assert len(core_colors) > 1
+    # Valley (i=0) shows the dim ◇ shape at the dim colour; peak (mid-cycle) the ◆.
+    assert "◇" in frames[0]
+    assert "◆" in frames[_PULSE_PERIOD // 2]
+
+
+def test_reactor_set_rate_and_verb_reflected_and_hint_demoted():
+    """set_rate / set_verb are reflected live; before any rate is set the tok/s
+    segment is OMITTED (never a bogus 0); the interrupt hint is demoted to a bare
+    'ctrl-c' (not the long 'ctrl-c to stop')."""
+    console = _FakeConsole(is_terminal=True)
+    sp = Spinner(
+        console, enabled=True, color="#101010", timer_color="#565f89",
+        pulse_to="#f0f0f0",
+    )
+    # No rate yet -> no tok/s segment (don't show 0).
+    line0 = sp._frame_reactor(0, 1.0)
+    assert "tok/s" not in line0
+    # Publish a rate + verb from the "caller" thread; both show up.
+    sp.set_rate(240.0)
+    sp.set_verb("reading providers.py")
+    line1 = sp._frame_reactor(3, 2.0)
+    assert "240" in line1 and "tok/s" in line1
+    assert "reading providers.py" in line1
+    # Interrupt hint demoted: 'ctrl-c' present, but NOT the old 'ctrl-c to stop'.
+    assert "ctrl-c" in line1
+    assert "ctrl-c to stop" not in line1
+    # A non-positive / None rate hides the segment again.
+    sp.set_rate(0)
+    assert "tok/s" not in sp._frame_reactor(4, 3.0)
+    sp.set_rate(None)
+    assert "tok/s" not in sp._frame_reactor(5, 3.0)
+
+
+def test_reactor_ascii_fallback_no_truecolor_no_mojibake():
+    """When the stream can't encode the diamonds, the reactor degrades to a plain
+    <>/<*> pulse: NO truecolor SGR, NO unicode glyphs (no mojibake), fully
+    ASCII-encodable — while still showing the verb + tok/s."""
+    class _AsciiConsole(_FakeConsole):
+        def __init__(self):
+            super().__init__(is_terminal=True)
+            self.file = io.TextIOWrapper(io.BytesIO(), encoding="ascii")
+
+    sp = Spinner(
+        _AsciiConsole(), enabled=True, color="#101010", timer_color="#565f89",
+        pulse_to="#f0f0f0", verb="forging",
+    )
+    assert sp._core_ascii is True
+    sp.set_rate(226.0)
+    line = sp._frame_reactor(6, 4.0)
+    assert "38;2;" not in line                 # no truecolor in the ascii fallback
+    assert "\x1b" not in line                   # no ANSI/SGR at all
+    assert "◆" not in line and "◇" not in line and "·" not in line  # no mojibake
+    line.encode("ascii")                        # fully ASCII-encodable -> no crash
+    assert "forging" in line and "226" in line and "tok/s" in line
+    assert ("<*>" in line) or ("<>" in line)    # the ascii core pulse
+
+
+def test_reactor_threaded_run_writes_truecolor_verb_and_clears(monkeypatch):
+    """The real daemon thread on a reactor spinner writes the pulsing core (38;2;),
+    the verb, and the demoted hint, then clears + restores the cursor on stop —
+    proving the _run reactor branch, not just the pure frame builder."""
+    import time as _time
+    import llmcode.spinner as sp_mod
+
+    monkeypatch.setattr(sp_mod, "_FPS_SLEEP", 0.001)
+    console = _FakeConsole(is_terminal=True)
+    sp = Spinner(
+        console, enabled=True, color="#101010", timer_color="#565f89",
+        pulse_to="#f0f0f0", verb="forging",
+    )
+    sp.set_rate(226.0)
+    sp.start()
+    deadline = _time.time() + 1.0
+    while _time.time() < deadline and console.file.getvalue().count("\x1b[K") < 2:
+        _time.sleep(0.005)
+    sp.stop()
+    out = console.file.getvalue()
+    assert "38;2;" in out                    # truecolor core drew
+    assert "forging" in out                   # the verb rendered
+    assert "226" in out and "tok/s" in out    # live rate rendered
+    assert "ctrl-c" in out                    # demoted interrupt hint
+    assert out.endswith("\x1b[?25h")          # final act: cursor restored
+    assert sp._thread is None                  # joined + cleared on stop

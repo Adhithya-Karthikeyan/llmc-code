@@ -323,10 +323,13 @@ def test_subagent_tool_trees_prefixed_and_no_ctrl_o_hint(tmp_workspace, capsys):
     )
     sub.run("two tools")
     out = capsys.readouterr().out
-    # Sub-agent run() prints collapsed "  ↳ ⏺ 2 tools" with NO Ctrl+O hint.
-    assert "↳ ⏺" in out
-    assert "tool" in out  # "2 tools"
-    assert "Ctrl+O" not in out
+    # Sub-agent run() prints the compact "  ↳ ◆ 2 tools · ✓2" counts line with NO
+    # ctrl-o hint and NO auto-expanded tree (both are orchestrator-only).
+    assert "↳ ◆" in out
+    assert "2 tools" in out
+    assert "✓2" in out
+    assert "Ctrl+O" not in out and "ctrl-o" not in out
+    assert "⎿" not in out  # sub-agent never auto-expands into the parent buffer
 
 
 def test_subagent_render_answer_false_does_not_double_print(capsys):
@@ -709,9 +712,11 @@ def test_repl_wires_non_input_confirm_fn(tmp_workspace, monkeypatch):
     assert Path("hello.py").exists()
 
 
-def test_run_with_tools_prints_collapsed_summary_not_tree(tmp_workspace, capsys):
-    """run() prints the collapsed '⏺ N tools · Ctrl+O to expand' line and does
-    NOT print per-tool ⎿ tree lines before render_details is called."""
+def test_run_with_tools_prints_summary_and_auto_expands(tmp_workspace, capsys):
+    """run() prints the ◆ counts one-liner AND auto-expands the ⏺/⎿ tree inline
+    for a modest all-green batch (≤5 tools) — the work is never hidden behind
+    Ctrl+O. Mid-turn narration is still suppressed (the tree prints once, at the
+    end, from the activity summary)."""
     from rich.console import Console
 
     agent = Agent(
@@ -724,13 +729,15 @@ def test_run_with_tools_prints_collapsed_summary_not_tree(tmp_workspace, capsys)
     agent.run("hello")
     out = capsys.readouterr().out
 
-    # Collapsed summary line is present.
-    assert "⏺" in out
-    assert "tool" in out        # "2 tools · Ctrl+O to expand"
-    assert "Ctrl+O" in out      # orchestrator always shows the hint
+    # ◆ counts one-liner present (2 successes, dim ctrl-o hint).
+    assert "◆" in out
+    assert "2 tools" in out
+    assert "✓2" in out
+    assert "ctrl-o" in out
 
-    # Mid-turn narration is suppressed; no per-tool ⎿ tree before reveal.
-    assert "⎿" not in out
+    # The 2-tool batch auto-expands: the ⏺/⎿ tree is present inline.
+    assert "⏺ Write(hello.py)" in out
+    assert "⎿" in out
 
 
 def test_render_details_reproduces_per_tool_tree(tmp_workspace, capsys):

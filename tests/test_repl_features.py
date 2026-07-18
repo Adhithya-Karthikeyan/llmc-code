@@ -528,13 +528,22 @@ def test_banner_degrades_glyphs_under_ascii_console(repl):
 # --------------------------------------------------------------------------- #
 
 # A row of the embedded ANSI-Shadow art — a substring no other banner text emits,
-# so its presence/absence cleanly proves whether the big wordmark rendered.
+# so its presence/absence cleanly proves whether the big wordmark rendered. The
+# gradient hero colours each cell individually, so the raw ANSI stream splits the
+# row with escapes; strip ANSI first to check the underlying glyphs.
 _WORDMARK_MARK = "╚══════╝╚══════╝"
+
+_ANSI_RE = __import__("re").compile(r"\x1b\[[0-9;]*m")
+
+
+def _strip_ansi(s: str) -> str:
+    return _ANSI_RE.sub("", s)
 
 
 def test_banner_wordmark_on_wide_truecolor_tty(repl):
-    """A wide, UTF-8-capable real terminal opens with the bold block-letter
-    ``llmc-code`` wordmark (bigger first impression than the compact frame)."""
+    """A wide, UTF-8-capable real terminal opens with the "Local Reactor" hero:
+    the diagonal-gradient ``llmc-code`` wordmark + value-prop tagline + the
+    reactor ribbon (``<model> · ◆ core ready · honest lock badge``)."""
     import io
     from rich.console import Console
 
@@ -544,16 +553,87 @@ def test_banner_wordmark_on_wide_truecolor_tty(repl):
     assert getattr(repl.console, "is_terminal", False) is True
     assert repl.console.size.width >= r._WORDMARK_WIDTH
     repl.config.theme = "neon"
+    repl.config.private = False            # network on -> honest badge is "local"
     repl.config.model = "qwen/qwen3.6-35b-a3b"
     repl._print_banner()
     out = buf.getvalue()
-    # A distinctive wordmark row is present, and the short model shows in the
-    # compact info line that replaces the framed head/sub.
-    assert _WORDMARK_MARK in out
-    assert "██████" in out                 # block glyphs actually rendered
+    flat = _strip_ansi(out)
+    # The wordmark art renders (its glyphs survive once ANSI is stripped).
+    assert _WORDMARK_MARK in flat
+    assert "██████" in flat
+    # The gradient is a per-cell RGB lerp: MANY distinct truecolor codes appear
+    # (a flat wordmark would repeat a single 38;2;r;g;b run).
+    codes = set(__import__("re").findall(r"38;2;\d+;\d+;\d+", out))
+    assert len(codes) > 10                 # a true gradient, not a flat fill
+    # Tagline + reactor ribbon (contiguous single-style runs -> survive raw too).
+    assert "a coding agent that runs on your machine" in out
+    assert "◆ core ready" in out
+    assert "⬡ local" in out                # network on -> "local", NOT "offline"
+    assert "no egress" not in out          # honesty: no offline claim when networked
     assert "qwen3.6-35b-a3b" in out
-    assert "theme neon" in out
     assert "\x1b[" in out                  # a real tty is styled (ANSI present)
+
+
+def test_banner_hero_badge_honest_offline_when_private(repl):
+    """HONESTY: only when private mode is on does the ribbon claim ``⬡ offline ·
+    no egress``; the model is always local but we never claim offline on network."""
+    import io
+    from rich.console import Console
+
+    buf = io.StringIO()
+    repl.console = Console(file=buf, force_terminal=True, width=100,
+                           color_system="truecolor")
+    repl.config.private = True
+    repl.config.model = "m"
+    repl._print_banner()
+    out = buf.getvalue()
+    assert "⬡ offline · no egress" in out
+    assert "◆ core ready" in out
+
+
+def test_banner_returning_run_skips_wordmark(repl):
+    """On a subsequent launch (the ~/.llmcode/seen marker is present) the wide-tty
+    startup compresses to a two-line ribbon — no big wordmark, no verbose tail."""
+    import io
+    import os
+    from rich.console import Console
+
+    # Simulate a prior first-run by writing the marker (HOME is the tmp fixture).
+    marker = os.path.expanduser("~/.llmcode/seen")
+    os.makedirs(os.path.dirname(marker), exist_ok=True)
+    with open(marker, "w", encoding="utf-8") as fh:
+        fh.write("1")
+
+    buf = io.StringIO()
+    repl.console = Console(file=buf, force_terminal=True, width=100,
+                           color_system="truecolor")
+    repl.config.private = True
+    repl.config.model = "qwen/qwen3.6-35b-a3b"
+    repl._print_banner()
+    out = buf.getvalue()
+    flat = _strip_ansi(out)
+    assert _WORDMARK_MARK not in flat          # big wordmark skipped
+    assert "██████" not in flat
+    assert "◆ llmc-code" in out                # compressed ribbon shown
+    assert "qwen3.6-35b-a3b" in out
+    assert "⬡ offline" in out
+
+
+def test_banner_first_run_writes_marker(repl):
+    """The first-run hero writes the ~/.llmcode/seen marker so the NEXT launch
+    takes the compressed path."""
+    import io
+    import os
+    from rich.console import Console
+
+    marker = os.path.expanduser("~/.llmcode/seen")
+    assert not os.path.exists(marker)          # fresh HOME -> first run
+    buf = io.StringIO()
+    repl.console = Console(file=buf, force_terminal=True, width=100,
+                           color_system="truecolor")
+    repl.config.model = "m"
+    repl._print_banner()
+    assert os.path.exists(marker)              # marker now recorded
 
 
 def test_banner_narrow_terminal_falls_back_to_compact(repl):
@@ -596,6 +676,10 @@ def test_banner_non_terminal_no_wordmark_and_ansi_free(repl):
     assert "██████" not in out
     assert "\x1b[" not in out              # byte-clean, ANSI-free (piped guarantee)
     assert "ready" in out                  # compact banner content still present
+    # The reactor hero's new glyphs/gradient never leak into the piped path — the
+    # ⬡ lock badge lives only on the wide-tty hero/ribbon (the compact fallback is
+    # unchanged and carries no ⬡).
+    assert "⬡" not in out
 
 
 # --------------------------------------------------------------------------- #

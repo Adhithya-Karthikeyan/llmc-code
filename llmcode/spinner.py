@@ -39,6 +39,7 @@ unit-tested without threads or sleeping.
 
 from __future__ import annotations
 
+import math
 import os
 import sys
 import threading
@@ -57,9 +58,28 @@ _BRAILLE_FRAMES = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
 # ASCII fallback spinner glyphs (classic |/-\ cycle).
 _ASCII_FRAMES = "|/-\\"
 
+# --- Reactor pulse ("The Local Reactor") ---------------------------------
+# The signature ◆ core BREATHES: its shape + truecolor brightness ramp between a
+# dim valley (the spinner colour) and a bright peak (``pulse_to``) on a ~1s sine
+# keyed to the frame counter. ◇ is the dim/valley shape, ◆ the peak — the shape
+# swap gives the beat a stronger read. On a stream that can't encode the diamonds
+# we fall back to an ASCII ``<>``/``<*>`` pulse with NO truecolor at all (no
+# mojibake, no SGR). This is the "your GPU under load" microinteraction.
+_CORE_GLYPH = "◆"        # peak / bright shape
+_CORE_GLYPH_DIM = "◇"    # valley / dim shape (stronger beat)
+_ASCII_CORE = "<*>"      # ascii peak pulse
+_ASCII_CORE_DIM = "<>"   # ascii valley pulse
+_RATE_UNIT = "tok/s"     # live decode-rate unit (your hardware, ticking up)
+# Frames per breath (~1s at the default ~10 fps). Keyed to the frame counter so
+# the pulse is deterministic regardless of the wall-clock frame sleep (tests
+# monkeypatch _FPS_SLEEP, which must not change the breathing curve's shape).
+_PULSE_PERIOD = 12
+
 # Short status label + the real interrupt hint (SIGINT sets the cancel flag).
 _LABEL = "working"
 _HINT = "ctrl-c to stop"
+# Demoted interrupt hint for the reactor pulse: a dim, right-anchored "ctrl-c".
+_HINT_SHORT = "ctrl-c"
 # Field separator: a middle dot on unicode terminals, plain ASCII "-" otherwise.
 _SEP = "·"
 _SEP_ASCII = "-"
@@ -120,6 +140,49 @@ def _sgr(hex_or_none: str | None) -> tuple[str, str]:
     return f"\x1b[38;2;{r};{g};{b}m", "\x1b[0m"
 
 
+def _parse_hex(hex_or_none: str | None) -> tuple[int, int, int] | None:
+    """Parse ``#rrggbb`` -> ``(r, g, b)`` ints, else ``None``. Never raises.
+
+    Mirrors the validation in :func:`_sgr` so the reactor pulse can interpolate
+    between two theme hexes (the dim valley and the bright peak). A non-hex value
+    (``None``, ``""``, an ANSI colour name, or a malformed string) yields ``None``
+    so the pulse cleanly opts out of truecolor.
+    """
+    if (
+        not hex_or_none
+        or not isinstance(hex_or_none, str)
+        or not hex_or_none.startswith("#")
+        or len(hex_or_none) < 7
+    ):
+        return None
+    try:
+        return (
+            int(hex_or_none[1:3], 16),
+            int(hex_or_none[3:5], 16),
+            int(hex_or_none[5:7], 16),
+        )
+    except ValueError:  # non-hex chars after the "#"
+        return None
+
+
+def _stream_can_encode(stream, chars: str) -> bool:
+    """True if ``stream`` can encode ``chars``. Never raises.
+
+    A stream without an ``encoding`` (e.g. ``io.StringIO`` used in tests) is
+    treated as capable. An encoding that can't represent ``chars`` (e.g.
+    ``ascii``/``cp1252``) — or any error probing it — returns False so writes
+    can't blow up mid-animation and the caller can degrade to ASCII.
+    """
+    enc = getattr(stream, "encoding", None)
+    if not enc:
+        return True
+    try:
+        chars.encode(enc)
+        return True
+    except Exception:  # noqa: BLE001 - detection must never crash
+        return False
+
+
 def _stream_supports_unicode(stream) -> bool:
     """True if ``stream`` can encode the braille glyph. Never raises.
 
@@ -128,14 +191,7 @@ def _stream_supports_unicode(stream) -> bool:
     glyph (e.g. ``ascii``/``cp1252``) — or any error probing it — falls back to
     ASCII so writes can't blow up mid-animation.
     """
-    enc = getattr(stream, "encoding", None)
-    if not enc:
-        return True
-    try:
-        _BRAILLE_FRAMES[0].encode(enc)
-        return True
-    except Exception:  # noqa: BLE001 - detection must never crash
-        return False
+    return _stream_can_encode(stream, _BRAILLE_FRAMES[0])
 
 
 class Spinner:
@@ -152,6 +208,9 @@ class Spinner:
         *,
         color: str | None = None,
         timer_color: str | None = None,
+        glyph: str = _CORE_GLYPH,
+        pulse_to: str | None = None,
+        verb: str = _LABEL,
     ):
         self.console = console
         # Optional per-theme colours (truecolor ``#hex``). ``color`` tints ONLY the
@@ -161,6 +220,19 @@ class Spinner:
         # A non-hex/empty value (e.g. the ansi theme) yields no SGR — see ``_sgr``.
         self.color = color
         self.timer_color = timer_color
+        # REACTOR PULSE (opt-in): when ``pulse_to`` is a real ``#hex`` AND ``color``
+        # is too, the spinner engages the breathing ◆ core — its shape + colour ramp
+        # between ``color`` (dim valley) and ``pulse_to`` (bright peak) — plus an
+        # activity verb and live tok/s. Constructions WITHOUT ``pulse_to`` keep the
+        # exact classic braille/coloured frame (no behaviour change).
+        self.glyph = glyph or _CORE_GLYPH
+        self.pulse_to = pulse_to
+        # Thread-safe cross-thread state (the daemon thread READS these; the caller
+        # WRITES them via set_verb/set_rate). Each is a single immutable value
+        # (str / float / None), so a bare attribute read/write is atomic under the
+        # GIL — the daemon can never observe a torn/mid-mutation structure.
+        self._verb = str(verb) if verb else _LABEL
+        self._rate: float | None = None
         if enabled is None:
             # Default ON only for a real TTY, and only if the env off-switch is
             # not set. A None/typeless console (no is_terminal) => disabled.
@@ -170,6 +242,18 @@ class Spinner:
         # Pick the glyph set once: honor the explicit ASCII off-switch, else fall
         # back to ASCII only when the stream can't encode the braille glyph.
         self.ascii_mode = bool(os.environ.get(_ENV_ASCII)) or not _stream_supports_unicode(self._stream())
+        # The reactor core (◆/◇) has its own encode gate: a stream that can't take
+        # the braille glyph almost never takes the diamonds either, but probe them
+        # explicitly so the ASCII <>/<*> fallback is guaranteed mojibake-free.
+        self._core_ascii = self.ascii_mode or not _stream_can_encode(
+            self._stream(), _CORE_GLYPH + _CORE_GLYPH_DIM
+        )
+        # Reactor engages only when we can pulse: BOTH a dim valley (``color``) and
+        # a bright peak (``pulse_to``) must be real ``#hex`` (else there's nothing
+        # to interpolate). Computed once; the SGR it emits can only ever reach an
+        # enabled (TTY-gated) stream because the animator thread never starts when
+        # disabled — so piped/non-tty output stays byte-for-byte clean.
+        self._reactor = bool(_sgr(color)[0]) and bool(_sgr(pulse_to)[0])
         self._stop_event = threading.Event()
         self._thread: threading.Thread | None = None
         self._start_ts = 0.0
@@ -213,11 +297,118 @@ class Spinner:
         timer_part = f"{t_pre}{secs}s{t_reset}"
         return f"{glyph_part} {_LABEL} {sep} {timer_part} {sep} {_HINT}"
 
+    # ----- reactor: thread-safe live state -------------------------------
+    def set_verb(self, verb: str) -> None:
+        """Thread-safe: update the activity verb shown in the reactor frame
+        (``forging`` / ``reading providers.py`` / ``running <cmd>`` / ``thinking``).
+
+        The caller (agent.run's main thread) writes it; the daemon thread reads a
+        single immutable string, so no lock is needed — the write is atomic under
+        the GIL and can never be observed half-applied. A falsy value is ignored so
+        the verb never regresses to blank mid-run.
+        """
+        try:
+            if verb:
+                self._verb = str(verb)
+        except Exception:  # noqa: BLE001 - a setter must never raise into the caller
+            pass
+
+    def set_rate(self, tok_per_s: float | None) -> None:
+        """Thread-safe: publish the live decode rate (tok/s) for the reactor frame.
+
+        THREAD-SAFETY (design risk flag): this is a single float attribute updated
+        from the caller's streaming snapshot (tokens_so_far / elapsed). The daemon
+        thread reads ONLY this float — never a mid-mutation structure — so it can
+        never see torn state. ``None`` (or a non-positive/uncoercible value) hides
+        the ``tok/s`` segment entirely (we never flash a bogus ``0``).
+        """
+        try:
+            self._rate = float(tok_per_s) if tok_per_s is not None else None
+        except (TypeError, ValueError):
+            self._rate = None
+
+    # ----- reactor: pulse maths ------------------------------------------
+    def _pulse_t(self, i: int) -> float:
+        """Breathing curve in ``[0, 1]`` for frame ``i`` — valley(0) -> peak(1) ->
+        valley(0) over ``_PULSE_PERIOD`` frames. Keyed to the frame counter (not the
+        wall clock) so the pulse is deterministic and test-stable."""
+        period = _PULSE_PERIOD if _PULSE_PERIOD > 1 else 2
+        phase = (i % period) / float(period)
+        return (1.0 - math.cos(2.0 * math.pi * phase)) / 2.0
+
+    def _pulse_rgb(self, t: float) -> tuple[int, int, int] | None:
+        """Interpolate the glyph RGB between ``color`` (valley) and ``pulse_to``
+        (peak) at ``t`` in ``[0, 1]``. ``None`` if either endpoint isn't a hex."""
+        c0 = _parse_hex(self.color)
+        c1 = _parse_hex(self.pulse_to)
+        if c0 is None or c1 is None:
+            return None
+        return tuple(int(round(a + (b - a) * t)) for a, b in zip(c0, c1))  # type: ignore[return-value]
+
+    def _frame_reactor(self, i: int, elapsed: float) -> str:
+        """The reactor frame: a breathing ◆ core + activity verb + live tok/s + a
+        dim, right-anchored ``ctrl-c``. Reads the thread-safe verb/rate snapshots.
+
+        Unicode: the core shape (◆ peak / ◇ valley) and its truecolor ramp pulse on
+        ``_pulse_t``; the ``Ns`` timer and the ``tok/s`` unit stay dim
+        (``timer_color``); the rate NUMBER carries the accent (``color``) so it
+        reads. ASCII fallback (stream can't encode the diamonds): a plain
+        ``<>``/``<*>`` pulse with the ``-`` separator and ZERO SGR — no truecolor,
+        no mojibake. Never raises (the ``_run`` caller also guards)."""
+        try:
+            t = self._pulse_t(i)
+        except Exception:  # noqa: BLE001 - the daemon must never die on a frame build
+            t = 0.0
+        ascii_core = self._core_ascii
+        sep = _SEP_ASCII if ascii_core else _SEP
+        # ASCII fallback emits NO truecolor at all (byte-clean + mojibake-free);
+        # unicode mode dims the timer/unit and accents the rate number.
+        if ascii_core:
+            t_pre = t_reset = ""
+            n_pre = n_reset = ""
+        else:
+            t_pre, t_reset = _sgr(self.timer_color)
+            n_pre, n_reset = _sgr(self.color)
+        verb = self._verb or _LABEL          # atomic snapshot read
+        secs = max(0, int(elapsed))
+        rate = self._rate                     # atomic snapshot read
+        # --- breathing core (plain shape for width; styled shape for the wire) ---
+        if ascii_core:
+            core_plain = _ASCII_CORE if t >= 0.5 else _ASCII_CORE_DIM
+            core_styled = core_plain
+        else:
+            glyph = self.glyph if t >= 0.5 else _CORE_GLYPH_DIM
+            rgb = self._pulse_rgb(t)
+            core_plain = glyph
+            core_styled = (
+                f"\x1b[38;2;{rgb[0]};{rgb[1]};{rgb[2]}m{glyph}\x1b[0m" if rgb else glyph
+            )
+        # --- core + verb + timer ---
+        plain = f"{core_plain} {verb} {sep} {secs}s"
+        styled = f"{core_styled} {verb} {sep} {t_pre}{secs}s{t_reset}"
+        # --- live tok/s (omit entirely when unset / non-positive) ---
+        if rate is not None and rate > 0:
+            num = str(int(round(rate)))
+            plain += f" {sep} {num} {_RATE_UNIT}"
+            styled += f" {sep} {n_pre}{num}{n_reset} {t_pre}{_RATE_UNIT}{t_reset}"
+        # --- dim interrupt hint, right-anchored when the console width is known ---
+        try:
+            width = int(getattr(self.console, "width", 0) or 0)
+        except Exception:  # noqa: BLE001 - width probing must never raise
+            width = 0
+        need = len(plain) + len(_HINT_SHORT)
+        gap = width - need if (width and width > need + 2) else 2
+        gap_str = " " * max(2, gap)
+        hint_part = _HINT_SHORT if ascii_core else f"{t_pre}{_HINT_SHORT}{t_reset}"
+        return styled + gap_str + hint_part
+
     def _run(self) -> None:
         i = 0
-        # Colour the frame only when a real ``#hex`` glyph colour is set. The
-        # thread only runs on an enabled (TTY-gated) spinner, so this SGR can never
-        # reach a piped/non-tty stream.
+        # Reactor pulse when both a valley + peak hex are set; else the classic
+        # coloured frame when a real ``#hex`` glyph colour is set; else plain. The
+        # thread only runs on an enabled (TTY-gated) spinner, so any SGR here can
+        # never reach a piped/non-tty stream.
+        reactor = self._reactor
         colored = bool(_sgr(self.color)[0])
         while not self._stop_event.is_set():
             elapsed = _now() - self._start_ts
@@ -226,14 +417,23 @@ class Spinner:
             # also clears the extra column when the seconds field gains a digit.
             # Padding is sized on the PLAIN (visible) width so the SGR bytes in the
             # coloured frame don't skew it; the erase-to-EOL is the real backstop.
-            if colored:
-                plain_len = len(_frame(i, elapsed, self.ascii_mode))
-                pad = " " * max(0, self._max_line - plain_len)
-                self._write("\r" + self._frame_colored(i, elapsed) + pad + _ERASE_EOL)
-            else:
-                self._write(
-                    "\r" + _frame(i, elapsed, self.ascii_mode).ljust(self._max_line) + _ERASE_EOL
-                )
+            # The whole frame build is guarded so a bad verb/rate read can never
+            # kill the daemon (which would leave the cursor hidden).
+            try:
+                if reactor:
+                    # The reactor frame self-anchors ``ctrl-c``; the trailing
+                    # erase-to-EOL clears any longer previous tail, so no manual pad.
+                    self._write("\r" + self._frame_reactor(i, elapsed) + _ERASE_EOL)
+                elif colored:
+                    plain_len = len(_frame(i, elapsed, self.ascii_mode))
+                    pad = " " * max(0, self._max_line - plain_len)
+                    self._write("\r" + self._frame_colored(i, elapsed) + pad + _ERASE_EOL)
+                else:
+                    self._write(
+                        "\r" + _frame(i, elapsed, self.ascii_mode).ljust(self._max_line) + _ERASE_EOL
+                    )
+            except Exception:  # noqa: BLE001 - a frame-build error must never kill the daemon
+                pass
             i += 1
             # Event.wait doubles as the sleep AND a prompt stop signal.
             if self._stop_event.wait(_FPS_SLEEP):
