@@ -267,6 +267,28 @@ def test_doctor_runs_without_raising(repl, capsys):
     assert ("✓" in out) or ("✗" in out)
 
 
+def test_doctor_prints_server_tuning_advice(repl, monkeypatch, capsys):
+    # A detected local window -> the ranked server-tuning section is printed.
+    monkeypatch.setattr(r, "detect_context_length", lambda *a, **k: 262144)
+    repl._cmd_doctor("")
+    out = capsys.readouterr().out
+    assert "Server tuning" in out
+    assert "flash attention" in out
+    assert "cache-type" in out
+    assert "Speculative" in out
+    # 262144 > 4 * default context_budget (12000) -> the reload-smaller-ctx tip fires.
+    assert "smaller" in out and "262144" in out
+
+
+def test_doctor_tuning_unavailable_without_endpoint(repl, monkeypatch, capsys):
+    # No detectable window (lookup returns None) -> graceful skip, no exception.
+    monkeypatch.setattr(r, "detect_context_length", lambda *a, **k: None)
+    repl._cmd_doctor("")
+    out = capsys.readouterr().out
+    assert "server tuning advice unavailable" in out
+    assert "flash attention" not in out
+
+
 # --------------------------------------------------------------------------- #
 # Custom macros
 # --------------------------------------------------------------------------- #

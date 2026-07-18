@@ -25,7 +25,9 @@ import json
 import math
 import os
 import re
+import sys
 import tempfile
+from array import array
 from collections import OrderedDict
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -302,6 +304,178 @@ def cosine(a: list[float], b: list[float]) -> float:
 
 
 # ---------------------------------------------------------------------------
+# Vector persistence: packed-float32 sidecar (shared by MemoryStore + CodeIndex)
+# ---------------------------------------------------------------------------
+#
+# Corpus vectors are already ``array('f')`` (float32) in RAM. Writing them INLINE
+# in the store JSON quadruples on-disk size and spikes peak-RAM on load (parse the
+# whole JSON string, then materialize every float). Instead we persist them as a
+# packed float32 blob in a SIDECAR file next to the JSON, and the JSON keeps only
+# slim metadata (dim + hash order). load() mmap-free reads the exact byte count.
+#
+# SAFETY (this is a shipped on-disk format change):
+#   - Backward compatible: an OLD-format JSON (no ``vector_format`` key, vectors
+#     inline) still loads via the legacy branch.
+#   - Never lose data: if ANYTHING about the sidecar fails on save, the caller
+#     writes the legacy inline JSON instead. If the sidecar is missing/short/torn
+#     on load, vectors are treated as ABSENT ({}) — they lazily re-embed via the
+#     existing content-hash guard. Never crash, never load wrong vectors.
+#   - Atomic: same mkstemp + os.replace discipline as the JSON write.
+_VECTOR_FORMAT = "f32-sidecar-v1"
+
+
+def _sidecar_path(path) -> Path:
+    """The packed-float32 vector sidecar next to the store JSON: ``<path>.vec``."""
+    return Path(str(path) + ".vec")
+
+
+def _unlink_sidecar(path) -> None:
+    """Best-effort remove a stale ``<path>.vec`` sidecar (e.g. after an inline
+    fallback save, so an orphaned old sidecar isn't left next to fresh inline
+    meta). Never raises."""
+    try:
+        os.unlink(_sidecar_path(path))
+    except OSError:
+        pass
+
+
+def _atomic_write_bytes(path, data: bytes) -> None:
+    """Write ``data`` to ``path`` atomically: a temp file in the SAME directory
+    (so ``os.replace`` is atomic on one filesystem) then replace. The parent dir
+    must already exist. Raises ``OSError`` on failure after removing the temp
+    file (mirrors session.py's mkstemp+os.replace pattern)."""
+    target = Path(path)
+    fd, tmp = tempfile.mkstemp(dir=str(target.parent), suffix=".tmp")
+    try:
+        with os.fdopen(fd, "wb") as fh:
+            fh.write(data)
+        os.replace(tmp, str(target))
+    except OSError:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
+
+
+def _atomic_write_json(path, payload) -> None:
+    """Serialize ``payload`` to UTF-8 JSON and write it to ``path`` atomically."""
+    _atomic_write_bytes(path, json.dumps(payload, ensure_ascii=False).encode("utf-8"))
+
+
+def _pack_vectors(vectors) -> tuple[list[str], int, bytes] | None:
+    """Pack ``{hash: array('f')}`` into ``(vhashes, dim, blob)`` for the f32
+    sidecar, where ``blob`` concatenates each vector's raw float32 bytes in
+    ``vhashes`` order. Return ``None`` — signalling the caller to write the legacy
+    inline format — when the set can't be packed UNIFORMLY: empty, zero-dim, or
+    any vector whose length differs from the first."""
+    vhashes = [h for h in vectors]
+    if not vhashes:
+        return None
+    dim = len(vectors[vhashes[0]])
+    if dim <= 0:
+        return None
+    buf = bytearray()
+    for h in vhashes:
+        v = vectors[h]
+        if len(v) != dim:
+            return None
+        buf += array('f', v).tobytes()  # already float32; copy is cheap + safe
+    return vhashes, dim, bytes(buf)
+
+
+def _save_vectors_sidecar(path, base_meta: dict, vectors) -> bool:
+    """Write the packed-f32 sidecar ``<path>.vec`` PLUS the slim meta JSON
+    (``base_meta`` augmented with ``vector_format``/``vector_dim``/
+    ``vector_hashes``) to ``path`` — both atomically, SIDECAR FIRST so the meta
+    that references it is only committed once the bytes exist.
+
+    Return ``True`` on success. Return ``False`` — signalling the caller to fall
+    back to the legacy inline-JSON write — when the vectors can't be packed
+    (empty/ragged) OR on ANY error, so a failed/torn sidecar never loses data."""
+    try:
+        packed = _pack_vectors(vectors)
+        if packed is None:
+            return False
+        vhashes, dim, blob = packed
+        _atomic_write_bytes(_sidecar_path(path), blob)  # sidecar FIRST
+        meta = dict(base_meta)
+        meta["vector_format"] = _VECTOR_FORMAT
+        meta["vector_dim"] = dim
+        meta["vector_hashes"] = vhashes
+        # Fingerprint the exact sidecar bytes so load() can reject a torn write
+        # (NEW sidecar + STALE meta) that the size guard alone would pass — same
+        # count+dim means identical byte length, so bytes-identity is the only
+        # cross-check that catches positionally-mispaired vectors.
+        meta["vector_sig"] = hashlib.sha1(blob).hexdigest()[:16]
+        meta["vector_byteorder"] = sys.byteorder  # self-describing (native f32)
+        _atomic_write_json(path, meta)  # then the meta that references it
+        return True
+    except Exception:
+        return False
+
+
+def _read_vector_sidecar(path, dim, vhashes, vector_sig=None, byteorder="little") -> dict:
+    """Read the f32 sidecar ``<path>.vec`` and rebuild ``{hash: array('f')}``.
+    Return ``{}`` (vectors lazily re-embed; never crash) when the file is missing,
+    the metadata is malformed, the byte size != ``dim*4*len(vhashes)``, or the
+    content fingerprint doesn't match ``vector_sig`` (a torn write left a NEW
+    sidecar paired with a STALE meta — same size, wrong bytes)."""
+    if not isinstance(dim, int) or dim <= 0 or not isinstance(vhashes, list):
+        return {}
+    try:
+        raw = _sidecar_path(path).read_bytes()
+    except OSError:
+        return {}
+    stride = dim * 4  # float32 == 4 bytes
+    if len(raw) != stride * len(vhashes):
+        return {}
+    # Content fingerprint cross-check (defense beyond the size guard): rejects a
+    # count-preserving, same-dim torn write whose STALE meta would otherwise pair
+    # vhashes against unrelated new bytes. Absent sig -> size-check-only (no regress).
+    if vector_sig is not None and hashlib.sha1(raw).hexdigest()[:16] != vector_sig:
+        return {}
+    swap = byteorder != sys.byteorder  # correct a foreign-endian .vec on read
+    out: dict = {}
+    for i, h in enumerate(vhashes):
+        if not isinstance(h, str):
+            return {}
+        a = array('f')
+        a.frombytes(raw[i * stride:(i + 1) * stride])
+        if swap:
+            a.byteswap()  # fingerprint is over on-disk bytes, so it still matches
+        out[h] = a
+    return out
+
+
+def _load_vectors(path, data: dict) -> dict:
+    """Reconstruct ``{hash: array('f')}`` from a parsed store JSON ``data``.
+
+    New format (``vector_format == 'f32-sidecar-v1'``): read the packed-f32
+    sidecar next to ``path`` (absent/short/torn -> ``{}``). Old format (no
+    ``vector_format`` key): parse the inline ``data['vectors']`` exactly as the
+    legacy code did (backward compatible). Never raises."""
+    if data.get("vector_format") == _VECTOR_FORMAT:
+        return _read_vector_sidecar(
+            path,
+            data.get("vector_dim"),
+            data.get("vector_hashes"),
+            data.get("vector_sig"),
+            data.get("vector_byteorder", "little"),
+        )
+    vectors: dict = {}
+    raw_vecs = data.get("vectors")
+    if isinstance(raw_vecs, dict):
+        for h, v in raw_vecs.items():
+            if isinstance(h, str) and isinstance(v, list):
+                try:
+                    vectors[h] = array('f', (float(x) for x in v))
+                except (TypeError, ValueError):
+                    continue
+    return vectors
+
+
+# ---------------------------------------------------------------------------
 # MemoryStore
 # ---------------------------------------------------------------------------
 
@@ -320,6 +494,9 @@ class MemoryStore:
     most once across a session (and across save/load)."""
 
     records: list[MemoryRecord] = field(default_factory=list)
+    # Values are ``array('f')`` (float32) at runtime, not boxed ``list[float]`` —
+    # a ~85% RAM cut for a full corpus. On-disk JSON is unchanged (save() emits
+    # ``list(v)``, load() rebuilds ``array('f')``).
     vectors: dict[str, list[float]] = field(default_factory=dict)
     # Set by add()/eviction, cleared by a successful save(); makes save() a no-op
     # when nothing changed so the REPL's per-turn save doesn't re-serialize an
@@ -468,7 +645,7 @@ class MemoryStore:
                 if not vecs or len(vecs) != len(missing):
                     return []
                 for r, v in zip(missing, vecs):
-                    self.vectors[r.content_hash] = [float(x) for x in v]
+                    self.vectors[r.content_hash] = array('f', (float(x) for x in v))
                 # Newly embedded vectors must survive save/load — otherwise a turn
                 # that escalates to embeddings but doesn't also add() a record
                 # (truncated/error turn) silently drops them and re-embeds next
@@ -571,36 +748,39 @@ class MemoryStore:
     # ----- persistence (atomic; mirrors session.py:107-111) ----------------
 
     def save(self, path) -> None:
-        """Atomically persist records + vectors as one JSON object. Best-effort:
-        a write temp file in the same dir then os.replace; never raises.
+        """Atomically persist records + vectors. Best-effort: a write temp file in
+        the same dir then os.replace; never raises.
+
+        Vectors are written as a packed float32 SIDECAR (``<path>.vec``) with the
+        JSON holding only slim metadata (``vector_format``/``vector_dim``/
+        ``vector_hashes``). If the sidecar can't be written (empty/ragged vectors,
+        or ANY error) it FALLS BACK to the legacy inline-JSON format so data is
+        never lost.
 
         NO-OP when the store is not ``_dirty`` (nothing added/evicted since the
         last save/load), so the REPL's per-turn save never re-serializes an
         unchanged store."""
         if not self._dirty:
             return
-        payload = {
-            "records": [r.to_dict() for r in self.records],
-            "vectors": {h: list(v) for h, v in self.vectors.items()},
-        }
         try:
             target = Path(path)
-            directory = target.parent
-            directory.mkdir(parents=True, exist_ok=True)
+            target.parent.mkdir(parents=True, exist_ok=True)
             _harden_state_dir()  # restrict ~/.llmcode to the owner (best-effort)
-            # Temp file in the SAME dir so os.replace is atomic (same filesystem).
-            fd, tmp = tempfile.mkstemp(dir=str(directory), suffix=".tmp")
-            try:
-                with os.fdopen(fd, "w", encoding="utf-8") as fh:
-                    json.dump(payload, fh, ensure_ascii=False)
-                os.replace(tmp, str(target))
-                self._dirty = False  # on-disk copy now matches memory
-            except OSError:
-                try:
-                    os.unlink(tmp)
-                except OSError:
-                    pass
-                raise
+        except OSError:
+            return  # can't prepare the dir — best-effort: silently skip
+        records = [r.to_dict() for r in self.records]
+        # Preferred: packed-f32 vector sidecar + slim meta JSON (sidecar FIRST).
+        if _save_vectors_sidecar(target, {"records": records}, self.vectors):
+            self._dirty = False
+            return
+        # Fallback: legacy inline-JSON (vectors embedded), best-effort. Drop any
+        # stale sidecar first so an old `.vec` isn't orphaned beside inline meta.
+        _unlink_sidecar(target)
+        payload = {"records": records,
+                   "vectors": {h: list(v) for h, v in self.vectors.items()}}
+        try:
+            _atomic_write_json(target, payload)
+            self._dirty = False  # on-disk copy now matches memory
         except OSError:
             return  # best-effort: disk full / permissions / etc. — silently skip
 
@@ -608,7 +788,9 @@ class MemoryStore:
     def load(cls, path) -> MemoryStore:
         """Read a store from ``path``; an EMPTY store on missing/corrupt/invalid
         input (never raises). Non-dict records and non-numeric vectors are
-        dropped so a hand-edited file can't crash a consumer."""
+        dropped so a hand-edited file can't crash a consumer. Vectors load from
+        the f32 sidecar (new format) or inline JSON (old format); a missing/torn
+        sidecar yields ``{}`` (lazy re-embed) rather than crashing."""
         try:
             raw = Path(path).read_text(encoding="utf-8")
         except OSError:
@@ -621,16 +803,7 @@ class MemoryStore:
             return cls()
         records = [MemoryRecord.from_dict(rd) for rd in (data.get("records") or [])
                    if isinstance(rd, dict)]
-        vectors: dict[str, list[float]] = {}
-        raw_vecs = data.get("vectors")
-        if isinstance(raw_vecs, dict):
-            for h, v in raw_vecs.items():
-                if isinstance(h, str) and isinstance(v, list):
-                    try:
-                        vectors[h] = [float(x) for x in v]
-                    except (TypeError, ValueError):
-                        continue
-        return cls(records=records, vectors=vectors)
+        return cls(records=records, vectors=_load_vectors(path, data))
 
 
 def store_path(cwd: str) -> Path:

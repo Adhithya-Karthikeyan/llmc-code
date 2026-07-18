@@ -87,7 +87,7 @@ _KNOWN_COMMANDS = frozenset({
     "/compact", "/mcp", "/audit", "/speed", "/context", "/provider",
     "/models", "/model", "/effort", "/maxout", "/temp", "/verify", "/image",
     "/gentle", "/cooldown",
-    "/rerank",
+    "/rerank", "/codeembed",
     # Foundation-wave commands (git/rules/checkpoint/session/clipboard/diagnostics).
     "/undo", "/diff", "/commit", "/init", "/copy", "/mode",
     "/branch", "/fork", "/doctor", "/commands",
@@ -134,6 +134,9 @@ Commands:
                         Does not touch your conversation. Default path: '.'
   /speed                Tips to raise tok/s (LM Studio settings + how context
                         size affects speed)
+  /codeembed [on|off]   Toggle semantic code_search. off (default) = BM25-only
+                        (fast, no embedding-model GPU swap); on = semantic (may
+                        swap the embed model on a single-GPU/local server)
   /mcp [on|off]         No arg: list MCP servers + status. on/off: enable or
                         disable MCP (off stops the servers + drops their tools,
                         shrinking each prompt → faster). Persisted.
@@ -226,6 +229,8 @@ Speed (tok/s) — what controls it and how to raise it
 # and cap the rendered unified diff so a huge change can't flood the prompt.
 _DIFF_PREVIEW_MAX_FILE_BYTES = 1_000_000
 _DIFF_PREVIEW_MAX_LINES = 60
+
+_MAX_AUTO_COMPACT_CEILING = 48_000  # cap: past ~48k the per-token KV bandwidth cost + eventual re-prefill outweigh keeping more context (decode is bandwidth-bound). config.context_soft_limit (floor) still wins if a user sets it higher.
 
 
 def _read_text_for_preview(path: str) -> str | None:
@@ -538,6 +543,9 @@ def _effective_soft_limit(provider: Provider, config: Config) -> int:
     (gemma 32k) it stays near that. Best-effort: a mock/no-endpoint provider or a
     failed lookup falls back to the floor. The detected length is cached on the
     provider so we don't re-query on every agent rebuild (/model, /clear, ...).
+    The ~80% ceiling is itself capped at ``_MAX_AUTO_COMPACT_CEILING`` (48k):
+    past that, per-token KV bandwidth + eventual re-prefill cost outweigh keeping
+    more context, though a larger ``context_soft_limit`` floor still wins.
     """
     floor = config.context_soft_limit
     base_url = getattr(provider, "base_url", None)
@@ -552,7 +560,7 @@ def _effective_soft_limit(provider: Provider, config: Config) -> int:
         except Exception:  # noqa: BLE001
             pass
     if isinstance(ctx, int) and ctx > 0:
-        return max(floor, int(ctx * 0.8))
+        return max(floor, min(int(ctx * 0.8), _MAX_AUTO_COMPACT_CEILING))
     return floor
 
 
@@ -599,6 +607,7 @@ _COMMAND_META = {
     "/mcp": "MCP servers on/off",
     "/audit": "map-reduce project review",
     "/speed": "speed guide",
+    "/codeembed": "toggle semantic code search",
     "/context": "context budget",
     "/provider": "switch provider",
     "/models": "list server models",
@@ -2027,6 +2036,33 @@ class Repl:
             self._ok(
                 f"[rerank -> {'on' if self.config.rerank else 'off'}]  {self._status()}"
             )
+        elif cmd == "/codeembed":
+            # View/set semantic code_search. Mirrors /rerank: no arg -> show
+            # current; on/off set the mode. "on" = semantic ("auto"), "off" =
+            # BM25-only ("bm25"). code_search reads config.code_search_recall LIVE
+            # per call, so the change applies this turn without rebuilding the agent.
+            _semantic = self.config.code_search_recall in ("auto", "embed")
+            if not arg or arg.lower() == "status":
+                self.console.print(f"code_search embeddings: {'on' if _semantic else 'off'}")
+                return True
+            val = arg.lower()
+            if val in ("on", "true", "yes", "1"):
+                self.config.code_search_recall = "auto"
+            elif val in ("off", "false", "no", "0"):
+                self.config.code_search_recall = "bm25"
+            else:
+                self.console.print("Usage: /codeembed [on|off]")
+                return True
+            self._persist_config()
+            _semantic = self.config.code_search_recall in ("auto", "embed")
+            self._ok(
+                f"[codeembed -> {'on' if _semantic else 'off'}]  {self._status()}"
+            )
+            self.console.print(
+                "on = semantic (may swap the embedding model on a single-GPU/local "
+                "server); off = BM25-only (fast, no swap).",
+                style="dim",
+            )
         elif cmd == "/verify":
             # View/set the auto-verify command (Feature 3). No arg -> show current;
             # "off" clears it (back to the prose build-nudge).
@@ -2625,6 +2661,60 @@ class Repl:
             writable = False
         _line(writable, "checkpoints dir writable",
               "" if writable else "cannot write ~/.llmcode/checkpoints — /undo disabled")
+
+        # Server tuning (local LLM): ranked, copy-pasteable load-time advice.
+        self.console.print("  Server tuning (local LLM):", style=success_style)
+
+        def _tip(text: str) -> None:
+            self.console.print(f"      · {text}", style="dim")
+
+        detected = getattr(self.provider, "_ctx_len", None)
+        if not isinstance(detected, int) or detected <= 0:
+            # Fall back to a best-effort lookup; NEVER raise (mock / no endpoint).
+            base_url = getattr(self.provider, "base_url", None) or self.config.base_url
+            model = getattr(self.provider, "model", None) or self.config.model
+            try:
+                detected = detect_context_length(base_url, model) if (base_url and model) else None
+            except Exception:  # noqa: BLE001 - best-effort; any failure -> skip
+                detected = None
+        if not isinstance(detected, int) or detected <= 0:
+            self.console.print(
+                "      server tuning advice unavailable (no local endpoint detected)",
+                style="dim",
+            )
+        else:
+            budget = self.config.context_budget
+            # The EFFECTIVE auto-compaction ceiling (raw floor grown toward ~80% of
+            # the server ctx, capped at _MAX_AUTO_COMPACT_CEILING) — NOT the raw
+            # context_soft_limit floor, which understates it ~2x on large servers.
+            soft = _effective_soft_limit(self.provider, self.config)
+            if detected > 4 * budget:
+                _tip(f"Server loaded at {detected} ctx but working budget is ~{budget} "
+                     f"(auto-compaction ceiling ~{soft}). Reload the model with a smaller "
+                     f"context (llama.cpp `-c 32768` / LM Studio 'Context Length' ≈ 32k–48k) "
+                     f"— KV memory is allocated at load and scales linearly with context, so "
+                     f"this frees VRAM/bandwidth.")
+            _tip("Enable flash attention (llama.cpp `-fa on` / LM Studio toggle) — mainly "
+                 "needed to unlock KV-cache quantization; small direct tok/s effect.")
+            _tip("KV cache quantization: `--cache-type-k q8_0 --cache-type-v q8_0` halves KV "
+                 "VRAM so you can FIT more context. HONEST NOTE: on Apple Metal q8 KV can be "
+                 "slightly SLOWER per token — use it to fit, not for speed.")
+            _tip("`--cache-reuse 256` recovers the post-compaction tail re-prefill that the "
+                 "prompt-cache (prefix-only) misses.")
+            _tip("Speculative decoding: load a small draft model (llama.cpp `-md <draft>` / "
+                 "LM Studio speculative decoding) — ~1.3–1.8x decode at low temperature. "
+                 "Guard: draft weights shrink the KV budget, so only with free VRAM.")
+            self.console.print(
+                "      Do NOT: avoid YaRN/RoPE context stretching (grows KV, hurts quality) "
+                "and `--mlock` unless you actually see swapping.",
+                style="dim",
+            )
+            self.console.print(
+                "      Note: these are mostly server LOAD-TIME settings the harness can't set "
+                "for you (LM Studio uses GUI toggles) — most are memory/VRAM wins that help "
+                "tok/s only indirectly by keeping all weights on-GPU.",
+                style="dim",
+            )
 
     def _macros(self) -> dict:
         """Discover project macros in ``<cwd>/.llmcode/commands/*.md`` (cached).

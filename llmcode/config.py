@@ -81,6 +81,12 @@ EFFORT_UNSET = ""
 # the safe "auto" default.
 RECALL_MODES = ("auto", "embed", "bm25", "off")
 
+# code_search recall modes (Config.code_search_recall). Same semantics as
+# RECALL_MODES but govern the deliberately-invoked code_search TOOL: "bm25" =
+# lexical-only (never calls embeddings); "auto"/"embed" re-enable semantic code
+# recall; "off" disables. Default is "bm25" (see the field below).
+CODE_SEARCH_RECALL_MODES = ("auto", "bm25", "embed", "off")
+
 # Permission modes (Config.permission_mode, --mode). Foundation for a later
 # feature wave; these only carry the value today (no behavior is wired yet).
 # "default" = CURRENT behavior (confirm destructive write/edit/bash tools).
@@ -386,6 +392,12 @@ class Config:
     # rerank_candidates: the candidate-pool width the reranker sees (guard: a real
     # int >= 1). Larger = more thorough but costs a bigger rerank chat prompt.
     rerank_candidates: int = 20
+    # code_search_recall: recall mode for the code_search TOOL (one of
+    # CODE_SEARCH_RECALL_MODES). Default BM25-only avoids embedding-model GPU
+    # swaps that evict the chat model on single-GPU/local servers; identifiers are
+    # lexical so BM25 is strong for code. Set to "auto"/"embed" (via /codeembed)
+    # to re-enable semantic code recall.
+    code_search_recall: str = "bm25"
     # ----- Foundation wave: fields carried now, BEHAVIOR wired in later waves.
     # Each default PRESERVES today's behavior; only the value is persisted here.
     # permission_mode: one of PERMISSION_MODES. "default" = current behavior
@@ -518,6 +530,12 @@ def load_config(path: Path = CONFIG_PATH) -> Config:
     # recall_mode: accept only a known mode; unknown/typo keeps the safe default.
     if isinstance(data.get("recall_mode"), str) and data["recall_mode"] in RECALL_MODES:
         cfg.recall_mode = data["recall_mode"]
+    # code_search_recall: accept only a known mode; unknown/typo keeps the default.
+    if (
+        isinstance(data.get("code_search_recall"), str)
+        and data["code_search_recall"] in CODE_SEARCH_RECALL_MODES
+    ):
+        cfg.code_search_recall = data["code_search_recall"]
     if isinstance(data.get("memory_enabled"), bool):
         cfg.memory_enabled = data["memory_enabled"]
     # memory_top_k: a real int > 0 only (bool is an int subclass — reject it).

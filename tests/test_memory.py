@@ -249,7 +249,7 @@ def test_incremental_embedding_only_embeds_new_hashes():
 def test_save_load_round_trip(tmp_path):
     store = _seeded_store()
     # Populate the vector cache so it is exercised by the round-trip.
-    store.retrieve("mcp", provider=MockProvider(), mode="auto", top_k=2)
+    store.retrieve("mcp", provider=MockProvider(), mode="embed", top_k=2)
     p = tmp_path / "mem.json"
     store.save(p)
 
@@ -297,6 +297,165 @@ def test_save_never_raises_on_oserror(tmp_path, monkeypatch):
     monkeypatch.setattr(m.tempfile, "mkstemp", _boom)
     # Must NOT raise.
     _seeded_store().save(tmp_path / "mem.json")
+
+
+def test_save_writes_f32_sidecar_not_inline_json(tmp_path):
+    """NEW format: vectors go to a packed-f32 `<path>.vec` sidecar; the JSON keeps
+    only slim metadata (vector_format/vector_dim/vector_hashes) — NOT inline
+    "vectors" (that was the ~4x on-disk bloat + peak-RAM spike being removed)."""
+    import json
+
+    store = _seeded_store()
+    store.retrieve("mcp", provider=MockProvider(), mode="embed", top_k=2)  # fill vectors
+    p = tmp_path / "mem.json"
+    store.save(p)
+
+    assert (tmp_path / "mem.json.vec").exists()  # sidecar written next to the JSON
+    data = json.loads(p.read_text(encoding="utf-8"))
+    assert "vectors" not in data  # no inline float bloat
+    assert data["vector_format"] == "f32-sidecar-v1"
+    assert data["vector_dim"] == 64
+    assert set(data["vector_hashes"]) == set(store.vectors)
+
+
+def test_load_old_inline_format_still_works(tmp_path):
+    """BACKWARD COMPAT: an OLD-format store (vectors inline, no vector_format /
+    no sidecar) — as already on users' disks under ~/.llmcode — still loads its
+    vectors correctly."""
+    import json
+
+    p = tmp_path / "old.json"
+    p.write_text(json.dumps({
+        "records": [{"id": "r0", "text": "hello", "summary": "h", "content_hash": "abc"}],
+        "vectors": {"abc": [0.5, 1.5, 2.5]},
+    }), encoding="utf-8")
+    loaded = MemoryStore.load(p)
+    assert [r.content_hash for r in loaded.records] == ["abc"]
+    assert list(loaded.vectors["abc"]) == [0.5, 1.5, 2.5]
+
+
+def test_load_missing_sidecar_yields_empty_vectors(tmp_path):
+    """SAFETY: a new-format store whose `.vec` sidecar is gone loads with
+    vectors == {} (they lazily re-embed) — NO crash, records preserved."""
+    store = _seeded_store()
+    store.retrieve("mcp", provider=MockProvider(), mode="embed", top_k=2)
+    p = tmp_path / "mem.json"
+    store.save(p)
+    (tmp_path / "mem.json.vec").unlink()  # sidecar vanishes
+
+    loaded = MemoryStore.load(p)
+    assert loaded.vectors == {}  # absent, not wrong
+    assert len(loaded.records) == len(store.records)  # records intact
+
+
+def test_load_truncated_sidecar_yields_empty_vectors(tmp_path):
+    """SAFETY: a short/torn `.vec` (size != dim*4*count) is rejected wholesale ->
+    vectors == {}, no exception, records intact."""
+    store = _seeded_store()
+    store.retrieve("mcp", provider=MockProvider(), mode="embed", top_k=2)
+    p = tmp_path / "mem.json"
+    store.save(p)
+    (tmp_path / "mem.json.vec").write_bytes(b"\x00\x01\x02")  # truncate
+
+    loaded = MemoryStore.load(p)
+    assert loaded.vectors == {}
+    assert len(loaded.records) == len(store.records)
+
+
+def test_save_falls_back_to_inline_when_sidecar_write_fails(tmp_path, monkeypatch):
+    """SAFETY: if the sidecar write raises, save() falls back to the legacy
+    inline-JSON format (vectors embedded) — data is never lost — and load()
+    recovers those vectors exactly."""
+    import json
+    import llmcode.memory as m
+
+    real = m._atomic_write_bytes
+
+    def _fail_on_vec(path, data):
+        if str(path).endswith(".vec"):
+            raise OSError("sidecar boom")
+        return real(path, data)
+
+    monkeypatch.setattr(m, "_atomic_write_bytes", _fail_on_vec)
+    store = _seeded_store()
+    store.retrieve("mcp", provider=MockProvider(), mode="embed", top_k=2)
+    p = tmp_path / "mem.json"
+    store.save(p)
+
+    assert not (tmp_path / "mem.json.vec").exists()  # sidecar never landed
+    data = json.loads(p.read_text(encoding="utf-8"))
+    assert "vectors" in data and "vector_format" not in data  # legacy inline
+    loaded = MemoryStore.load(p)
+    assert set(loaded.vectors) == set(store.vectors)
+    for h, v in store.vectors.items():
+        assert loaded.vectors[h] == v
+
+
+def test_load_torn_write_sig_mismatch_yields_empty_vectors(tmp_path):
+    """SAFETY (torn-write guard): a NEW-format store whose `.vec` was overwritten
+    with DIFFERENT bytes of the SAME length — the exact crash-between-writes case
+    (new sidecar + STALE meta) the byte-size guard alone would MISS — is rejected
+    by the content fingerprint -> vectors == {} (lazy re-embed), records intact.
+    The old size-only guard would have loaded positionally-mispaired vectors."""
+    store = _seeded_store()
+    store.retrieve("mcp", provider=MockProvider(), mode="embed", top_k=2)
+    p = tmp_path / "mem.json"
+    store.save(p)
+    vec = tmp_path / "mem.json.vec"
+    raw = vec.read_bytes()
+    tampered = bytes((b ^ 0xFF) for b in raw)  # same length, every byte differs
+    assert len(tampered) == len(raw)
+    vec.write_bytes(tampered)
+
+    loaded = MemoryStore.load(p)
+    assert loaded.vectors == {}  # mispaired bytes refused, not loaded
+    assert len(loaded.records) == len(store.records)  # records intact
+
+
+def test_save_records_sig_and_byteorder_in_meta(tmp_path):
+    """The f32 sidecar meta is self-describing: it carries a content fingerprint
+    (vector_sig) and the native byte order (vector_byteorder)."""
+    import json
+    import sys
+
+    store = _seeded_store()
+    store.retrieve("mcp", provider=MockProvider(), mode="embed", top_k=2)
+    p = tmp_path / "mem.json"
+    store.save(p)
+    data = json.loads(p.read_text(encoding="utf-8"))
+    assert isinstance(data["vector_sig"], str) and len(data["vector_sig"]) == 16
+    assert data["vector_byteorder"] == sys.byteorder
+
+
+def test_inline_fallback_removes_stale_sidecar(tmp_path, monkeypatch):
+    """When save() falls back to inline-JSON (sidecar writer raises), a stale
+    `.vec` from a prior successful save is removed so it can't linger next to the
+    fresh inline meta — and vectors still recover from the inline copy."""
+    import json
+    import llmcode.memory as m
+
+    store = _seeded_store()
+    store.retrieve("mcp", provider=MockProvider(), mode="embed", top_k=2)
+    p = tmp_path / "mem.json"
+    store.save(p)  # first save writes a real sidecar
+    assert (tmp_path / "mem.json.vec").exists()
+
+    real = m._atomic_write_bytes
+
+    def _fail_on_vec(path, data):
+        if str(path).endswith(".vec"):
+            raise OSError("sidecar boom")
+        return real(path, data)
+
+    monkeypatch.setattr(m, "_atomic_write_bytes", _fail_on_vec)
+    store._dirty = True  # re-arm the no-op guard so save() actually runs
+    store.save(p)
+
+    assert not (tmp_path / "mem.json.vec").exists()  # stale sidecar cleaned up
+    data = json.loads(p.read_text(encoding="utf-8"))
+    assert "vectors" in data and "vector_format" not in data  # legacy inline
+    loaded = MemoryStore.load(p)
+    assert set(loaded.vectors) == set(store.vectors)
 
 
 # --------------------------------------------------------------------------- #
