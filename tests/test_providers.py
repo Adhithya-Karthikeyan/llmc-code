@@ -854,3 +854,90 @@ def test_local_assembles_large_streamed_tool_call_args():
     assert calls[0]["arguments"]["path"] == "big.py"
     assert calls[0]["arguments"]["content"] == "x = 1\n" * 4000
     assert events[-1]["finish_reason"] == "tool_calls"
+
+
+# ----- base_url normalization (bare host -> /v1) --------------------------
+
+@pytest.mark.parametrize(
+    "raw, expected",
+    [
+        # Bare host (no path): /v1 is appended so the SDK hits the API root.
+        ("http://127.0.0.1:1234", "http://127.0.0.1:1234/v1"),
+        # Bare host with a trailing slash: same, without a doubled slash.
+        ("http://127.0.0.1:1234/", "http://127.0.0.1:1234/v1"),
+        # Already has the OpenAI path: unchanged.
+        ("http://localhost:1234/v1", "http://localhost:1234/v1"),
+        # Already has a path (even trailing-slash): unchanged, not re-appended.
+        ("http://localhost:1234/v1/", "http://localhost:1234/v1/"),
+        # An intentional custom endpoint (any non-empty path): respected as-is.
+        ("http://host:8000/api", "http://host:8000/api"),
+        # Garbage / non-URL string: returned unchanged, never raises.
+        ("not a url", "not a url"),
+    ],
+)
+def test_normalize_openai_base_url(raw, expected):
+    from llmcode.providers import _normalize_openai_base_url
+
+    assert _normalize_openai_base_url(raw) == expected
+
+
+def test_local_provider_normalizes_bare_host_base_url():
+    """A bare-host base_url is normalized to /v1 at construction so chat +
+    embeddings + _get_client all target the OpenAI API root, not the server ROOT."""
+    from llmcode.providers import LocalProvider
+
+    lp = LocalProvider(model="m", base_url="http://127.0.0.1:1234", api_key="x")
+    assert lp.base_url.endswith("/v1")
+    assert lp.base_url == "http://127.0.0.1:1234/v1"
+
+
+# ----- list_local_models: normalization + loopback proxy defense ----------
+
+def _capture_list_models_kwargs(monkeypatch, base_url, private=False):
+    """Run list_local_models with a fake openai (real httpx) and return the
+    OpenAI(**kwargs) it was constructed with. No network: models.list() is stubbed."""
+    import types
+
+    from llmcode.providers import list_local_models
+
+    captured: dict = {}
+
+    class _FakeModels:
+        def list(self):
+            return types.SimpleNamespace(data=[])
+
+    class _FakeOpenAI:
+        def __init__(self, **kwargs):
+            captured.update(kwargs)
+            self.models = _FakeModels()
+
+    fake_openai = types.ModuleType("openai")
+    fake_openai.OpenAI = _FakeOpenAI
+    monkeypatch.setitem(sys.modules, "openai", fake_openai)
+
+    list_local_models(base_url, "k", private=private)
+    return captured
+
+
+def test_list_local_models_normalizes_bare_host(monkeypatch):
+    # A bare-host loopback base_url is normalized to /v1 before the client is
+    # built, so models.list() hits /v1/models (not the ROOT -> 0 models).
+    captured = _capture_list_models_kwargs(monkeypatch, "http://127.0.0.1:1234")
+    assert "/v1" in str(captured.get("base_url"))
+
+
+def test_list_local_models_loopback_disables_proxy(monkeypatch):
+    # A loopback metadata call in DEFAULT (non-private) mode must build an
+    # explicit httpx client with trust_env=False so HTTP(S)_PROXY/ALL_PROXY
+    # cannot tunnel the model-list call off-box (mirrors _get_client).
+    captured = _capture_list_models_kwargs(monkeypatch, "http://127.0.0.1:1234/v1")
+    http_client = captured.get("http_client")
+    assert http_client is not None
+    assert http_client.trust_env is False
+
+
+def test_list_local_models_external_honors_proxy(monkeypatch):
+    # A genuinely external (non-loopback, non-private) base_url stays on the
+    # default client so proxy env vars are honored, as designed.
+    captured = _capture_list_models_kwargs(monkeypatch, "http://example.com:1234/v1")
+    assert "http_client" not in captured

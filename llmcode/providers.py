@@ -73,6 +73,21 @@ def _pin_loopback_base_url(base_url: str) -> tuple[str, str | None]:
     return pinned_url, original_host
 
 
+def _normalize_openai_base_url(base_url: str) -> str:
+    """Ensure an OpenAI-compatible base_url has an API path. LM Studio serves the
+    OpenAI API under /v1; a bare host (e.g. http://127.0.0.1:1234) makes the SDK
+    hit /models, /chat/completions at the ROOT (wrong). If the URL has no path
+    (or just '/'), append '/v1'. A URL that already has a path (…/v1, …/api, …) is
+    left untouched so an intentional custom endpoint is respected."""
+    try:
+        p = urllib.parse.urlparse(base_url)
+        if p.scheme and p.netloc and p.path.strip("/") == "":
+            return base_url.rstrip("/") + "/v1"
+    except Exception:  # noqa: BLE001 - never raise from a normalizer; return input
+        pass
+    return base_url
+
+
 # ---------------------------------------------------------------------------
 # Text-fallback tool-call parser (module scope; stdlib only)
 # ---------------------------------------------------------------------------
@@ -873,6 +888,10 @@ def list_local_models(base_url: str, api_key: str, private: bool = False) -> lis
     """
     from openai import OpenAI  # noqa: PLC0415
 
+    # Normalize a bare-host base_url (…:1234 -> …:1234/v1) so models.list() hits
+    # /v1/models, not the server ROOT (which returns 0 models). See _get_client.
+    base_url = _normalize_openai_base_url(base_url)
+
     kwargs: dict = {"base_url": base_url, "api_key": api_key, "timeout": _MODELS_TIMEOUT}
     if private:
         import httpx  # noqa: PLC0415
@@ -881,6 +900,20 @@ def list_local_models(base_url: str, api_key: str, private: bool = False) -> lis
         # host once and connect to that literal IP so httpx cannot re-resolve a
         # hostname to a public address between calls. The original Host header is
         # preserved so the local server still sees the intended vhost.
+        pinned_url, host_header = _pin_loopback_base_url(base_url)
+        kwargs["base_url"] = pinned_url
+        headers = {"Host": host_header} if host_header else None
+        kwargs["http_client"] = httpx.Client(
+            trust_env=False, timeout=_MODELS_TIMEOUT, headers=headers
+        )
+    elif is_loopback_url(base_url):
+        # DEFAULT (network-on) HARDENING (finding #3): a loopback metadata call
+        # must never be tunneled through HTTP(S)_PROXY/ALL_PROXY. Mirror
+        # _get_client: IP-pin the loopback host and build an httpx client with
+        # trust_env=False so proxy env vars are ignored. External (non-loopback,
+        # non-private) base_urls stay on the default client (proxy honored).
+        import httpx  # noqa: PLC0415
+
         pinned_url, host_header = _pin_loopback_base_url(base_url)
         kwargs["base_url"] = pinned_url
         headers = {"Host": host_header} if host_header else None
@@ -1054,7 +1087,10 @@ class LocalProvider(Provider):
         # turns (re-prefill only the delta). None = do not pin (omit the key).
         self.id_slot = id_slot
         self.model = model
-        self.base_url = base_url
+        # Normalize a bare-host base_url (…:1234 -> …:1234/v1) so the OpenAI SDK
+        # hits /v1/chat/completions + /v1/embeddings, not the server ROOT. A URL
+        # that already has a path is left untouched.
+        self.base_url = _normalize_openai_base_url(base_url)
         self.api_key = api_key
         # Sampling temperature sent on every request. LOW by default for
         # deterministic, well-formed code/tool-call output (Feature 1); the server
