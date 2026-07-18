@@ -43,16 +43,20 @@ from __future__ import annotations
 import ast
 import json
 import os
-import tempfile
+from array import array
 from dataclasses import dataclass, field
 from pathlib import Path
 
 from .memory import (
     _BM25Index,
     _QueryVecLRU,
+    _atomic_write_json,
     _bm25_score_index,
     _build_bm25_index,
+    _load_vectors,
+    _save_vectors_sidecar,
     _tokenize,
+    _unlink_sidecar,
     content_hash,
     cosine,
 )
@@ -278,6 +282,9 @@ class CodeIndex:
     MAX_CHUNKS (so the tool can warn instead of silently truncating)."""
 
     chunks: list[CodeChunk] = field(default_factory=list)
+    # Values are ``array('f')`` (float32) at runtime, not boxed ``list[float]`` —
+    # a ~85% RAM cut for a full corpus. On-disk JSON is unchanged (save() emits
+    # ``list(v)``, load() rebuilds ``array('f')``).
     vectors: dict[str, list[float]] = field(default_factory=dict)
     file_hashes: dict[str, str] = field(default_factory=dict)
     capped: bool = False
@@ -503,7 +510,7 @@ class CodeIndex:
                         return []
                     vecs.extend(bvecs)
                 for c, v in zip(items, vecs):
-                    self.vectors[c.content_hash] = [float(x) for x in v]
+                    self.vectors[c.content_hash] = array('f', (float(x) for x in v))
                 # Newly embedded vectors must survive across save/load (the documented
                 # "vectors survive"): mark dirty so the caller's save() persists them.
                 self._dirty = True
@@ -541,34 +548,39 @@ class CodeIndex:
     # ----- persistence (atomic; mirrors memory.MemoryStore) ----------------
 
     def save(self, path) -> None:
-        """Atomically persist chunks + vectors + file_hashes as one JSON object.
-        Best-effort: write a temp file in the same dir then os.replace; never
-        raises. NO-OP when the index is not ``_dirty``."""
+        """Atomically persist chunks + vectors + file_hashes. Best-effort: write a
+        temp file in the same dir then os.replace; never raises. NO-OP when the
+        index is not ``_dirty``.
+
+        Vectors are written as a packed float32 SIDECAR (``<path>.vec``); the JSON
+        keeps only slim metadata. If the sidecar can't be written (empty/ragged
+        vectors, or ANY error) it FALLS BACK to the legacy inline-JSON format so
+        data is never lost."""
         if not self._dirty:
             return
-        payload = {
+        try:
+            target = Path(path)
+            target.parent.mkdir(parents=True, exist_ok=True)
+            _harden_state_dir()  # restrict ~/.llmcode to the owner (best-effort)
+        except OSError:
+            return  # can't prepare the dir — best-effort: silently skip
+        base = {
             "chunks": [c.to_dict() for c in self.chunks],
-            "vectors": {h: list(v) for h, v in self.vectors.items()},
             "file_hashes": dict(self.file_hashes),
             "capped": bool(self.capped),
         }
+        # Preferred: packed-f32 vector sidecar + slim meta JSON (sidecar FIRST).
+        if _save_vectors_sidecar(target, base, self.vectors):
+            self._dirty = False
+            return
+        # Fallback: legacy inline-JSON (vectors embedded), best-effort. Drop any
+        # stale sidecar first so an old `.vec` isn't orphaned beside inline meta.
+        _unlink_sidecar(target)
+        payload = dict(base)
+        payload["vectors"] = {h: list(v) for h, v in self.vectors.items()}
         try:
-            target = Path(path)
-            directory = target.parent
-            directory.mkdir(parents=True, exist_ok=True)
-            _harden_state_dir()  # restrict ~/.llmcode to the owner (best-effort)
-            fd, tmp = tempfile.mkstemp(dir=str(directory), suffix=".tmp")
-            try:
-                with os.fdopen(fd, "w", encoding="utf-8") as fh:
-                    json.dump(payload, fh, ensure_ascii=False)
-                os.replace(tmp, str(target))
-                self._dirty = False  # on-disk copy now matches memory
-            except OSError:
-                try:
-                    os.unlink(tmp)
-                except OSError:
-                    pass
-                raise
+            _atomic_write_json(target, payload)
+            self._dirty = False  # on-disk copy now matches memory
         except OSError:
             return  # best-effort: disk full / permissions / etc. — silently skip
 
@@ -576,7 +588,9 @@ class CodeIndex:
     def load(cls, path) -> CodeIndex:
         """Read an index from ``path``; an EMPTY index on missing/corrupt/invalid
         input (never raises). Non-dict chunks and non-numeric vectors are dropped
-        so a hand-edited file can't crash a consumer."""
+        so a hand-edited file can't crash a consumer. Vectors load from the f32
+        sidecar (new format) or inline JSON (old format); a missing/torn sidecar
+        yields ``{}`` (lazy re-embed) rather than crashing."""
         try:
             raw = Path(path).read_text(encoding="utf-8")
         except OSError:
@@ -589,15 +603,7 @@ class CodeIndex:
             return cls()
         chunks = [CodeChunk.from_dict(cd) for cd in (data.get("chunks") or [])
                   if isinstance(cd, dict)]
-        vectors: dict[str, list[float]] = {}
-        raw_vecs = data.get("vectors")
-        if isinstance(raw_vecs, dict):
-            for h, v in raw_vecs.items():
-                if isinstance(h, str) and isinstance(v, list):
-                    try:
-                        vectors[h] = [float(x) for x in v]
-                    except (TypeError, ValueError):
-                        continue
+        vectors = _load_vectors(path, data)
         file_hashes: dict[str, str] = {}
         raw_fh = data.get("file_hashes")
         if isinstance(raw_fh, dict):
@@ -743,9 +749,12 @@ def make_code_search_tool(provider, workspace, private: bool = False,
     so it is SAFE in --private lockdown and is intentionally never dropped there.
 
     ``config`` is read LIVE on each call (not captured at build time) for the
-    gated LLM-judge reranker: ``config.rerank`` / ``config.rerank_candidates``.
-    Reading it at call time means ``/rerank on`` takes effect this turn without
-    rebuilding the agent. ``None`` (tests/sub-agents) leaves rerank off.
+    gated LLM-judge reranker: ``config.rerank`` / ``config.rerank_candidates``,
+    and for ``config.code_search_recall`` (the search mode: "bm25" lexical-only by
+    default, "auto"/"embed" to re-enable semantic recall). Reading it at call time
+    means ``/rerank on`` / ``/codeembed on`` take effect this turn without
+    rebuilding the agent. ``None`` (tests/sub-agents) leaves rerank off and the
+    recall mode at the safe "bm25" default (no embedding-model GPU swap).
     """
     del private  # no-op: code_search is local-only and safe in private mode
     from .tools import Tool
@@ -771,7 +780,11 @@ def make_code_search_tool(provider, workspace, private: bool = False,
         # off when no config is supplied (tests, sub-agents built without one).
         rr = bool(getattr(config, "rerank", False)) if config is not None else False
         rc = getattr(config, "rerank_candidates", 20) if config is not None else 20
-        hits = idx.search(query, top_k=k, provider=provider, rerank=rr,
+        # Read the recall mode LIVE so /codeembed on|off applies this turn. Defaults
+        # to "bm25" (lexical-only, no embedding-model GPU swap) when no config is
+        # supplied (tests, sub-agents built without one).
+        mode = getattr(config, "code_search_recall", "bm25") if config is not None else "bm25"
+        hits = idx.search(query, top_k=k, provider=provider, mode=mode, rerank=rr,
                           rerank_candidates=rc)
         # Persist AFTER search so query-time embedded vectors are saved too (otherwise a
         # static repo re-embeds from scratch every process); no-op when nothing changed.

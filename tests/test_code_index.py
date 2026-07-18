@@ -20,6 +20,7 @@ from llmcode.code_index import (
     index_path,
     make_code_search_tool,
 )
+from llmcode.config import Config
 from llmcode.providers import MockProvider
 from llmcode.session import session_id
 
@@ -380,28 +381,34 @@ def test_save_load_round_trip(tmp_path):
 
 
 def test_save_is_noop_when_not_dirty(tmp_path, monkeypatch):
+    # The atomic writer now lives in the shared memory module (mkstemp+os.replace).
+    import llmcode.memory as mem
+
     idx = _seeded_index(tmp_path)
     p = tmp_path / "ci.json"
     idx.save(p)
     assert idx._dirty is False
 
     calls = []
-    orig = ci.tempfile.mkstemp
+    orig = mem.tempfile.mkstemp
 
     def _spy(*a, **k):
         calls.append(1)
         return orig(*a, **k)
 
-    monkeypatch.setattr(ci.tempfile, "mkstemp", _spy)
+    monkeypatch.setattr(mem.tempfile, "mkstemp", _spy)
     idx.save(p)  # clean -> must NOT serialize
     assert calls == []
 
 
 def test_save_never_raises_on_oserror(tmp_path, monkeypatch):
+    # The atomic writer now lives in the shared memory module (mkstemp+os.replace).
+    import llmcode.memory as mem
+
     def _boom(*a, **k):
         raise OSError("disk full")
 
-    monkeypatch.setattr(ci.tempfile, "mkstemp", _boom)
+    monkeypatch.setattr(mem.tempfile, "mkstemp", _boom)
     _seeded_index(tmp_path).save(tmp_path / "ci.json")  # must NOT raise
 
 
@@ -421,6 +428,171 @@ def test_load_non_object_returns_empty(tmp_path):
     p = tmp_path / "arr.json"
     p.write_text('["a", "b"]', encoding="utf-8")
     assert CodeIndex.load(p).chunks == []
+
+
+def test_save_writes_f32_sidecar_not_inline_json(tmp_path):
+    """NEW format: vectors go to a packed-f32 `<path>.vec` sidecar; the JSON keeps
+    only slim metadata (vector_format/vector_dim/vector_hashes), NOT inline
+    "vectors" — chunks/file_hashes/capped stay in the JSON as before."""
+    import json
+
+    idx = _seeded_index(tmp_path)
+    idx.search("mcp_toggle", provider=MockProvider(), mode="embed", top_k=3)  # fill vectors
+    p = tmp_path / "store" / "code_index.json"
+    idx.save(p)
+
+    assert (p.parent / "code_index.json.vec").exists()  # sidecar written
+    data = json.loads(p.read_text(encoding="utf-8"))
+    assert "vectors" not in data  # no inline float bloat
+    assert data["vector_format"] == "f32-sidecar-v1"
+    assert data["vector_dim"] == 64
+    assert set(data["vector_hashes"]) == set(idx.vectors)
+    assert "chunks" in data and "file_hashes" in data  # non-vector state stays inline
+
+
+def test_load_old_inline_format_still_works(tmp_path):
+    """BACKWARD COMPAT: an OLD-format index (vectors inline, no vector_format /
+    no sidecar) still loads its vectors + chunks + file_hashes correctly."""
+    import json
+
+    p = tmp_path / "old.json"
+    p.write_text(json.dumps({
+        "chunks": [{"path": "a.py", "start_line": 1, "end_line": 2,
+                    "text": "x", "content_hash": "abc"}],
+        "vectors": {"abc": [0.5, 1.5, 2.5]},
+        "file_hashes": {"a.py": "sig"},
+        "capped": False,
+    }), encoding="utf-8")
+    loaded = CodeIndex.load(p)
+    assert [c.content_hash for c in loaded.chunks] == ["abc"]
+    assert list(loaded.vectors["abc"]) == [0.5, 1.5, 2.5]
+    assert loaded.file_hashes == {"a.py": "sig"}
+
+
+def test_load_missing_sidecar_yields_empty_vectors(tmp_path):
+    """SAFETY: a new-format index whose `.vec` sidecar is gone loads with
+    vectors == {} (they lazily re-embed) — NO crash, chunks/file_hashes intact."""
+    idx = _seeded_index(tmp_path)
+    idx.search("mcp_toggle", provider=MockProvider(), mode="embed", top_k=3)
+    p = tmp_path / "ci.json"
+    idx.save(p)
+    (tmp_path / "ci.json.vec").unlink()  # sidecar vanishes
+
+    loaded = CodeIndex.load(p)
+    assert loaded.vectors == {}  # absent, not wrong
+    assert len(loaded.chunks) == len(idx.chunks)
+    assert loaded.file_hashes == idx.file_hashes
+
+
+def test_load_truncated_sidecar_yields_empty_vectors(tmp_path):
+    """SAFETY: a short/torn `.vec` (size != dim*4*count) is rejected wholesale ->
+    vectors == {}, no exception, chunks intact."""
+    idx = _seeded_index(tmp_path)
+    idx.search("mcp_toggle", provider=MockProvider(), mode="embed", top_k=3)
+    p = tmp_path / "ci.json"
+    idx.save(p)
+    (tmp_path / "ci.json.vec").write_bytes(b"\x00\x01\x02")  # truncate
+
+    loaded = CodeIndex.load(p)
+    assert loaded.vectors == {}
+    assert len(loaded.chunks) == len(idx.chunks)
+
+
+def test_save_falls_back_to_inline_when_sidecar_write_fails(tmp_path, monkeypatch):
+    """SAFETY: if the sidecar write raises, save() falls back to the legacy
+    inline-JSON format (vectors embedded) — data is never lost — and load()
+    recovers those vectors exactly."""
+    import json
+    import llmcode.memory as mem
+
+    real = mem._atomic_write_bytes
+
+    def _fail_on_vec(path, data):
+        if str(path).endswith(".vec"):
+            raise OSError("sidecar boom")
+        return real(path, data)
+
+    monkeypatch.setattr(mem, "_atomic_write_bytes", _fail_on_vec)
+    idx = _seeded_index(tmp_path)
+    idx.search("mcp_toggle", provider=MockProvider(), mode="embed", top_k=3)
+    p = tmp_path / "ci.json"
+    idx.save(p)
+
+    assert not (tmp_path / "ci.json.vec").exists()  # sidecar never landed
+    data = json.loads(p.read_text(encoding="utf-8"))
+    assert "vectors" in data and "vector_format" not in data  # legacy inline
+    loaded = CodeIndex.load(p)
+    assert set(loaded.vectors) == set(idx.vectors)
+    for h, v in idx.vectors.items():
+        assert loaded.vectors[h] == v
+
+
+def test_load_torn_write_sig_mismatch_yields_empty_vectors(tmp_path):
+    """SAFETY (torn-write guard): a NEW-format index whose `.vec` was overwritten
+    with DIFFERENT bytes of the SAME length — the crash-between-writes case (new
+    sidecar + STALE meta) the byte-size guard alone would MISS — is rejected by the
+    content fingerprint -> vectors == {} (lazy re-embed), chunks intact. The old
+    size-only guard would have loaded positionally-mispaired vectors."""
+    idx = _seeded_index(tmp_path)
+    idx.search("mcp_toggle", provider=MockProvider(), mode="embed", top_k=3)
+    p = tmp_path / "ci.json"
+    idx.save(p)
+    vec = tmp_path / "ci.json.vec"
+    raw = vec.read_bytes()
+    tampered = bytes((b ^ 0xFF) for b in raw)  # same length, every byte differs
+    assert len(tampered) == len(raw)
+    vec.write_bytes(tampered)
+
+    loaded = CodeIndex.load(p)
+    assert loaded.vectors == {}  # mispaired bytes refused, not loaded
+    assert len(loaded.chunks) == len(idx.chunks)  # chunks intact
+    assert loaded.file_hashes == idx.file_hashes
+
+
+def test_save_records_sig_and_byteorder_in_meta(tmp_path):
+    """The f32 sidecar meta is self-describing: it carries a content fingerprint
+    (vector_sig) and the native byte order (vector_byteorder)."""
+    import json
+    import sys
+
+    idx = _seeded_index(tmp_path)
+    idx.search("mcp_toggle", provider=MockProvider(), mode="embed", top_k=3)
+    p = tmp_path / "ci.json"
+    idx.save(p)
+    data = json.loads(p.read_text(encoding="utf-8"))
+    assert isinstance(data["vector_sig"], str) and len(data["vector_sig"]) == 16
+    assert data["vector_byteorder"] == sys.byteorder
+
+
+def test_inline_fallback_removes_stale_sidecar(tmp_path, monkeypatch):
+    """When save() falls back to inline-JSON (sidecar writer raises), a stale
+    `.vec` from a prior successful save is removed so it can't linger next to the
+    fresh inline meta — and vectors still recover from the inline copy."""
+    import json
+    import llmcode.memory as mem
+
+    idx = _seeded_index(tmp_path)
+    idx.search("mcp_toggle", provider=MockProvider(), mode="embed", top_k=3)
+    p = tmp_path / "ci.json"
+    idx.save(p)  # first save writes a real sidecar
+    assert (tmp_path / "ci.json.vec").exists()
+
+    real = mem._atomic_write_bytes
+
+    def _fail_on_vec(path, data):
+        if str(path).endswith(".vec"):
+            raise OSError("sidecar boom")
+        return real(path, data)
+
+    monkeypatch.setattr(mem, "_atomic_write_bytes", _fail_on_vec)
+    idx._dirty = True  # re-arm the no-op guard so save() actually runs
+    idx.save(p)
+
+    assert not (tmp_path / "ci.json.vec").exists()  # stale sidecar cleaned up
+    data = json.loads(p.read_text(encoding="utf-8"))
+    assert "vectors" in data and "vector_format" not in data  # legacy inline
+    loaded = CodeIndex.load(p)
+    assert set(loaded.vectors) == set(idx.vectors)
 
 
 def test_chunk_from_dict_tolerant_of_missing_keys():
@@ -637,7 +809,12 @@ def test_query_time_vectors_persist_across_processes(tmp_path, monkeypatch):
     ws = tmp_path / "proj"
     _write(ws, "a.py", "def alpha_widget():\n    return 1\n")
     ci._INDEX_CACHE.clear()
-    tool = make_code_search_tool(provider=MockProvider(), workspace=str(ws))
+    # This test exercises the embed path via the TOOL, so opt in explicitly
+    # (the tool now defaults to bm25-only to avoid mid-turn embedding GPU swaps).
+    tool = make_code_search_tool(
+        provider=MockProvider(), workspace=str(ws),
+        config=Config(code_search_recall="auto"),
+    )
     # No lexical overlap -> auto escalates to embeddings -> vectors cached + saved.
     out = tool.fn({"query": "zzzzz qqqqq paraphrase"})
     assert out["ok"] is True

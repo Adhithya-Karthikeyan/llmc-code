@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from llmcode.config import Config
 from llmcode.providers import _pick_context_length
-from llmcode.repl import _effective_soft_limit
+from llmcode.repl import _MAX_AUTO_COMPACT_CEILING, _effective_soft_limit
 
 
 class _Prov:
@@ -35,10 +35,23 @@ def test_pick_context_length():
 def test_effective_soft_limit_raises_for_big_context():
     cfg = Config()
     cfg.context_soft_limit = 24000
-    # qwen 256k -> budget ~80% of it (cached ctx avoids any network call)
-    assert _effective_soft_limit(_Prov("http://h/v1", "qwen", 262144), cfg) == max(24000, int(262144 * 0.8))
-    # gemma 32k -> just above the floor
+    # qwen 256k -> ~80% of it BUT capped at the 48k auto-compaction ceiling
+    # (past ~48k the per-token KV bandwidth + re-prefill cost outweigh more context).
+    assert _effective_soft_limit(_Prov("http://h/v1", "qwen", 262144), cfg) == _MAX_AUTO_COMPACT_CEILING
+    # gemma 32k -> just above the floor (below the cap, so 80% is used)
     assert _effective_soft_limit(_Prov("http://h/v1", "gemma", 32768), cfg) == max(24000, int(32768 * 0.8))
+
+
+def test_effective_soft_limit_caps_at_ceiling():
+    cfg = Config()
+    cfg.context_soft_limit = 24000
+    # (a) small window below the cap -> plain 80% (32000 * 0.8 = 25600)
+    assert _effective_soft_limit(_Prov("http://h/v1", "small", 32000), cfg) == 25600
+    # (b) huge window -> capped at 48000, NOT 204800 (256000 * 0.8)
+    assert _effective_soft_limit(_Prov("http://h/v1", "huge", 256000), cfg) == 48000
+    # (c) a user floor larger than the cap still wins (max(floor, capped))
+    cfg.context_soft_limit = 60000
+    assert _effective_soft_limit(_Prov("http://h/v1", "huge", 256000), cfg) == 60000
 
 
 def test_effective_soft_limit_falls_back_to_floor():
