@@ -130,8 +130,24 @@ figcaption{ font-size:8.6pt; color:var(--ink-faint); margin-top:2mm; }
   justify-content:space-between; font-family:var(--mono); font-size:7.5pt; color:#b3bfcc; }
 .big{ font-family:var(--serif); font-size:17pt; color:#12293d; line-height:1.3; }
 .stat{ text-align:center; }
-.stat .n{ font-family:var(--serif); font-size:26pt; color:var(--blue); font-weight:600; line-height:1; }
+.stat .n{ font-family:var(--serif); font-size:21pt; color:var(--blue); font-weight:600;
+          line-height:1.05; white-space:nowrap; }
 
+
+/* box-anatomy header strip */
+.boxstrip{ display:flex; gap:3mm; margin:0 0 4mm 0; }
+.boxstrip .chip{ flex:1; border-radius:4px; padding:2.2mm 3mm; border:1.4px solid; }
+.boxstrip .chip .n{ font-family:var(--mono); font-size:10pt; font-weight:700; margin-bottom:.6mm; }
+.boxstrip .chip .d{ font-size:8.8pt; line-height:1.35; color:var(--ink-soft); }
+.chip.g{ background:#ecf8f2; border-color:#1d7a53; } .chip.g .n{ color:#155e40; }
+.chip.a{ background:#fdf3e8; border-color:#a8611f; } .chip.a .n{ color:#8a4f19; }
+.chip.p{ background:#f4eefc; border-color:#6a3fa0; } .chip.p .n{ color:#563285; }
+.chip.b{ background:#eef4fc; border-color:#1f5fa8; } .chip.b .n{ color:#1a4f8c; }
+.boxnote{ font-family:var(--mono); font-size:7.6pt; letter-spacing:.12em; text-transform:uppercase;
+          color:var(--ink-faint); margin-bottom:2mm; }
+.qa{ margin-bottom:3mm; }
+.qa .q{ font-weight:650; color:#0f2436; font-size:10.4pt; margin-bottom:1mm; }
+.qa .a{ font-size:10pt; line-height:1.45; color:var(--ink); }
 /* module cards */
 .modgrid{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:3.2mm; }
 .mod{ border:1px solid var(--rule); border-radius:4px; padding:2.4mm 3mm; background:#fbfdff; }
@@ -380,15 +396,27 @@ figcaption{ font-size:8.6pt; color:var(--ink-faint); margin-top:2mm; }
   <rect class="bx-d" x="855" y="428" width="210" height="42" rx="5"/>
   <text class="t" x="960" y="447" text-anchor="middle" style="font-weight:600">MCP servers</text>
   <text class="tms" x="960" y="462" text-anchor="middle">small helper programs</text>
+
+  <!-- box numbers -->
+  <circle cx="858" cy="70" r="9" fill="#1f5fa8"/><text x="858" y="73.5" text-anchor="middle" style="font-family:'SF Mono',Menlo,monospace;font-size:9px;font-weight:700;fill:#fff">1</text>
+  <circle cx="858" cy="140" r="9" fill="#1d7a53"/><text x="858" y="143.5" text-anchor="middle" style="font-family:'SF Mono',Menlo,monospace;font-size:9px;font-weight:700;fill:#fff">2</text>
+  <circle cx="858" cy="244" r="9" fill="#a8611f"/><text x="858" y="247.5" text-anchor="middle" style="font-family:'SF Mono',Menlo,monospace;font-size:9px;font-weight:700;fill:#fff">3</text>
+  <circle cx="858" cy="338" r="9" fill="#6a3fa0"/><text x="858" y="341.5" text-anchor="middle" style="font-family:'SF Mono',Menlo,monospace;font-size:9px;font-weight:700;fill:#fff">4</text>
+  <circle cx="208" cy="140" r="9" fill="#a8611f"/><text x="208" y="143.5" text-anchor="middle" style="font-family:'SF Mono',Menlo,monospace;font-size:9px;font-weight:700;fill:#fff">5</text>
+  <circle cx="208" cy="270" r="9" fill="#6a3fa0"/><text x="208" y="273.5" text-anchor="middle" style="font-family:'SF Mono',Menlo,monospace;font-size:9px;font-weight:700;fill:#fff">6</text>
+  <circle cx="1082" cy="140" r="9" fill="#1f5fa8"/><text x="1082" y="143.5" text-anchor="middle" style="font-family:'SF Mono',Menlo,monospace;font-size:9px;font-weight:700;fill:#fff">7</text>
+  <circle cx="1082" cy="270" r="9" fill="#6a3fa0"/><text x="1082" y="273.5" text-anchor="middle" style="font-family:'SF Mono',Menlo,monospace;font-size:9px;font-weight:700;fill:#fff">8</text>
+  <circle cx="1082" cy="354" r="9" fill="#5a6c80"/><text x="1082" y="357.5" text-anchor="middle" style="font-family:'SF Mono',Menlo,monospace;font-size:9px;font-weight:700;fill:#fff">9</text>
+  <circle cx="208" cy="354" r="9" fill="#a8324a"/><text x="208" y="357.5" text-anchor="middle" style="font-family:'SF Mono',Menlo,monospace;font-size:8px;font-weight:700;fill:#fff">10</text>
 </svg>
 </figure>
-  <div style="display:flex;gap:4mm;align-items:center;margin:0 0 3mm 0;font-size:9.2pt;color:#4a5769">
+  <div style="display:flex;gap:3mm;align-items:center;margin:0 0 3mm 0;font-size:9.2pt;color:#4a5769;white-space:nowrap">
     <span class="pill" style="background:#eef4fc;border-color:#1f5fa8;color:#1f5fa8">interface &amp; retrieval</span>
     <span class="pill" style="background:#ecf8f2;border-color:#1d7a53;color:#1d7a53">the loop</span>
     <span class="pill" style="background:#fdf3e8;border-color:#a8611f;color:#a8611f">actions &amp; context</span>
     <span class="pill" style="background:#f4eefc;border-color:#6a3fa0;color:#6a3fa0">model I/O &amp; caching</span>
     <span class="pill" style="background:#fdeef1;border-color:#a8324a;color:#a8324a">hardware limits</span>
-    <span style="margin-left:auto"><b>26 modules</b> &#183; ~13,000 lines &#183; 3 dependencies</span>
+    <span style="margin-left:auto;white-space:nowrap"><b>Each numbered box gets its own slide next.</b></span>
   </div>
   <div class="wwh">
     <div class="why"><span class="lbl">Why it is built in layers</span>
@@ -408,168 +436,258 @@ figcaption{ font-size:8.6pt; color:var(--ink-faint); margin-top:2mm; }
 </div>
 
 <div data-src="s03a" class="slide">
-  <div class="sh"><span class="num">03</span><h2>Every module &#8212; 1 of 3: what you see, and what decides</h2>
-    <span class="tag">module by module</span></div>
-  <div class="body col">
-    <div class="modgrid">
-      <div class="mod"><div class="nm">repl.py</div><div class="sub">4,000 lines &#183; the app you actually touch</div>
-        <div class="r why"><b>why</b><span>A bare Python <code>input()</code> can't do history, colours, or a status bar &#8212; and a slow local model feels broken without something moving on screen.</span></div>
-        <div class="r what"><b>what</b><span>The prompt you type into, 35 slash commands, 6 colour themes, and the bar pinned at the bottom.</span></div>
-        <div class="r how"><b>how</b><span>One library owns typing, another owns colour. They are kept apart so they never fight over the cursor.</span></div></div>
-
-      <div class="mod"><div class="nm">__main__.py</div><div class="sub">396 lines &#183; the front door</div>
-        <div class="r why"><b>why</b><span>A flag typed once for a quick test must not silently become your permanent setting.</span></div>
-        <div class="r what"><b>what</b><span>Reads the command-line flags, then either opens the chat or runs one prompt and exits.</span></div>
-        <div class="r how"><b>how</b><span>Every flag starts as "not given". Only flags you actually typed are applied, and only <code>--save</code> writes them to disk.</span></div></div>
-
-      <div class="mod"><div class="nm">spinner.py</div><div class="sub">492 lines &#183; proof it's alive</div>
-        <div class="r why"><b>why</b><span>A local model can think for 30 seconds. Without movement on screen, people assume it crashed.</span></div>
-        <div class="r what"><b>what</b><span>A small animation with a timer, and the current speed in words per second.</span></div>
-        <div class="r how"><b>how</b><span>It redraws on the <em>same line</em> and always erases itself before anything else prints &#8212; so it can never smear into the answer. Piped output turns it off completely.</span></div></div>
-
-      <div class="mod"><div class="nm">images.py</div><div class="sub">192 lines &#183; show, don't tell</div>
-        <div class="r why"><b>why</b><span>Sometimes a screenshot of the broken screen explains more than a paragraph.</span></div>
-        <div class="r what"><b>what</b><span>Drag a picture onto the prompt, or type <code>/image</code>, and it goes to the model with your message.</span></div>
-        <div class="r how"><b>how</b><span>It only treats a word as a picture if that file really exists, so writing "check logo.png" stays ordinary text.</span></div></div>
-
-      <div class="mod"><div class="nm">mentions.py</div><div class="sub">~300 lines &#183; point at a file</div>
-        <div class="r why"><b>why</b><span>If you already know the file, making the model hunt for it wastes a whole round trip.</span></div>
-        <div class="r what"><b>what</b><span>Type <code>@config.py</code> and the file's contents are attached before the message is sent.</span></div>
-        <div class="r how"><b>how</b><span>Tab-completion guesses as you type, and it skips the same junk folders the search tools skip.</span></div></div>
-
-      <div class="mod"><div class="nm">agent.py</div><div class="sub">3,108 lines &#183; the decider</div>
-        <div class="r why"><b>why</b><span>Something has to run the try &#8594; look &#8594; try again cycle, and know when to stop.</span></div>
-        <div class="r what"><b>what</b><span>The loop itself, the list of messages, and the rules that keep the conversation small.</span></div>
-        <div class="r how"><b>how</b><span>Ask the model. If it asked for something, do it and add the result. If it just talked, that's the answer. Repeat, up to 80 times.</span></div></div>
-
-      <div class="mod"><div class="nm">orchestration.py</div><div class="sub">~330 lines &#183; send a helper</div>
-        <div class="r why"><b>why</b><span>Reading 20 files to answer one question would fill up the main conversation with junk.</span></div>
-        <div class="r what"><b>what</b><span>A way to start a <b>second, separate assistant</b> for one job, which reports back in a few lines.</span></div>
-        <div class="r how"><b>how</b><span>The helper gets its own private conversation and a limited set of abilities. When it finishes, all its reading is thrown away.</span></div></div>
-
-      <div class="mod"><div class="nm">prompts.py</div><div class="sub">323 lines &#183; the instructions</div>
-        <div class="r why"><b>why</b><span>How the assistant behaves is decided far more by <em>what we tell it</em> than by clever code.</span></div>
-        <div class="r what"><b>what</b><span>The standing instructions for four jobs: planner, explorer, coder, reviewer.</span></div>
-        <div class="r how"><b>how</b><span>Plain English rules like "look before you change anything" and "read at most three files, then search instead".</span></div></div>
-
-      <div class="mod" style="background:#f4f8fc"><div class="nm">Why this split?</div><div class="sub">the rule that holds it together</div>
-        <div class="r what"><b>rule</b><span><b>agent.py never opens a file and never opens a connection.</b> It can only ask other modules to.</span></div>
-        <div class="r how"><b>pay-off</b><span>That means we can hand it a <b>fake model</b> and a <b>fake filesystem</b> and test the entire thing &#8212; which is why 1,355 tests run in seconds with no GPU.</span></div></div>
+  <div class="sh"><span class="num">03</span><h2>What you see &#8212; and what's kept on your disk</h2>
+    <span class="tag">boxes 1 &amp; 9 &#183; top blue, bottom right grey</span></div>
+  <div class="body">
+    <div class="left">
+      <div class="boxstrip" style="margin-bottom:3mm">
+        <div class="chip b"><div class="n">repl.py</div>
+          <div class="d">The prompt, the commands, the colours, the status bar.</div></div>
+        <div class="chip b"><div class="n">__main__.py</div>
+          <div class="d">Command-line flags, and the one-shot mode.</div></div>
+      </div>
+      <div class="qa"><div class="q">Why is this 4,000 lines?</div>
+      <div class="a">Because two libraries both want to control the same terminal: one owns
+      <b>typing</b> (history, editing, tab-completion), the other owns <b>colour and layout</b>.
+      Left alone they fight over the cursor, and you get half-drawn prompts and stray characters.
+      Most of that file is keeping them out of each other's way.</div></div>
+      <div class="qa"><div class="q">Two decisions worth copying</div></div>
+      <table>
+      <tr><th style="width:34%">Decision</th><th>Why</th></tr>
+      <tr><td><b>Don't print the reply as it arrives</b> &#8212; collect it, then print once</td>
+          <td>Printed live, headings and code blocks show up as raw <code>##</code> and backticks.
+          Collected first, they render properly. The spinner is what moves while you wait.</td></tr>
+      <tr><td><b>The status bar reads a cached value</b>, refreshed once per turn</td>
+          <td>It's redrawn on <em>every keystroke</em>. Asking git for the branch name that often
+          would make typing visibly laggy. Expensive work happens once a turn, not once a letter.</td></tr>
+      </table>
+      <div class="note"><span class="t">And the one that stops it annoying you</span>
+      <p>A line starting with <code>/</code> is only treated as a command if it's one we actually
+      know. Anything else is sent to the model as ordinary text &#8212; so asking about
+      <em>another</em> tool's <code>/deploy</code> command doesn't get hijacked.</p></div>
+    </div>
+    <div class="right">
+      <div class="boxstrip" style="margin-bottom:3mm">
+        <div class="chip"><div class="n" style="color:#12293d">config.py</div>
+          <div class="d">Your settings.</div></div>
+        <div class="chip"><div class="n" style="color:#12293d">session.py</div>
+          <div class="d">Past conversations.</div></div>
+        <div class="chip"><div class="n" style="color:#12293d">checkpoint.py</div>
+          <div class="d">Undo.</div></div>
+      </div>
+      <div class="qa"><div class="q">Why a whole box just for saving things?</div>
+      <div class="a">Because all three have the same failure mode: <b>a crash halfway through
+      writing</b>. Settings, conversations and undo copies are each one file that must be either
+      completely old or completely new &#8212; never half-written.</div></div>
+      <div class="key"><span class="t">The trick, used identically in all three</span>
+      <p>Never write to the real file. Write to a <b>temporary file next to it</b>, then rename it
+      over the top. Renaming is a single, indivisible step &#8212; so a crash leaves you with either
+      the old file or the new one, and never a broken half of each.</p></div>
+      <div class="qa"><div class="q">Settings: the rule that stops surprises</div>
+      <div class="a">Three layers, in order: <b>built-in defaults</b>, then <b>your saved file</b>,
+      then <b>flags you typed just now</b>. Each layer only overrides what it actually mentions.
+      <br>And a flag you typed is <b>not saved</b> unless you ask for it &#8212; so a quick experiment
+      never quietly becomes your permanent setup.</div></div>
+      <div class="note"><span class="t">Why this matters more when it's local</span>
+      <p>The saved conversation contains <b>the contents of files the model read</b>. On a cloud
+      tool that would be a real problem. Here it never leaves the machine &#8212; which is exactly the
+      reason people run it locally in the first place.</p></div>
     </div>
   </div>
   <div class="foot"><span>llmc-code &#183; how it works</span><span>3</span></div>
 </div>
 
 <div data-src="s03b" class="slide">
-  <div class="sh"><span class="num">04</span><h2>Every module &#8212; 2 of 3: doing things on your machine</h2>
-    <span class="tag">module by module</span></div>
+  <div class="sh"><span class="num">04</span><h2>The brain &#8212; decides what to do next</h2>
+    <span class="tag">box 2 of 10 &#183; green, centre of the map</span></div>
   <div class="body col">
-    <div class="modgrid">
-      <div class="mod"><div class="nm">tools.py</div><div class="sub">1,738 lines &#183; the hands</div>
-        <div class="r why"><b>why</b><span>This is the <em>only</em> place the assistant can affect the real world. Keeping it in one file means all the safety checks live in one place.</span></div>
-        <div class="r what"><b>what</b><span>Read a file, write a file, change part of a file, run a command, find files, search text, map the project, fetch a web page.</span></div>
-        <div class="r how"><b>how</b><span>Each one describes itself to the model, then runs plain Python. It <b>never crashes</b> &#8212; a failure comes back as a message the model can read and react to.</span></div></div>
-
-      <div class="mod"><div class="nm">providers.py</div><div class="sub">1,770 lines &#183; the mouth</div>
-        <div class="r why"><b>why</b><span>Every model family asks for things in its own made-up format. The rest of the code should never have to care.</span></div>
-        <div class="r what"><b>what</b><span>Sends the conversation to LM Studio and reads the reply back as it arrives. Also holds the fake model used by the tests.</span></div>
-        <div class="r how"><b>how</b><span>It understands <b>7 different formats</b> and converts them all into one simple shape: either "here is some text" or "please run this".</span></div></div>
-
-      <div class="mod"><div class="nm">mcp.py</div><div class="sub">741 lines &#183; other people's tools</div>
-        <div class="r why"><b>why</b><span>Our 11 tools can't cover everything. Other people have already built tools for databases, note vaults, and so on.</span></div>
-        <div class="r what"><b>what</b><span>A way to start someone else's tool program and offer its abilities to the model alongside our own.</span></div>
-        <div class="r how"><b>how</b><span>We start it as a small background program and talk to it through its input and output. <b>We never trust what it says about itself</b> &#8212; you decide what it's allowed to do.</span></div></div>
-
-      <div class="mod"><div class="nm">remediation.py</div><div class="sub">~270 lines &#183; second chance</div>
-        <div class="r why"><b>why</b><span>Most failures are tiny &#8212; a slightly wrong file path. Making the model spend a whole round fixing that is wasteful.</span></div>
-        <div class="r what"><b>what</b><span>Catches a failed request, corrects the obvious mistake, and quietly tries again.</span></div>
-        <div class="r how"><b>how</b><span>Strictly limited retries, so a genuinely broken request fails fast instead of looping.</span></div></div>
-
-      <div class="mod"><div class="nm">checkpoint.py</div><div class="sub">461 lines &#183; undo</div>
-        <div class="r why"><b>why</b><span>People approve far more changes when they know they can take them back.</span></div>
-        <div class="r what"><b>what</b><span>Before any file is changed, a copy of the old version is saved. <code>/undo</code> puts it back.</span></div>
-        <div class="r how"><b>how</b><span>Copies are kept per project and per session. Writing always goes to a temp file first, then swaps &#8212; so a crash can't leave half a file.</span></div></div>
-
-      <div class="mod"><div class="nm">hooks.py</div><div class="sub">443 lines &#183; your own rules</div>
-        <div class="r why"><b>why</b><span>Asking the model nicely is not a guarantee. Some rules need to be enforced by something that isn't the model.</span></div>
-        <div class="r what"><b>what</b><span>Your own commands, run automatically before or after a tool. A "before" hook can <b>block the action entirely</b>.</span></div>
-        <div class="r how"><b>how</b><span>If your check fails &#8212; or takes too long &#8212; the action is refused. A safety check that can't finish must never quietly allow things.</span></div></div>
-
-      <div class="mod"><div class="nm">rules.py</div><div class="sub">~120 lines &#183; house style</div>
-        <div class="r why"><b>why</b><span>Every project has conventions. Repeating them in every message is tedious.</span></div>
-        <div class="r what"><b>what</b><span>Reads a rules file from your project and puts it at the top of every conversation.</span></div>
-        <div class="r how"><b>how</b><span>Looks for <code>AGENTS.md</code> and a few other names, caps the length, and presents it as instructions you wrote.</span></div></div>
-
-      <div class="mod"><div class="nm">gitint.py</div><div class="sub">~220 lines &#183; git without leaving</div>
-        <div class="r why"><b>why</b><span>After a change you immediately want to see the diff and commit. Switching windows breaks the flow.</span></div>
-        <div class="r what"><b>what</b><span><code>/diff</code> and <code>/commit</code>, right in the chat.</span></div>
-        <div class="r how"><b>how</b><span>It just calls <code>git</code> and turns every possible failure &#8212; no git, not a repo, timed out &#8212; into a tidy message instead of a crash.</span></div></div>
-
-      <div class="mod"><div class="nm">audit.py</div><div class="sub">~230 lines &#183; review the whole project</div>
-        <div class="r why"><b>why</b><span>A whole codebase does not fit in a local model's head. Not even close.</span></div>
-        <div class="r what"><b>what</b><span><code>/audit</code> &#8212; reviews the entire project anyway.</span></div>
-        <div class="r how"><b>how</b><span>Split the code into small pieces, review each one with a fresh helper, then merge the findings. <b>When a job is too big, split the job &#8212; don't ask for a bigger head.</b></span></div></div>
+    <div class="boxstrip">
+      <div class="chip g"><div class="n">agent.py</div>
+        <div class="d">Runs the loop. Holds the conversation. Decides when to stop.</div></div>
+      <div class="chip g"><div class="n">orchestration.py</div>
+        <div class="d">Sends a second assistant off to do a job on its own.</div></div>
+      <div class="chip g"><div class="n">prompts.py</div>
+        <div class="d">The standing instructions that shape how it behaves.</div></div>
+    </div>
+    <div class="body" style="gap:6mm">
+      <div class="left">
+        <div class="qa"><div class="q">What does each one actually do?</div>
+        <div class="a"><b>agent.py</b> keeps a plain Python list of messages. Each round it sends that
+        list to the model. If the reply contains a request, it runs it, adds the result to the list,
+        and goes round again. If the reply is just words, that's the answer &#8212; stop.
+        <br><b>orchestration.py</b> adds one special tool: "start another assistant". That helper gets
+        a fresh, empty conversation and a smaller set of abilities. It reports back in a few lines.
+        <br><b>prompts.py</b> holds the instructions for four different jobs &#8212; planner, explorer,
+        coder, reviewer &#8212; that get pasted at the top of the conversation.</div></div>
+        <div class="qa"><div class="q">How do the three fit together?</div>
+        <div class="a">Three separate questions, three separate files:<br>
+        &#8226; <b>prompts.py decides HOW it behaves.</b><br>
+        &#8226; <b>agent.py decides WHEN to stop.</b><br>
+        &#8226; <b>orchestration.py decides WHO does the work.</b><br>
+        Change one and the other two keep working &#8212; which is why the behaviour can be tuned by
+        editing English, with no code change at all.</div></div>
+        <div class="key"><span class="t">The rule that makes it testable</span>
+        <p>The brain <b>never opens a file and never opens a connection</b>. It only ever asks the
+        hands or the mouth. So we can hand it a fake model and a temporary folder and test the entire
+        decision-making layer &#8212; which is how 1,355 tests run offline in seconds.</p></div>
+      </div>
+      <div class="right">
+        <div class="qa"><div class="q">Why does a <em>local</em> model need all this?</div>
+        <div class="a">A big cloud model mostly gets it right first time. A small local one does not,
+        and the brain is where you absorb that:</div></div>
+        <table>
+        <tr><th style="width:38%">What goes wrong locally</th><th>What the brain does about it</th></tr>
+        <tr><td><b>It forgets to look first</b> and answers from imagination</td>
+            <td><code>prompts.py</code> spells out <em>explore &#8594; plan &#8594; act &#8594; validate</em>,
+            and caps how many files it may read before it must search instead</td></tr>
+        <tr><td><b>It loops</b> &#8212; asking for the same file over and over</td>
+            <td><code>agent.py</code> compares each round's requests to the last. Four identical
+            rounds and it stops</td></tr>
+        <tr><td><b>It sends a broken request</b></td>
+            <td>Three rounds where <em>everything</em> failed to parse and it stops. One good request
+            resets the count &#8212; progress is progress</td></tr>
+        <tr><td><b>It thinks, then says nothing</b></td>
+            <td>Re-asks up to twice, with the reply length cap lifted</td></tr>
+        <tr><td><b>A big job won't fit</b> in its small memory</td>
+            <td><code>orchestration.py</code> splits it: helpers do the reading, the main
+            conversation only receives conclusions</td></tr>
+        </table>
+        <div class="note"><span class="t">The shape to copy</span>
+        <p>Your loop should assume the model <b>will</b> misbehave. Every stop-condition here exists
+        because something actually went wrong once &#8212; and each one has a <b>number</b> attached, so
+        it can never argue with you about when to give up.</p></div>
+      </div>
     </div>
   </div>
   <div class="foot"><span>llmc-code &#183; how it works</span><span>4</span></div>
 </div>
 
 <div data-src="s03c" class="slide">
-  <div class="sh"><span class="num">05</span><h2>Every module &#8212; 3 of 3: remembering, searching, staying fast</h2>
-    <span class="tag">module by module</span></div>
+  <div class="sh"><span class="num">05</span><h2>The hands &#8212; does things on your machine</h2>
+    <span class="tag">box 3 of 10 &#183; orange, below the brain</span></div>
   <div class="body col">
-    <div class="modgrid">
-      <div class="mod"><div class="nm">memory.py</div><div class="sub">812 lines &#183; past conversations</div>
-        <div class="r why"><b>why</b><span>Re-sending every past message is slow. Throwing them away makes the assistant forgetful. We want neither.</span></div>
-        <div class="r what"><b>what</b><span>Every question-and-answer pair is saved. When you ask something new, only the few relevant old ones are pulled back in.</span></div>
-        <div class="r how"><b>how</b><span>First a <b>word search</b> (fast). Only if that finds nothing do we try a <b>meaning search</b> (slower). Cheap check first, expensive check only when needed.</span></div></div>
-
-      <div class="mod"><div class="nm">code_index.py</div><div class="sub">816 lines &#183; searching your code</div>
-        <div class="r why"><b>why</b><span>A small model can't read a 50-file project. Reading three files already fills it up.</span></div>
-        <div class="r what"><b>what</b><span>A search the model can run itself, to find the right 40 lines instead of reading whole files.</span></div>
-        <div class="r how"><b>how</b><span>Your code is split <b>function by function</b>, not every-50-lines &#8212; so every result is a whole, complete piece that makes sense on its own.</span></div></div>
-
-      <div class="mod"><div class="nm">repo_graph.py</div><div class="sub">479 lines &#183; which files matter</div>
-        <div class="r why"><b>why</b><span>Showing the model a flat list of 300 filenames tells it nothing useful.</span></div>
-        <div class="r what"><b>what</b><span>A ranked map of the project: the important files first.</span></div>
-        <div class="r how"><b>how</b><span>A file used by many other files is probably important. That's the same idea Google used to rank web pages by who links to them.</span></div></div>
-
-      <div class="mod"><div class="nm">rerank.py</div><div class="sub">~160 lines &#183; a closer look</div>
-        <div class="r why"><b>why</b><span>A fast search gets you roughly the right 50 results. You only want the best 5.</span></div>
-        <div class="r what"><b>what</b><span>A second pass that re-orders the shortlist more carefully.</span></div>
-        <div class="r how"><b>how</b><span>Off by default. It only runs when the fast search was unsure &#8212; carefulness costs time, so we spend it only where it pays.</span></div></div>
-
-      <div class="mod"><div class="nm">tokens.py</div><div class="sub">25 lines &#183; measuring</div>
-        <div class="r why"><b>why</b><span>You can't keep a conversation small if you can't measure it. A proper measuring tool is a big download.</span></div>
-        <div class="r what"><b>what</b><span>A rough estimate: <b>characters divided by 4</b>.</span></div>
-        <div class="r how"><b>how</b><span>It's off by about 15%, and that is completely fine &#8212; every limit it feeds into is a number we picked ourselves anyway.</span></div></div>
-
-      <div class="mod"><div class="nm">cooldown.py</div><div class="sub">~160 lines &#183; let it breathe</div>
-        <div class="r why"><b>why</b><span>An hour of flat-out work makes a laptop hot, and a hot laptop <em>slows itself down</em> to protect its parts.</span></div>
-        <div class="r what"><b>what</b><span>A one-minute break after roughly every ten minutes of continuous work.</span></div>
-        <div class="r how"><b>how</b><span>The pause happens at the <b>top of the loop</b>, where nothing is half-finished. Pausing mid-step would leave a broken conversation behind.</span></div></div>
-
-      <div class="mod"><div class="nm">config.py</div><div class="sub">768 lines &#183; your settings</div>
-        <div class="r why"><b>why</b><span>Settings that silently change themselves are infuriating.</span></div>
-        <div class="r what"><b>what</b><span>Your preferences in <code>~/.llmcode</code>, plus <code>/doctor</code>, which checks your setup and tells you what's wrong.</span></div>
-        <div class="r how"><b>how</b><span>Three layers: built-in defaults, then your saved file, then flags you typed. Each layer only overrides what it actually specifies.</span></div></div>
-
-      <div class="mod"><div class="nm">session.py</div><div class="sub">~220 lines &#183; picking up again</div>
-        <div class="r why"><b>why</b><span>Closing the terminal shouldn't throw away an hour of context.</span></div>
-        <div class="r what"><b>what</b><span>Saves the conversation per project folder, so tomorrow you can carry on.</span></div>
-        <div class="r how"><b>how</b><span>Written to a temp file then swapped into place, so a crash never corrupts it. <b>Stored on your disk only &#8212; never sent anywhere.</b></span></div></div>
-
-      <div class="mod" style="background:#f4f8fc"><div class="nm">The pattern to notice</div><div class="sub">it shows up in four of these modules</div>
-        <div class="r what"><b>shape</b><span><b>Try the cheap thing first. Only pay for the expensive thing if the cheap one found nothing.</b></span></div>
-        <div class="r how"><b>where</b><span>Word search before meaning search &#183; plain search before the careful re-ranking &#183; shortening old text before summarising it &#183; a quick retry before giving up.</span></div>
-        <div class="r why"><b>why</b><span>On one laptop GPU, the expensive path isn't just slower &#8212; it can force the whole model to be swapped out and back in.</span></div></div>
+    <div class="boxstrip">
+      <div class="chip a"><div class="n">tools.py</div>
+        <div class="d">The 11 things the model is allowed to do, and every safety check.</div></div>
+      <div class="chip a"><div class="n">mcp.py</div>
+        <div class="d">Tools other people wrote, plugged in at runtime.</div></div>
+      <div class="chip a"><div class="n">remediation.py</div>
+        <div class="d">Fixes an obviously-wrong request and quietly tries again.</div></div>
+    </div>
+    <div class="body" style="gap:6mm">
+      <div class="left">
+        <div class="qa"><div class="q">Why is this one box, and not scattered everywhere?</div>
+        <div class="a">This is the <b>only</b> place the model can affect the real world. One box means every
+        dangerous thing goes through the same door &#8212; so the confirmation prompt, the folder limit,
+        the output cap and the secret-stripping are written <b>once</b>.<br>
+        If file writing lived in three places, you'd have three chances to forget the check.</div></div>
+        <div class="qa"><div class="q">What every tool must promise</div>
+        <div class="a">Three rules, no exceptions:</div></div>
+        <table>
+        <tr><th style="width:34%">Rule</th><th>Why it has to be a rule</th></tr>
+        <tr><td><b>Never crash</b></td><td>A crash ends the whole turn. A failure <em>message</em>
+        gets read by the model, which then tries something else.</td></tr>
+        <tr><td><b>Always cut output short</b></td><td>Whatever a tool returns is added to the
+        conversation and re-sent <em>forever after</em>. One giant result poisons the rest of
+        the session.</td></tr>
+        <tr><td><b>Explain the failure</b></td><td><code>"error"</code> makes the model guess.
+        <code>"no such path; did you mean llmcode/agent.py?"</code> gets fixed next round.</td></tr>
+        </table>
+        <div class="key"><span class="t">Your error messages are now prompts</span>
+        <p>The most surprising thing about building an agent: the text you put in an error is
+        <b>read by the model and acted on</b>. Write it for the model, not for a log file.</p></div>
+      </div>
+      <div class="right">
+        <div class="qa"><div class="q">How does a tool actually get used?</div>
+        <div class="a">Four steps, every time:</div></div>
+        <table>
+        <tr><th style="width:8%">#</th><th>Step</th></tr>
+        <tr><td><b>1</b></td><td>Its <b>description</b> goes to the model with the conversation &#8212; name,
+        purpose, options.</td></tr>
+        <tr><td><b>2</b></td><td>The model replies asking for it by name, with options filled in.</td></tr>
+        <tr><td><b>3</b></td><td>We fix the option names (local models get them wrong), ask you if it's
+        dangerous, then run <b>ordinary Python</b>.</td></tr>
+        <tr><td><b>4</b></td><td>The result is cut short and added to the conversation.</td></tr>
+        </table>
+        <div class="qa"><div class="q">Why it matters more on a local model</div>
+        <div class="a">A small model gets paths and arguments wrong <b>constantly</b>. So the hands do
+        two extra jobs a cloud harness wouldn't bother with:</div></div>
+        <ul>
+          <li><b>remediation.py</b> corrects the obvious mistakes and retries, instead of burning a
+          whole round on a typo.</li>
+          <li><b>The caps are tighter</b> than you would set for a big model &#8212; the memory it all
+          has to fit into is much smaller.</li>
+        </ul>
+        <div class="note"><span class="t">And about other people's tools</span>
+        <p>An <b>mcp.py</b> tool can declare "I'm harmless, don't ask". A bad one could say that about
+        something destructive &#8212; so the claim is <b>ignored</b> unless you said you trust that
+        program. <b>Trust is your call, never the tool's.</b></p></div>
+      </div>
     </div>
   </div>
   <div class="foot"><span>llmc-code &#183; how it works</span><span>5</span></div>
 </div>
 
+<div data-src="s03d" class="slide">
+  <div class="sh"><span class="num">06</span><h2>The mouth &#8212; talks to the model</h2>
+    <span class="tag">box 4 of 10 &#183; purple, bottom centre</span></div>
+  <div class="body col">
+    <div class="boxstrip">
+      <div class="chip p"><div class="n">the real one</div>
+        <div class="d">Sends the conversation to LM Studio and reads the reply back as it arrives.</div></div>
+      <div class="chip p"><div class="n">the translator</div>
+        <div class="d">Understands 7 ways of asking for things, and turns them all into one shape.</div></div>
+      <div class="chip p"><div class="n">the fake one</div>
+        <div class="d">A scripted stand-in model, so the tests need no GPU and no internet.</div></div>
+    </div>
+    <div class="body" style="gap:6mm">
+      <div class="left">
+        <div class="qa"><div class="q">Why is there a box here at all?</div>
+        <div class="a">Because the rest of the program should <b>never know which model you loaded</b>. Every
+        family has its own quirks; if those leaked into the brain, changing model would mean changing
+        the loop. So this box always emits the <b>same three things</b>:</div></div>
+        <div class="srcfile">real model or fake one &#8212; both produce only these</div>
+        <pre>{<span class="str">"type"</span>:<span class="str">"text"</span>,      <span class="str">"text"</span>: <span class="cmt">&#8230; a piece of the reply &#8230;</span>}
+{<span class="str">"type"</span>:<span class="str">"tool_call"</span>, <span class="str">"name"</span>, <span class="str">"arguments"</span>: <span class="cmt">&#8230; what it wants done &#8230;</span>}
+{<span class="str">"type"</span>:<span class="str">"done"</span>,      <span class="cmt"># exactly one, always last</span>}</pre>
+        <div class="qa"><div class="q">The fiddly bit: replies arrive in pieces</div>
+        <div class="a">A single request arrives <b>split across dozens of fragments</b> &#8212; and if the model
+        asks for two things at once, the fragments are <b>interleaved</b>. We collect them into
+        numbered slots and assemble them only once the reply ends.<br>
+        They are joined <b>in one go</b>, not glued on one at a time &#8212; with a whole file arriving
+        in pieces, that is the difference between instant and painfully slow.</div></div>
+      </div>
+      <div class="right">
+        <div class="qa"><div class="q">Why the fake model is the best decision in the project</div>
+        <div class="a">Nearly every bug here is a <b>loop bug</b>: a request with no matching result, a
+        counter that never resets, messages in the wrong order. You cannot chase those against a real
+        model &#8212; it answers differently every time, and slowly. Against a script they are ordinary
+        tests that run in <b>milliseconds</b>.</div></div>
+        <div class="key"><span class="t">Build this seam on day one</span>
+        <p>Ten minutes at the start: never call the model directly, always go through a swappable piece.
+        Adding it <em>later</em>, once a dozen places call the model, is miserable.</p></div>
+        <div class="qa"><div class="q">And the privacy part</div>
+        <div class="a">Because this is the only place that opens a connection, it is also the only
+        place privacy has to be enforced:</div></div>
+        <ul>
+          <li>The address <b>must</b> be your own machine, pinned to the exact number it resolved to,
+          so it cannot quietly become something else later.</li>
+          <li>Proxy settings are <b>ignored</b>, so traffic meant for your own machine can never be
+          routed out through someone else's server.</li>
+          <li>If any of that can't be guaranteed, it <b>refuses to start</b>.</li>
+        </ul>
+        <div class="note"><span class="t">One box, one responsibility</span>
+        <p>All of this follows from a single sentence: <b>this is the only code that talks to the
+        outside.</b> The translator, the fake model and the privacy lock are all about that one
+        boundary.</p></div>
+      </div>
+    </div>
+  </div>
+  <div class="foot"><span>llmc-code &#183; how it works</span><span>6</span></div>
+</div>
+
 <div data-src="s04" class="slide">
-  <div class="sh"><span class="num">06</span><h2>What happens when you press Enter</h2><span class="tag">the main flow</span></div>
+  <div class="sh"><span class="num">07</span><h2>What happens when you press Enter</h2><span class="tag">the main flow</span></div>
   <div class="body col">
     <figure style="flex:1"><svg viewBox="0 0 760 322" xmlns="http://www.w3.org/2000/svg">
   <!-- row 1 -->
@@ -648,11 +766,11 @@ figcaption{ font-size:8.6pt; color:var(--ink-faint); margin-top:2mm; }
       writes a file or runs a command <b>asks you first</b>. Just reading? It goes ahead.</p></div>
     </div>
   </div>
-  <div class="foot"><span>llmc-code &#183; how it works</span><span>6</span></div>
+  <div class="foot"><span>llmc-code &#183; how it works</span><span>7</span></div>
 </div>
 
 <div data-src="s05" class="slide">
-  <div class="sh"><span class="num">07</span><h2>The whole agent, in 20 lines</h2><span class="tag">the loop</span></div>
+  <div class="sh"><span class="num">08</span><h2>The whole agent, in 20 lines</h2><span class="tag">the loop</span></div>
   <div class="body">
     <div class="left">
       <p>Take away 3,000 lines of safety checks and polish, and this is the whole thing. It is not
@@ -703,11 +821,11 @@ figcaption{ font-size:8.6pt; color:var(--ink-faint); margin-top:2mm; }
       <b>Your error messages are now instructions to the model.</b> Write them for the model to read, not for a log file nobody opens.</p></div>
     </div>
   </div>
-  <div class="foot"><span>llmc-code &#183; how it works</span><span>7</span></div>
+  <div class="foot"><span>llmc-code &#183; how it works</span><span>8</span></div>
 </div>
 
 <div data-src="s06" class="slide">
-  <div class="sh"><span class="num">08</span><h2>Tools — giving the model hands</h2><span class="tag">tools.py</span></div>
+  <div class="sh"><span class="num">09</span><h2>Tools — giving the model hands</h2><span class="tag">tools.py</span></div>
   <div class="body">
     <div class="left">
       <h4>A tool is just three things</h4>
@@ -755,11 +873,11 @@ figcaption{ font-size:8.6pt; color:var(--ink-faint); margin-top:2mm; }
       reader got confused about where the file ended.</p></div>
     </div>
   </div>
-  <div class="foot"><span>llmc-code &#183; how it works</span><span>8</span></div>
+  <div class="foot"><span>llmc-code &#183; how it works</span><span>9</span></div>
 </div>
 
 <div data-src="s07" class="slide">
-  <div class="sh"><span class="num">09</span><h2>Custom #1 &#8212; every model speaks a different language</h2>
+  <div class="sh"><span class="num">10</span><h2>Custom #1 &#8212; every model speaks a different language</h2>
     <span class="tag">providers.py</span></div>
   <div class="body">
     <div class="left center"><figure><svg viewBox="0 0 760 428" xmlns="http://www.w3.org/2000/svg">
@@ -851,12 +969,12 @@ figcaption{ font-size:8.6pt; color:var(--ink-faint); margin-top:2mm; }
       written into the user's source file</b>. That second one actually happened.</p></div>
     </div>
   </div>
-  <div class="foot"><span>llmc-code &#183; how it works</span><span>9</span></div>
+  <div class="foot"><span>llmc-code &#183; how it works</span><span>10</span></div>
 </div>
 
 <style>#s-alias li{font-size:10pt;margin-bottom:1.2mm}#s-alias td{padding:1.3mm 2.5mm}#s-alias th{padding:1.3mm 2.5mm}</style>
 <div data-src="s08" id="s-alias" class="slide">
-  <div class="sh"><span class="num">10</span><h2>Custom #2 &#8212; wrong argument names, and refusing to guess</h2>
+  <div class="sh"><span class="num">11</span><h2>Custom #2 &#8212; wrong argument names, and refusing to guess</h2>
     <span class="tag">tools.py</span></div>
   <div class="body">
     <div class="left">
@@ -910,65 +1028,80 @@ figcaption{ font-size:8.6pt; color:var(--ink-faint); margin-top:2mm; }
       <p>Misunderstanding costs one wasted turn. Acting on a misunderstanding costs the user's files.</p></div>
     </div>
   </div>
-  <div class="foot"><span>llmc-code &#183; how it works</span><span>10</span></div>
+  <div class="foot"><span>llmc-code &#183; how it works</span><span>11</span></div>
 </div>
 
 <style>#s-slow td{padding:1.3mm 2.5mm}#s-slow th{padding:1.3mm 2.5mm}#s-slow .card{padding:2.4mm}</style>
 <div data-src="s09" id="s-slow" class="slide">
-  <div class="sh"><span class="num">11</span><h2>Why long chats get painfully slow</h2>
-    <span class="tag">keeping the chat small</span></div>
+  <div class="sh"><span class="num">12</span><h2>Keeping the chat small &#8212; why not just send everything?</h2>
+    <span class="tag">box 5 of 10 &#183; orange, top left</span></div>
   <div class="body">
     <div class="left">
-      <div class="analogy" style="margin-top:0"><span class="t">Picture this</span>
-      <p>Imagine a colleague who <b>forgets everything between sentences</b>. To answer your next
-      question they must re-read the <em>entire</em> transcript from the start. Every single time.</p>
-      <p>That is exactly a language model. Every question re-sends the whole conversation, and it
-      reads all of it before writing a word.</p></div>
-      <h3>So there are two speeds, not one</h3>
+      <div class="qa"><div class="q">First, the thing that makes this necessary</div>
+      <div class="a">The model has <b>no memory between messages</b>. So every single turn, we send the
+      <em>entire</em> conversation again from the beginning &#8212; and it reads all of it before writing
+      one word of the reply.<br>
+      Imagine a colleague who forgets everything between sentences and has to re-read the whole
+      meeting transcript each time you speak. That is exactly what is happening.</div></div>
+      <div class="qa"><div class="q">So why not just send it all and let it sort it out?</div>
+      <div class="a">Three reasons, and only the first is the obvious one:</div></div>
       <table>
-      <tr><th style="width:26%">Step</th><th>What happens</th><th style="width:26%">How long</th></tr>
-      <tr><td><b>Reading</b><br><span class="ts">before it says anything</span></td>
-          <td>The instructions, every past message, every tool result.</td>
-          <td><b>Grows with the chat.</b> This is the part that hurts.</td></tr>
-      <tr><td><b>Writing</b><br><span class="ts">the reply itself</span></td>
-          <td>It produces the answer, word by word.</td>
-          <td>Roughly the same speed always (~95 words/sec here).</td></tr>
+      <tr><th style="width:26%">Reason</th><th>What actually happens</th></tr>
+      <tr><td><b>1. It gets slow</b></td>
+          <td>Reading time grows with the chat. Typing speed doesn't change &#8212; so it just
+          <b>sits in silence for longer and longer</b> before it starts answering.</td></tr>
+      <tr><td><b>2. It doesn't fit</b></td>
+          <td>A local model can only hold so much. Past that point the oldest messages fall off
+          <b>silently</b> &#8212; including, quite possibly, the instruction that mattered most.</td></tr>
+      <tr><td><b>3. The answers get worse</b></td>
+          <td>This is the one people miss. Your actual question ends up buried in thousands of lines
+          of stale tool output, and the model starts answering about a file it read six steps ago.
+          <b>More context is not more understanding.</b></td></tr>
       </table>
-      <div class="key"><span class="t">The thing people get wrong</span>
-      <p>Old notes don't make it <em>type</em> slower. They make it <b>sit in silence first</b>. Measure
-      only typing speed and everything looks fine while the user stares at nothing.</p></div>
+      <div class="problem"><span class="t">The measurement that started all this</span>
+      <p>Someone typed <em>"what happened?"</em> &#8212; four words. We sent <b>55,000 words</b> of old
+      conversation with it. The reply took <b>about 20 minutes</b>.</p>
+      <p><b>Over half</b> of what we sent was old tool output &#8212; files read six steps earlier that
+      nobody needed any more.</p></div>
     </div>
     <div class="right">
-      <div class="problem" style="margin-top:0"><span class="t">The measurement that started all this</span>
-      <p>Someone typed <em>"what happened?"</em> &#8212; four words.</p>
-      <p>The program sent <b>55,000 words of old conversation</b> along with it. The reply took
-      <b>about 20 minutes</b>.</p>
-      <p><b>Over half</b> of it was old tool output &#8212; files read six steps ago that nobody needed
-      any more. Counting file contents saved inside old write requests: <b>over 90%</b>.</p></div>
-      <div style="display:flex;gap:4mm;margin:4mm 0">
+      <div class="qa"><div class="q">So how do we pick just the part that's needed?</div>
+      <div class="a">Five steps, run in this order at the start of every turn &#8212; cheapest first, and
+      each one only does something if the one before wasn't enough:</div></div>
+      <table>
+      <tr><th style="width:7%">#</th><th style="width:30%">Step</th><th>What it decides</th></tr>
+      <tr><td><b>1</b></td><td><b>Judge the question</b></td>
+          <td>Quick question, or real work? "thanks" and "refactor the parser" should not get the
+          same treatment.</td></tr>
+      <tr><td><b>2</b></td><td><b>Set a size budget</b></td>
+          <td>A number for <em>this</em> turn. Small for a quick question, up to 3&#215; for a
+          whole-project job.</td></tr>
+      <tr><td><b>3</b></td><td><b>Shorten what's stale</b></td>
+          <td>Tool results from <em>finished</em> steps get cut to their first few lines, with a note
+          saying how to get the rest back.</td></tr>
+      <tr><td><b>4</b></td><td><b>Look up what's relevant</b></td>
+          <td>Search past conversations for the few bits that match this question, and attach only
+          those. <span class="ts">(box 7 &#8212; RAG)</span></td></tr>
+      <tr><td><b>5</b></td><td><b>Summarise, if still too big</b></td>
+          <td>Ask the model to condense the old turns into one short note. This costs a round trip,
+          so it's the last resort.</td></tr>
+      </table>
+      <div class="key"><span class="t">The rule underneath all five</span>
+      <p><b>The most recent exchange is always kept whole.</b> Everything being shortened or
+      summarised is from turns that are already finished. What you just said, and what just
+      happened, is never touched.</p></div>
+      <div style="display:flex;gap:4mm;margin-top:3mm">
         <div class="card stat"><div class="n">55k &#8594; 5k</div><div class="l">words sent, same question</div></div>
         <div class="card stat"><div class="n">20 min &#8594; 24 s</div><div class="l">time to answer, same laptop</div></div>
       </div>
-      <h3>Four ways to fix it, cheapest first</h3>
-      <table>
-      <tr><th style="width:20%">Step</th><th>What it does</th><th style="width:26%">What it costs</th></tr>
-      <tr><td><b>1. Measure</b></td><td>Know how big the chat is right now.</td><td>Nothing</td></tr>
-      <tr><td><b>2. Budget</b></td><td>Decide how much history this question deserves.</td><td>Nothing</td></tr>
-      <tr><td><b>3. Shorten</b></td><td>Cut down old tool results nobody needs any more.</td><td>Almost nothing</td></tr>
-      <tr><td><b>4. Summarise</b></td><td>Ask the model to condense old turns into a short note.</td><td>A whole extra round trip</td></tr>
-      </table>
-      <div class="note"><span class="t">Why guess upwards, not downwards</span>
-      <p>Calling something "just a quick question" saves time &#8212; but getting that wrong <b>breaks the
-      answer</b>, while guessing the other way only wastes seconds. So when unsure, we assume
-      <b>real work</b>.</p></div>
     </div>
   </div>
-  <div class="foot"><span>llmc-code &#183; how it works</span><span>11</span></div>
+  <div class="foot"><span>llmc-code &#183; how it works</span><span>12</span></div>
 </div>
 
 <div data-src="s10" class="slide">
-  <div class="sh"><span class="num">12</span><h2>Shortening, and summarising</h2>
-    <span class="tag">two ways to shrink a chat</span></div>
+  <div class="sh"><span class="num">13</span><h2>Keeping the chat small &#8212; how the shortening works</h2>
+    <span class="tag">box 5 of 10 &#183; continued</span></div>
   <div class="body col">
     <figure style="margin:0 auto 2mm auto;width:76%"><svg viewBox="0 0 760 316" xmlns="http://www.w3.org/2000/svg">
   <!-- col 1 -->
@@ -1042,12 +1175,12 @@ figcaption{ font-size:8.6pt; color:var(--ink-faint); margin-top:2mm; }
       back</b>. A fix that doesn't fix anything still costs you time.</p></div>
     </div>
   </div>
-  <div class="foot"><span>llmc-code &#183; how it works</span><span>12</span></div>
+  <div class="foot"><span>llmc-code &#183; how it works</span><span>13</span></div>
 </div>
 
 <div data-src="s11" class="slide">
-  <div class="sh"><span class="num">13</span><h2>Free speed: never make it re-read</h2>
-    <span class="tag">re-using the server's work</span></div>
+  <div class="sh"><span class="num">14</span><h2>Re-using the server's work &#8212; free speed</h2>
+    <span class="tag">box 6 of 10 &#183; purple, left side</span></div>
   <div class="body col">
     <div class="wwh" style="margin:0 0 4mm 0">
       <div class="why"><span class="lbl">Why this works</span>
@@ -1105,12 +1238,12 @@ figcaption{ font-size:8.6pt; color:var(--ink-faint); margin-top:2mm; }
       than disturb the beginning.</p></div>
     </div>
   </div>
-  <div class="foot"><span>llmc-code &#183; how it works</span><span>13</span></div>
+  <div class="foot"><span>llmc-code &#183; how it works</span><span>14</span></div>
 </div>
 
 <div data-src="s12" class="slide">
-  <div class="sh"><span class="num">14</span><h2>Custom #6 &#8212; RAG: remembering without re-reading</h2>
-    <span class="tag">memory.py</span></div>
+  <div class="sh"><span class="num">15</span><h2>Looking things up &#8212; remembering without re-reading</h2>
+    <span class="tag">box 7 of 10 &#183; blue, right side</span></div>
   <div class="body col">
     <div class="wwh" style="margin:0 0 3mm 0">
       <div class="why"><span class="lbl">Why</span>
@@ -1174,12 +1307,12 @@ figcaption{ font-size:8.6pt; color:var(--ink-faint); margin-top:2mm; }
       Losing it must never cost you the answer.</p></div>
     </div>
   </div>
-  <div class="foot"><span>llmc-code &#183; how it works</span><span>14</span></div>
+  <div class="foot"><span>llmc-code &#183; how it works</span><span>15</span></div>
 </div>
 
 <div data-src="s13" class="slide">
-  <div class="sh"><span class="num">15</span><h2>Custom #7 &#8212; how the word search ranks results</h2>
-    <span class="tag">keyword search</span></div>
+  <div class="sh"><span class="num">16</span><h2>Looking things up &#8212; how the word search ranks</h2>
+    <span class="tag">box 7 of 10 &#183; continued</span></div>
   <div class="body col">
     <figure style="margin-bottom:2mm"><svg viewBox="0 0 760 196" xmlns="http://www.w3.org/2000/svg">
   <!-- panel 1: IDF -->
@@ -1250,12 +1383,12 @@ figcaption{ font-size:8.6pt; color:var(--ink-faint); margin-top:2mm; }
       </div>
     </div>
   </div>
-  <div class="foot"><span>llmc-code &#183; how it works</span><span>15</span></div>
+  <div class="foot"><span>llmc-code &#183; how it works</span><span>16</span></div>
 </div>
 
 <div data-src="s14" class="slide">
-  <div class="sh"><span class="num">16</span><h2>Custom #8 &#8212; searching by meaning, and when not to</h2>
-    <span class="tag">the hybrid gate</span></div>
+  <div class="sh"><span class="num">17</span><h2>Looking things up &#8212; searching by meaning</h2>
+    <span class="tag">box 7 of 10 &#183; continued</span></div>
   <div class="body">
     <div class="left">
       <div class="analogy"><span class="t">What "searching by meaning" actually is</span>
@@ -1298,12 +1431,12 @@ figcaption{ font-size:8.6pt; color:var(--ink-faint); margin-top:2mm; }
       nothing.</b> The same shape turns up four times in this codebase.</p></div>
     </div>
   </div>
-  <div class="foot"><span>llmc-code &#183; how it works</span><span>16</span></div>
+  <div class="foot"><span>llmc-code &#183; how it works</span><span>17</span></div>
 </div>
 
 <div data-src="s15" class="slide">
-  <div class="sh"><span class="num">17</span><h2>Custom #9 &#8212; storing the numbers, without a database</h2>
-    <span class="tag">no Chroma, no FAISS, no NumPy</span></div>
+  <div class="sh"><span class="num">18</span><h2>Where meanings are stored &#8212; no database needed</h2>
+    <span class="tag">box 8 of 10 &#183; purple, right side</span></div>
   <div class="body col">
     <div class="wwh" style="margin:0 0 3mm 0">
       <div class="why"><span class="lbl">Why</span>
@@ -1370,11 +1503,11 @@ figcaption{ font-size:8.6pt; color:var(--ink-faint); margin-top:2mm; }
       forever, with no error".</p></div>
     </div>
   </div>
-  <div class="foot"><span>llmc-code &#183; how it works</span><span>17</span></div>
+  <div class="foot"><span>llmc-code &#183; how it works</span><span>18</span></div>
 </div>
 
 <div data-src="s16" class="slide">
-  <div class="sh"><span class="num">18</span><h2>Custom #10 &#8212; helping it find the right code</h2>
+  <div class="sh"><span class="num">19</span><h2>Custom #10 &#8212; helping it find the right code</h2>
     <span class="tag">code_index.py &#183; repo_graph.py</span></div>
   <div class="body">
     <div class="left">
@@ -1425,11 +1558,11 @@ figcaption{ font-size:8.6pt; color:var(--ink-faint); margin-top:2mm; }
       A good search tool beats a bigger memory, and costs far less.</p></div>
     </div>
   </div>
-  <div class="foot"><span>llmc-code &#183; how it works</span><span>18</span></div>
+  <div class="foot"><span>llmc-code &#183; how it works</span><span>19</span></div>
 </div>
 
 <div data-src="s17" class="slide">
-  <div class="sh"><span class="num">19</span><h2>Custom #11 &#8212; sending a helper to do the reading</h2>
+  <div class="sh"><span class="num">20</span><h2>Custom #11 &#8212; sending a helper to do the reading</h2>
     <span class="tag">orchestration.py</span></div>
   <div class="body">
     <div class="left">
@@ -1476,12 +1609,12 @@ figcaption{ font-size:8.6pt; color:var(--ink-faint); margin-top:2mm; }
       <p>When a job doesn't fit, <b>don't go looking for a bigger model &#8212; split the job.</b></p></div>
     </div>
   </div>
-  <div class="foot"><span>llmc-code &#183; how it works</span><span>19</span></div>
+  <div class="foot"><span>llmc-code &#183; how it works</span><span>20</span></div>
 </div>
 
 <div data-src="s18" id="s-heat" class="slide">
-  <div class="sh"><span class="num">20</span><h2>Custom #12 &#8212; your laptop is not a data centre</h2>
-    <span class="tag">cooldown.py &#183; gentle mode</span></div>
+  <div class="sh"><span class="num">21</span><h2>Keeping the laptop cool</h2>
+    <span class="tag">box 10 of 10 &#183; red, left side</span></div>
   <div class="body">
     <div class="left">
       <div class="wwh" style="flex-direction:column;margin-top:0">
@@ -1526,12 +1659,12 @@ figcaption{ font-size:8.6pt; color:var(--ink-faint); margin-top:2mm; }
       waited."</b> That is the number to improve.</p></div>
     </div>
   </div>
-  <div class="foot"><span>llmc-code &#183; how it works</span><span>20</span></div>
+  <div class="foot"><span>llmc-code &#183; how it works</span><span>21</span></div>
 </div>
 
 <style>#s-safety li{font-size:9.7pt;margin-bottom:1.1mm}#s-safety td{padding:1.2mm 2.5mm}#s-safety th{padding:1.2mm 2.5mm}#s-safety h3{margin:0 0 1.5mm 0}</style>
 <div data-src="s19" class="slide" id="s-safety" style="padding-bottom:7mm">
-  <div class="sh"><span class="num">21</span><h2>Custom #13 &#8212; never trusting the model</h2>
+  <div class="sh"><span class="num">22</span><h2>Custom #13 &#8212; never trusting the model</h2>
     <span class="tag">guards &#183; safety &#183; privacy</span></div>
   <div class="body">
     <div class="left">
@@ -1580,11 +1713,11 @@ figcaption{ font-size:8.6pt; color:var(--ink-faint); margin-top:2mm; }
       <em>because</em> of it. Say which mechanism enforces a guarantee &#8212; or don't make it.</p></div>
     </div>
   </div>
-  <div class="foot"><span>llmc-code &#183; how it works</span><span>21</span></div>
+  <div class="foot"><span>llmc-code &#183; how it works</span><span>22</span></div>
 </div>
 
 <div data-src="s20" class="slide">
-  <div class="sh"><span class="num">22</span><h2>Custom #14 &#8212; other people's tools, and testing without a GPU</h2>
+  <div class="sh"><span class="num">23</span><h2>Custom #14 &#8212; other people's tools, and testing without a GPU</h2>
     <span class="tag">mcp.py &#183; providers.py</span></div>
   <div class="body">
     <div class="left">
@@ -1633,11 +1766,11 @@ figcaption{ font-size:8.6pt; color:var(--ink-faint); margin-top:2mm; }
       directly, is miserable work. Done at the start, it costs ten minutes.</p></div>
     </div>
   </div>
-  <div class="foot"><span>llmc-code &#183; how it works</span><span>22</span></div>
+  <div class="foot"><span>llmc-code &#183; how it works</span><span>23</span></div>
 </div>
 
 <div data-src="s21" class="slide">
-  <div class="sh"><span class="num">23</span><h2>Recap &#8212; and how to build your own</h2>
+  <div class="sh"><span class="num">24</span><h2>Recap &#8212; and how to build your own</h2>
     <span class="tag">take-aways</span></div>
   <div class="body" style="font-size:96%">
     <div class="left">
@@ -1681,7 +1814,7 @@ figcaption{ font-size:8.6pt; color:var(--ink-faint); margin-top:2mm; }
       pipx install llmc-code &#183; github.com/Adhithya-Karthikeyan/llmc-code</p>
     </div>
   </div>
-  <div class="foot"><span>llmc-code &#183; how it works</span><span>23</span></div>
+  <div class="foot"><span>llmc-code &#183; how it works</span><span>24</span></div>
 </div>
 
 </body></html>
