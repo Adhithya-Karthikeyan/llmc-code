@@ -147,7 +147,8 @@ figcaption{ font-size:8.6pt; color:var(--ink-faint); margin-top:2mm; }
           color:var(--ink-faint); margin-bottom:2mm; }
 .qa{ margin-bottom:3mm; }
 .qa .q{ font-weight:650; color:#0f2436; font-size:10.4pt; margin-bottom:1mm; }
-.qa .a{ font-size:10pt; line-height:1.45; color:var(--ink); }
+.a{ font-size:10pt; line-height:1.45; color:var(--ink); margin-bottom:3mm; }
+.qa .a{ margin-bottom:0; }
 /* module cards */
 .modgrid{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:3.2mm; }
 .mod{ border:1px solid var(--rule); border-radius:4px; padding:2.4mm 3mm; background:#fbfdff; }
@@ -269,8 +270,128 @@ figcaption{ font-size:8.6pt; color:var(--ink-faint); margin-top:2mm; }
 </div>
 
 <div data-src="s03" class="slide">
-  <div class="sh"><span class="num">02</span><h2>The complete architecture</h2>
-    <span class="tag">every module, one picture</span></div>
+  <div class="sh"><span class="num">02</span><h2>The one data structure everything else operates on</h2>
+    <span class="tag">start here</span></div>
+  <div class="body">
+    <div class="left">
+      <p>Before any module makes sense, you need this. The assistant's entire "memory" is <b>one
+      Python list of dictionaries</b>, in a variable called <code>agent.messages</code>.</p>
+      <p>No database, no hidden state, no framework object. Just a list. Every feature in this deck
+      is an <b>operation on that list</b>.</p>
+      <div class="srcfile">agent.messages &#8212; the only five shapes that ever go in it</div>
+      <pre class="sm" style="font-size:7pt">[
+ {<span class="str">"role"</span>:<span class="str">"system"</span>,    <span class="str">"content"</span>:<span class="str">"You are a coding agent…"</span>},   <span class="cmt"># [0], never moves</span>
+
+ {<span class="str">"role"</span>:<span class="str">"user"</span>,      <span class="str">"content"</span>:<span class="str">"fix the failing test"</span>},
+
+ {<span class="str">"role"</span>:<span class="str">"assistant"</span>, <span class="str">"content"</span>:<span class="str">""</span>,                      <span class="cmt"># it wants something</span>
+  <span class="str">"tool_calls"</span>:[{<span class="str">"id"</span>:<span class="str">"call_1"</span>,
+                <span class="str">"function"</span>:{<span class="str">"name"</span>:<span class="str">"run_bash"</span>,
+                             <span class="str">"arguments"</span>:<span class="str">'{"command":"pytest -q"}'</span>}}]},
+
+ {<span class="str">"role"</span>:<span class="str">"tool"</span>,      <span class="str">"tool_call_id"</span>:<span class="str">"call_1"</span>,          <span class="cmt"># the result</span>
+  <span class="str">"content"</span>:<span class="str">'{"ok":true,"exit":1,"stdout":"FAILED test_parse.py…"}'</span>},
+
+ {<span class="str">"role"</span>:<span class="str">"assistant"</span>, <span class="str">"content"</span>:<span class="str">"The parser crashes on empty input…"</span>}
+]                                                <span class="cmt"># ↑ no tool_calls = done</span></pre>
+      <div class="key"><span class="t">Two invariants you must never break</span>
+      <p>&#8226; <b>Index 0 is always the system message.</b> Every operation starts from index 1.<br>
+      &#8226; <b>Every <code>tool_calls</code> entry needs a matching <code>tool</code> entry with the
+      same <code>id</code>.</b> One without the other and the server rejects the <em>whole</em>
+      request. Most agent bugs are this bug.</p></div>
+    </div>
+    <div class="right">
+      <div class="qa"><div class="q">How fast does it grow?</div>
+      <div class="a">One thing you type produces <b>1 + 2&#215;N</b> entries, where N is how many actions
+      the model took. "Fix the failing test" &#8212; run tests, read two files, edit, re-run &#8212; is
+      <b>11 entries</b>, and those tool results can be thousands of lines.</div></div>
+      <div class="qa"><div class="q">Where does it actually live?</div>
+      <div class="a"><b>In RAM</b>, as an attribute on the <code>Agent</code> object. <b>On disk</b>,
+      rewritten after every completed turn:</div></div>
+      <div class="srcfile">~/.llmcode/sessions/&lt;project-id&gt;.json</div>
+      <pre class="sm">{<span class="str">"cwd"</span>:        <span class="str">"/Users/you/projects/app"</span>,
+ <span class="str">"updated_at"</span>: <span class="str">"2026-09-18T09:14:02+00:00"</span>,
+ <span class="str">"model"</span>:      <span class="str">"qwen3-coder-30b"</span>,
+ <span class="str">"title"</span>:      <span class="str">"fix the failing test"</span>,
+ <span class="str">"messages"</span>:   [ <span class="cmt">… the exact list above …</span> ]}</pre>
+      <div class="qa"><div class="q">Four operations, and nothing else</div>
+      <div class="a">Every technique later in this deck is one of these:<br>
+      &#8226; <b>Append</b> to the end &#8212; all the loop ever does<br>
+      &#8226; <b>Shorten</b> one entry's <code>content</code>, in place &#8212; the trim (box 5)<br>
+      &#8226; <b>Replace</b> a run of old entries with one summary &#8212; compaction (box 5)<br>
+      &#8226; <b>Copy</b> the list and add to the copy &#8212; recall and caching (boxes 6, 7)</div></div>
+      <div class="note"><span class="t">Why this slide comes first</span>
+      <p>"Managing context" sounds abstract until you know it means <b>editing strings inside a Python
+      list</b>. That is all it is.</p></div>
+    </div>
+  </div>
+  <div class="foot"><span>llmc-code &#183; how it works</span><span>2</span></div>
+</div>
+
+<div data-src="s04" class="slide">
+  <div class="sh"><span class="num">03</span><h2>Where everything is actually stored</h2>
+    <span class="tag">one folder, seven files</span></div>
+  <div class="body">
+    <div class="left">
+      <p>Every piece of state this program keeps lives under <b>one folder in your home
+      directory</b>. No database, no server, no cache daemon. You can open all of it in a text
+      editor.</p>
+      <div class="srcfile">the whole state of the tool &#8212; chmod 0700, owner only</div>
+      <pre class="sm">~/.llmcode/
+├── config.json                       <span class="cmt"># your settings</span>
+├── mcp.json                          <span class="cmt"># external tool programs</span>
+├── sessions/
+│   ├── app-3f9a1c2b7e04.json         <span class="cmt"># THE CONVERSATION</span>
+│   ├── app-3f9a1c2b7e04.memory.json  <span class="cmt"># past Q&amp;A, for recall</span>
+│   ├── app-3f9a1c2b7e04.memory.json.vec   <span class="cmt"># their vectors (binary)</span>
+│   └── app-3f9a1c2b7e04.code_index.json   <span class="cmt"># your code, chunked</span>
+└── checkpoints/app-3f9a1c2b7e04/sessions/&lt;id&gt;/
+    ├── index.json                    <span class="cmt"># what was backed up, when</span>
+    └── blobs/*.blob                  <span class="cmt"># the file bytes, for undo</span></pre>
+      <div class="qa"><div class="q">What is that <code>app-3f9a1c2b7e04</code> part?</div>
+      <div class="a">A <b>project id</b>, built from the folder you launched in:</div></div>
+      <pre class="sm">project_id = <span class="str">"app"</span> + <span class="str">"-"</span> + sha256(<span class="str">"/Users/you/projects/app"</span>)[:<span class="num">12</span>]
+             <span class="cmt">#  ↑ folder name        ↑ first 12 hex of the FULL path</span></pre>
+      <div class="a">The name makes it readable. The hash of the <em>absolute path</em> makes it
+      unique &#8212; so two different projects both called <code>app</code> never collide, and the same
+      project always maps back to the same files.</div>
+    </div>
+    <div class="right">
+      <div class="qa"><div class="q">Why one file per concern, not one big one?</div></div>
+      <table>
+      <tr><th style="width:36%">File</th><th>Written when</th></tr>
+      <tr><td><code>&lt;proj&gt;.json</code><br><span class="ts">the conversation</span></td>
+          <td>After <b>every completed turn</b>. Whole file rewritten.</td></tr>
+      <tr><td><code>&lt;proj&gt;.memory.json</code><br><span class="ts">past questions + answers</span></td>
+          <td>When a turn finishes, one record is added.</td></tr>
+      <tr><td><code>&#8230;.memory.json.vec</code><br><span class="ts">the numbers</span></td>
+          <td>Only when something new gets embedded.</td></tr>
+      <tr><td><code>&lt;proj&gt;.code_index.json</code><br><span class="ts">your code, in chunks</span></td>
+          <td>When a search runs and a file has changed.</td></tr>
+      <tr><td><code>blobs/*.blob</code><br><span class="ts">undo copies</span></td>
+          <td>Just before each file edit.</td></tr>
+      </table>
+      <div class="a">Splitting them means a big write to one never risks the others, and the
+      <b>numbers stay out of the readable files</b>.</div>
+      <div class="key"><span class="t">Every single write uses the same three steps</span>
+      <p>Write to a <b>temporary file in the same folder</b> &#8594; flush it to the disk &#8594;
+      <b>rename</b> it over the real file.</p>
+      <p>Renaming is one indivisible operation, so a crash leaves you with <b>either the old file or
+      the new one</b> &#8212; never a half-written one. Same three lines in
+      <code>config.py</code>, <code>session.py</code>, <code>memory.py</code> and
+      <code>checkpoint.py</code>.</p></div>
+      <div class="note"><span class="t">What this buys you as a builder</span>
+      <p>When something goes wrong you can <code>cat</code> the file and see exactly what the model was
+      sent. Debugging an agent is mostly <b>reading the conversation you actually sent</b> &#8212; make
+      that easy on day one.</p></div>
+    </div>
+  </div>
+  <div class="foot"><span>llmc-code &#183; how it works</span><span>3</span></div>
+</div>
+
+<div data-src="s05" class="slide">
+  <div class="sh"><span class="num">04</span><h2>The complete architecture</h2>
+    <span class="tag">the map &#183; box numbers below</span></div>
   <figure style="margin-bottom:2mm"><svg viewBox="0 0 1100 474" xmlns="http://www.w3.org/2000/svg">
   <!-- USER -->
   <rect class="bx-d" x="440" y="4" width="220" height="34" rx="5"/>
@@ -416,7 +537,7 @@ figcaption{ font-size:8.6pt; color:var(--ink-faint); margin-top:2mm; }
     <span class="pill" style="background:#fdf3e8;border-color:#a8611f;color:#a8611f">actions &amp; context</span>
     <span class="pill" style="background:#f4eefc;border-color:#6a3fa0;color:#6a3fa0">model I/O &amp; caching</span>
     <span class="pill" style="background:#fdeef1;border-color:#a8324a;color:#a8324a">hardware limits</span>
-    <span style="margin-left:auto;white-space:nowrap"><b>Each numbered box gets its own slide next.</b></span>
+    <span style="margin-left:auto;white-space:nowrap"><b>Boxes 2&#8211;10 each get their own slide.</b></span>
   </div>
   <div class="wwh">
     <div class="why"><span class="lbl">Why it is built in layers</span>
@@ -432,262 +553,11 @@ figcaption{ font-size:8.6pt; color:var(--ink-faint); margin-top:2mm; }
     calls <em>before</em> and <em>around</em> each trip to the model. Only the bottom row is not
     our code.</p></div>
   </div>
-  <div class="foot"><span>llmc-code &#183; how it works</span><span>2</span></div>
-</div>
-
-<div data-src="s03a" class="slide">
-  <div class="sh"><span class="num">03</span><h2>What you see &#8212; and what's kept on your disk</h2>
-    <span class="tag">boxes 1 &amp; 9 &#183; top blue, bottom right grey</span></div>
-  <div class="body">
-    <div class="left">
-      <div class="boxstrip" style="margin-bottom:3mm">
-        <div class="chip b"><div class="n">repl.py</div>
-          <div class="d">The prompt, the commands, the colours, the status bar.</div></div>
-        <div class="chip b"><div class="n">__main__.py</div>
-          <div class="d">Command-line flags, and the one-shot mode.</div></div>
-      </div>
-      <div class="qa"><div class="q">Why is this 4,000 lines?</div>
-      <div class="a">Because two libraries both want to control the same terminal: one owns
-      <b>typing</b> (history, editing, tab-completion), the other owns <b>colour and layout</b>.
-      Left alone they fight over the cursor, and you get half-drawn prompts and stray characters.
-      Most of that file is keeping them out of each other's way.</div></div>
-      <div class="qa"><div class="q">Two decisions worth copying</div></div>
-      <table>
-      <tr><th style="width:34%">Decision</th><th>Why</th></tr>
-      <tr><td><b>Don't print the reply as it arrives</b> &#8212; collect it, then print once</td>
-          <td>Printed live, headings and code blocks show up as raw <code>##</code> and backticks.
-          Collected first, they render properly. The spinner is what moves while you wait.</td></tr>
-      <tr><td><b>The status bar reads a cached value</b>, refreshed once per turn</td>
-          <td>It's redrawn on <em>every keystroke</em>. Asking git for the branch name that often
-          would make typing visibly laggy. Expensive work happens once a turn, not once a letter.</td></tr>
-      </table>
-      <div class="note"><span class="t">And the one that stops it annoying you</span>
-      <p>A line starting with <code>/</code> is only treated as a command if it's one we actually
-      know. Anything else is sent to the model as ordinary text &#8212; so asking about
-      <em>another</em> tool's <code>/deploy</code> command doesn't get hijacked.</p></div>
-    </div>
-    <div class="right">
-      <div class="boxstrip" style="margin-bottom:3mm">
-        <div class="chip"><div class="n" style="color:#12293d">config.py</div>
-          <div class="d">Your settings.</div></div>
-        <div class="chip"><div class="n" style="color:#12293d">session.py</div>
-          <div class="d">Past conversations.</div></div>
-        <div class="chip"><div class="n" style="color:#12293d">checkpoint.py</div>
-          <div class="d">Undo.</div></div>
-      </div>
-      <div class="qa"><div class="q">Why a whole box just for saving things?</div>
-      <div class="a">Because all three have the same failure mode: <b>a crash halfway through
-      writing</b>. Settings, conversations and undo copies are each one file that must be either
-      completely old or completely new &#8212; never half-written.</div></div>
-      <div class="key"><span class="t">The trick, used identically in all three</span>
-      <p>Never write to the real file. Write to a <b>temporary file next to it</b>, then rename it
-      over the top. Renaming is a single, indivisible step &#8212; so a crash leaves you with either
-      the old file or the new one, and never a broken half of each.</p></div>
-      <div class="qa"><div class="q">Settings: the rule that stops surprises</div>
-      <div class="a">Three layers, in order: <b>built-in defaults</b>, then <b>your saved file</b>,
-      then <b>flags you typed just now</b>. Each layer only overrides what it actually mentions.
-      <br>And a flag you typed is <b>not saved</b> unless you ask for it &#8212; so a quick experiment
-      never quietly becomes your permanent setup.</div></div>
-      <div class="note"><span class="t">Why this matters more when it's local</span>
-      <p>The saved conversation contains <b>the contents of files the model read</b>. On a cloud
-      tool that would be a real problem. Here it never leaves the machine &#8212; which is exactly the
-      reason people run it locally in the first place.</p></div>
-    </div>
-  </div>
-  <div class="foot"><span>llmc-code &#183; how it works</span><span>3</span></div>
-</div>
-
-<div data-src="s03b" class="slide">
-  <div class="sh"><span class="num">04</span><h2>The brain &#8212; decides what to do next</h2>
-    <span class="tag">box 2 of 10 &#183; green, centre of the map</span></div>
-  <div class="body col">
-    <div class="boxstrip">
-      <div class="chip g"><div class="n">agent.py</div>
-        <div class="d">Runs the loop. Holds the conversation. Decides when to stop.</div></div>
-      <div class="chip g"><div class="n">orchestration.py</div>
-        <div class="d">Sends a second assistant off to do a job on its own.</div></div>
-      <div class="chip g"><div class="n">prompts.py</div>
-        <div class="d">The standing instructions that shape how it behaves.</div></div>
-    </div>
-    <div class="body" style="gap:6mm">
-      <div class="left">
-        <div class="qa"><div class="q">What does each one actually do?</div>
-        <div class="a"><b>agent.py</b> keeps a plain Python list of messages. Each round it sends that
-        list to the model. If the reply contains a request, it runs it, adds the result to the list,
-        and goes round again. If the reply is just words, that's the answer &#8212; stop.
-        <br><b>orchestration.py</b> adds one special tool: "start another assistant". That helper gets
-        a fresh, empty conversation and a smaller set of abilities. It reports back in a few lines.
-        <br><b>prompts.py</b> holds the instructions for four different jobs &#8212; planner, explorer,
-        coder, reviewer &#8212; that get pasted at the top of the conversation.</div></div>
-        <div class="qa"><div class="q">How do the three fit together?</div>
-        <div class="a">Three separate questions, three separate files:<br>
-        &#8226; <b>prompts.py decides HOW it behaves.</b><br>
-        &#8226; <b>agent.py decides WHEN to stop.</b><br>
-        &#8226; <b>orchestration.py decides WHO does the work.</b><br>
-        Change one and the other two keep working &#8212; which is why the behaviour can be tuned by
-        editing English, with no code change at all.</div></div>
-        <div class="key"><span class="t">The rule that makes it testable</span>
-        <p>The brain <b>never opens a file and never opens a connection</b>. It only ever asks the
-        hands or the mouth. So we can hand it a fake model and a temporary folder and test the entire
-        decision-making layer &#8212; which is how 1,355 tests run offline in seconds.</p></div>
-      </div>
-      <div class="right">
-        <div class="qa"><div class="q">Why does a <em>local</em> model need all this?</div>
-        <div class="a">A big cloud model mostly gets it right first time. A small local one does not,
-        and the brain is where you absorb that:</div></div>
-        <table>
-        <tr><th style="width:38%">What goes wrong locally</th><th>What the brain does about it</th></tr>
-        <tr><td><b>It forgets to look first</b> and answers from imagination</td>
-            <td><code>prompts.py</code> spells out <em>explore &#8594; plan &#8594; act &#8594; validate</em>,
-            and caps how many files it may read before it must search instead</td></tr>
-        <tr><td><b>It loops</b> &#8212; asking for the same file over and over</td>
-            <td><code>agent.py</code> compares each round's requests to the last. Four identical
-            rounds and it stops</td></tr>
-        <tr><td><b>It sends a broken request</b></td>
-            <td>Three rounds where <em>everything</em> failed to parse and it stops. One good request
-            resets the count &#8212; progress is progress</td></tr>
-        <tr><td><b>It thinks, then says nothing</b></td>
-            <td>Re-asks up to twice, with the reply length cap lifted</td></tr>
-        <tr><td><b>A big job won't fit</b> in its small memory</td>
-            <td><code>orchestration.py</code> splits it: helpers do the reading, the main
-            conversation only receives conclusions</td></tr>
-        </table>
-        <div class="note"><span class="t">The shape to copy</span>
-        <p>Your loop should assume the model <b>will</b> misbehave. Every stop-condition here exists
-        because something actually went wrong once &#8212; and each one has a <b>number</b> attached, so
-        it can never argue with you about when to give up.</p></div>
-      </div>
-    </div>
-  </div>
   <div class="foot"><span>llmc-code &#183; how it works</span><span>4</span></div>
 </div>
 
-<div data-src="s03c" class="slide">
-  <div class="sh"><span class="num">05</span><h2>The hands &#8212; does things on your machine</h2>
-    <span class="tag">box 3 of 10 &#183; orange, below the brain</span></div>
-  <div class="body col">
-    <div class="boxstrip">
-      <div class="chip a"><div class="n">tools.py</div>
-        <div class="d">The 11 things the model is allowed to do, and every safety check.</div></div>
-      <div class="chip a"><div class="n">mcp.py</div>
-        <div class="d">Tools other people wrote, plugged in at runtime.</div></div>
-      <div class="chip a"><div class="n">remediation.py</div>
-        <div class="d">Fixes an obviously-wrong request and quietly tries again.</div></div>
-    </div>
-    <div class="body" style="gap:6mm">
-      <div class="left">
-        <div class="qa"><div class="q">Why is this one box, and not scattered everywhere?</div>
-        <div class="a">This is the <b>only</b> place the model can affect the real world. One box means every
-        dangerous thing goes through the same door &#8212; so the confirmation prompt, the folder limit,
-        the output cap and the secret-stripping are written <b>once</b>.<br>
-        If file writing lived in three places, you'd have three chances to forget the check.</div></div>
-        <div class="qa"><div class="q">What every tool must promise</div>
-        <div class="a">Three rules, no exceptions:</div></div>
-        <table>
-        <tr><th style="width:34%">Rule</th><th>Why it has to be a rule</th></tr>
-        <tr><td><b>Never crash</b></td><td>A crash ends the whole turn. A failure <em>message</em>
-        gets read by the model, which then tries something else.</td></tr>
-        <tr><td><b>Always cut output short</b></td><td>Whatever a tool returns is added to the
-        conversation and re-sent <em>forever after</em>. One giant result poisons the rest of
-        the session.</td></tr>
-        <tr><td><b>Explain the failure</b></td><td><code>"error"</code> makes the model guess.
-        <code>"no such path; did you mean llmcode/agent.py?"</code> gets fixed next round.</td></tr>
-        </table>
-        <div class="key"><span class="t">Your error messages are now prompts</span>
-        <p>The most surprising thing about building an agent: the text you put in an error is
-        <b>read by the model and acted on</b>. Write it for the model, not for a log file.</p></div>
-      </div>
-      <div class="right">
-        <div class="qa"><div class="q">How does a tool actually get used?</div>
-        <div class="a">Four steps, every time:</div></div>
-        <table>
-        <tr><th style="width:8%">#</th><th>Step</th></tr>
-        <tr><td><b>1</b></td><td>Its <b>description</b> goes to the model with the conversation &#8212; name,
-        purpose, options.</td></tr>
-        <tr><td><b>2</b></td><td>The model replies asking for it by name, with options filled in.</td></tr>
-        <tr><td><b>3</b></td><td>We fix the option names (local models get them wrong), ask you if it's
-        dangerous, then run <b>ordinary Python</b>.</td></tr>
-        <tr><td><b>4</b></td><td>The result is cut short and added to the conversation.</td></tr>
-        </table>
-        <div class="qa"><div class="q">Why it matters more on a local model</div>
-        <div class="a">A small model gets paths and arguments wrong <b>constantly</b>. So the hands do
-        two extra jobs a cloud harness wouldn't bother with:</div></div>
-        <ul>
-          <li><b>remediation.py</b> corrects the obvious mistakes and retries, instead of burning a
-          whole round on a typo.</li>
-          <li><b>The caps are tighter</b> than you would set for a big model &#8212; the memory it all
-          has to fit into is much smaller.</li>
-        </ul>
-        <div class="note"><span class="t">And about other people's tools</span>
-        <p>An <b>mcp.py</b> tool can declare "I'm harmless, don't ask". A bad one could say that about
-        something destructive &#8212; so the claim is <b>ignored</b> unless you said you trust that
-        program. <b>Trust is your call, never the tool's.</b></p></div>
-      </div>
-    </div>
-  </div>
-  <div class="foot"><span>llmc-code &#183; how it works</span><span>5</span></div>
-</div>
-
-<div data-src="s03d" class="slide">
-  <div class="sh"><span class="num">06</span><h2>The mouth &#8212; talks to the model</h2>
-    <span class="tag">box 4 of 10 &#183; purple, bottom centre</span></div>
-  <div class="body col">
-    <div class="boxstrip">
-      <div class="chip p"><div class="n">the real one</div>
-        <div class="d">Sends the conversation to LM Studio and reads the reply back as it arrives.</div></div>
-      <div class="chip p"><div class="n">the translator</div>
-        <div class="d">Understands 7 ways of asking for things, and turns them all into one shape.</div></div>
-      <div class="chip p"><div class="n">the fake one</div>
-        <div class="d">A scripted stand-in model, so the tests need no GPU and no internet.</div></div>
-    </div>
-    <div class="body" style="gap:6mm">
-      <div class="left">
-        <div class="qa"><div class="q">Why is there a box here at all?</div>
-        <div class="a">Because the rest of the program should <b>never know which model you loaded</b>. Every
-        family has its own quirks; if those leaked into the brain, changing model would mean changing
-        the loop. So this box always emits the <b>same three things</b>:</div></div>
-        <div class="srcfile">real model or fake one &#8212; both produce only these</div>
-        <pre>{<span class="str">"type"</span>:<span class="str">"text"</span>,      <span class="str">"text"</span>: <span class="cmt">&#8230; a piece of the reply &#8230;</span>}
-{<span class="str">"type"</span>:<span class="str">"tool_call"</span>, <span class="str">"name"</span>, <span class="str">"arguments"</span>: <span class="cmt">&#8230; what it wants done &#8230;</span>}
-{<span class="str">"type"</span>:<span class="str">"done"</span>,      <span class="cmt"># exactly one, always last</span>}</pre>
-        <div class="qa"><div class="q">The fiddly bit: replies arrive in pieces</div>
-        <div class="a">A single request arrives <b>split across dozens of fragments</b> &#8212; and if the model
-        asks for two things at once, the fragments are <b>interleaved</b>. We collect them into
-        numbered slots and assemble them only once the reply ends.<br>
-        They are joined <b>in one go</b>, not glued on one at a time &#8212; with a whole file arriving
-        in pieces, that is the difference between instant and painfully slow.</div></div>
-      </div>
-      <div class="right">
-        <div class="qa"><div class="q">Why the fake model is the best decision in the project</div>
-        <div class="a">Nearly every bug here is a <b>loop bug</b>: a request with no matching result, a
-        counter that never resets, messages in the wrong order. You cannot chase those against a real
-        model &#8212; it answers differently every time, and slowly. Against a script they are ordinary
-        tests that run in <b>milliseconds</b>.</div></div>
-        <div class="key"><span class="t">Build this seam on day one</span>
-        <p>Ten minutes at the start: never call the model directly, always go through a swappable piece.
-        Adding it <em>later</em>, once a dozen places call the model, is miserable.</p></div>
-        <div class="qa"><div class="q">And the privacy part</div>
-        <div class="a">Because this is the only place that opens a connection, it is also the only
-        place privacy has to be enforced:</div></div>
-        <ul>
-          <li>The address <b>must</b> be your own machine, pinned to the exact number it resolved to,
-          so it cannot quietly become something else later.</li>
-          <li>Proxy settings are <b>ignored</b>, so traffic meant for your own machine can never be
-          routed out through someone else's server.</li>
-          <li>If any of that can't be guaranteed, it <b>refuses to start</b>.</li>
-        </ul>
-        <div class="note"><span class="t">One box, one responsibility</span>
-        <p>All of this follows from a single sentence: <b>this is the only code that talks to the
-        outside.</b> The translator, the fake model and the privacy lock are all about that one
-        boundary.</p></div>
-      </div>
-    </div>
-  </div>
-  <div class="foot"><span>llmc-code &#183; how it works</span><span>6</span></div>
-</div>
-
-<div data-src="s04" class="slide">
-  <div class="sh"><span class="num">07</span><h2>What happens when you press Enter</h2><span class="tag">the main flow</span></div>
+<div data-src="s06" class="slide">
+  <div class="sh"><span class="num">05</span><h2>What happens when you press Enter</h2><span class="tag">one request, end to end</span></div>
   <div class="body col">
     <figure style="flex:1"><svg viewBox="0 0 760 322" xmlns="http://www.w3.org/2000/svg">
   <!-- row 1 -->
@@ -766,11 +636,11 @@ figcaption{ font-size:8.6pt; color:var(--ink-faint); margin-top:2mm; }
       writes a file or runs a command <b>asks you first</b>. Just reading? It goes ahead.</p></div>
     </div>
   </div>
-  <div class="foot"><span>llmc-code &#183; how it works</span><span>7</span></div>
+  <div class="foot"><span>llmc-code &#183; how it works</span><span>5</span></div>
 </div>
 
-<div data-src="s05" class="slide">
-  <div class="sh"><span class="num">08</span><h2>The whole agent, in 20 lines</h2><span class="tag">the loop</span></div>
+<div data-src="s07" class="slide">
+  <div class="sh"><span class="num">06</span><h2>The whole agent, in 20 lines</h2><span class="tag">the loop, in real code</span></div>
   <div class="body">
     <div class="left">
       <p>Take away 3,000 lines of safety checks and polish, and this is the whole thing. It is not
@@ -821,66 +691,194 @@ figcaption{ font-size:8.6pt; color:var(--ink-faint); margin-top:2mm; }
       <b>Your error messages are now instructions to the model.</b> Write them for the model to read, not for a log file nobody opens.</p></div>
     </div>
   </div>
+  <div class="foot"><span>llmc-code &#183; how it works</span><span>6</span></div>
+</div>
+
+<div data-src="s08" class="slide">
+  <div class="sh"><span class="num">07</span><h2>Box 2 &#8212; the brain: what the Agent object holds</h2>
+    <span class="tag">agent.py &#183; orchestration.py &#183; prompts.py</span></div>
+  <div class="body">
+    <div class="left">
+      <div class="qa"><div class="q">The whole "brain" is one object with these fields</div></div>
+      <div class="srcfile">llmcode/agent.py &#8212; the state that matters</div>
+      <pre class="sm">self.messages      <span class="cmt"># the list from slide 2 — the ONLY real state</span>
+self.provider      <span class="cmt"># who to send it to (real model, or the fake one)</span>
+self.registry      <span class="cmt"># {name: Tool} — what it is allowed to do</span>
+self.tool_names    <span class="cmt"># which of those to offer THIS agent</span>
+self.max_iterations<span class="cmt"># 80 — hard stop</span>
+self.memory        <span class="cmt"># the recall store (box 7), or None</span>
+self.context_budget<span class="cmt"># 12_000 — the target size for the list</span>
+
+<span class="cmt"># per-turn scratch, all reset at the top of run():</span>
+self._read_bytes         <span class="cmt"># how much it has read this turn</span>
+self._changed_files      <span class="cmt"># what it edited, for the verify step</span>
+self.last_turn_details   <span class="cmt"># full args+results, for Ctrl+O</span></pre>
+      <div class="a">Note what is <b>not</b> there: no file handles, no sockets. The brain can only
+      call <code>self.provider</code> and things in <code>self.registry</code> &#8212; which is what lets
+      the whole decision layer be tested with a fake model and a temp folder.</div>
+      <div class="qa"><div class="q">Two different agents, same class</div>
+      <div class="a">A sub-agent is <b>the same <code>Agent</code> class</b>, constructed with a
+      different system prompt and a smaller <code>registry</code>. An explorer literally has no
+      <code>write_file</code> key in its dict &#8212; it cannot be talked into writing, because the
+      function isn't reachable.</div></div>
+    </div>
+    <div class="right">
+      <div class="qa"><div class="q">What one pass of the loop does, in order</div></div>
+      <table>
+      <tr><th style="width:8%">#</th><th style="width:34%">Step</th><th>Touches</th></tr>
+      <tr><td>1</td><td>Cancelled? Cooldown due?</td><td>checked <em>before</em> anything is appended</td></tr>
+      <tr><td>2</td><td>Over budget? &#8594; summarise</td><td><code>self.messages</code> (box 5)</td></tr>
+      <tr><td>3</td><td>Build the request</td><td>a <b>copy</b>: <code>self.messages + extras</code></td></tr>
+      <tr><td>4</td><td>Stream the reply</td><td><code>self.provider</code> (box 4)</td></tr>
+      <tr><td>5</td><td>No tool calls? &#8594; return</td><td>this is the only exit</td></tr>
+      <tr><td>6</td><td>Append <code>assistant</code> + run each tool + append <code>tool</code></td>
+          <td><code>self.registry</code> (box 3)</td></tr>
+      <tr><td>7</td><td>Check the loop guards</td><td>counters, below</td></tr>
+      </table>
+      <div class="qa"><div class="q">The guards are just counters on local variables</div></div>
+      <pre class="sm">consecutive_parse_errors  <span class="cmt"># 3 all-bad rounds  → stop</span>
+_consecutive_dup_batches  <span class="cmt"># 4 identical rounds → stop</span>
+nudge_count               <span class="cmt"># max_nudges = 2 (it said nothing)</span>
+tool_markup_nudged        <span class="cmt"># one-shot latch</span>
+truncation_retried        <span class="cmt"># once per pass (reply got cut off)</span>
+<span class="kw">for</span> _iter <span class="kw">in</span> range(self.max_iterations):  <span class="cmt"># 80, the outer stop</span></pre>
+      <div class="key"><span class="t">The rule that stops guards misfiring</span>
+      <p>A round where <b>one call worked and one failed</b> is still progress &#8212; so the counter
+      only increases when the <b>entire</b> round failed, and any good call resets it to zero.</p>
+      <p>Our first version counted <em>any</em> failure, and killed sessions that were working fine.</p></div>
+    </div>
+  </div>
+  <div class="foot"><span>llmc-code &#183; how it works</span><span>7</span></div>
+</div>
+
+<style>#s-tools td{padding:1.3mm 2.5mm}#s-tools th{padding:1.3mm 2.5mm}</style>
+<div data-src="s09" id="s-tools" class="slide">
+  <div class="sh"><span class="num">08</span><h2>Box 3 &#8212; the hands: what a tool actually is</h2>
+    <span class="tag">tools.py &#183; mcp.py &#183; remediation.py</span></div>
+  <div class="body">
+    <div class="left">
+      <div class="qa"><div class="q">A tool is a five-field dataclass. That's the whole abstraction.</div></div>
+      <div class="srcfile">llmcode/tools.py</div>
+      <pre class="sm"><span class="kw">@dataclass</span>
+<span class="kw">class</span> Tool:
+    name: str
+    description: str          <span class="cmt"># the model READS this — it's a prompt</span>
+    parameters: dict          <span class="cmt"># JSON Schema for the arguments</span>
+    fn: Callable[[dict], dict]<span class="cmt"># the Python that runs</span>
+    requires_confirmation: bool = <span class="kw">False</span>
+
+REGISTRY: dict[str, Tool] = {}          <span class="cmt"># name → Tool</span>
+
+<span class="kw">def</span> register(tool): REGISTRY[tool.name] = tool</pre>
+      <div class="a">Tools add themselves to <code>REGISTRY</code> when the module is imported. An
+      agent is then given a <b>subset</b> of that dict &#8212; which is how role-scoping works.</div>
+      <div class="qa"><div class="q">The round trip, with the real names</div></div>
+      <pre class="sm"><span class="num">1.</span> openai_schema(names, registry)     <span class="cmt"># {name, description,</span>
+     &#8594; sent with the messages        <span class="cmt">#  parameters} per tool</span>
+<span class="num">2.</span> model replies: <span class="str">"run_bash"</span>, <span class="str">'{"command":"pytest"}'</span>
+<span class="num">3.</span> normalize_tool_args(name, args)    <span class="cmt"># cmd→command, file_path→path</span>
+<span class="num">4.</span> _permission_decision(tool, args)   <span class="cmt"># allow / ask / block</span>
+<span class="num">5.</span> checkpoint.snapshot([path])        <span class="cmt"># before any write</span>
+<span class="num">6.</span> result = tool.fn(args)             <span class="cmt"># ordinary Python</span>
+<span class="num">7.</span> messages.append({<span class="str">"role"</span>:<span class="str">"tool"</span>,
+      <span class="str">"tool_call_id"</span>: id, <span class="str">"content"</span>: json.dumps(result)[:cap]})</pre>
+    </div>
+    <div class="right">
+      <div class="qa"><div class="q">Every tool returns the same two shapes &#8212; and never raises</div></div>
+      <pre class="sm">{<span class="str">"ok"</span>: <span class="kw">True</span>,  <span class="str">"result"</span>: <span class="str">"…"</span>}
+{<span class="str">"ok"</span>: <span class="kw">False</span>, <span class="str">"error"</span>:  <span class="str">"no such path: llmcode/agnt.py"</span>}</pre>
+      <div class="a">An exception ends your turn. A returned error becomes a <code>role:"tool"</code> entry
+      the model <b>reads next pass</b> and corrects &#8212; which is why error text is written for the
+      model, not for a log file.</div>
+      <div class="qa"><div class="q">The caps, and where they are enforced</div></div>
+      <table>
+      <tr><th style="width:38%">Limit</th><th>Applies to</th></tr>
+      <tr><td><code>_MAX_OUTPUT</code> = <b>24,000 bytes</b></td><td>every tool result, the hard ceiling</td></tr>
+      <tr><td><b>250 lines</b> / 10 MB scan guard</td><td>a whole-file <code>read_file</code></td></tr>
+      <tr><td><b>500</b> matches / <b>100</b> matches</td><td><code>glob</code> / <code>grep</code></td></tr>
+      <tr><td><b>256 KB</b>, streamed via <code>select()</code></td><td><code>run_bash</code> output</td></tr>
+      <tr><td><b>12,000 bytes</b></td><td><code>code_search</code> &#8212; tighter on purpose</td></tr>
+      </table>
+      <div class="a">Caps live <b>inside the tool</b>. Whatever it returns is appended to the list and
+      re-sent forever after &#8212; so the only safe place to stop it is where it is produced.</div>
+      <div class="key"><span class="t">Two details worth stealing</span>
+      <p>&#8226; <code>run_bash</code> streams output through <code>select()</code> instead of waiting for
+      the process to end &#8212; so a runaway log can't fill your RAM before the timeout fires. On
+      timeout the whole <b>process group</b> is killed.<br>
+      &#8226; <code>run_bash</code> truncates <b>head + tail</b>, while <code>read_file</code>
+      truncates head-only &#8212; because a test failure summary is at the <em>bottom</em>.</p></div>
+    </div>
+  </div>
   <div class="foot"><span>llmc-code &#183; how it works</span><span>8</span></div>
 </div>
 
-<div data-src="s06" class="slide">
-  <div class="sh"><span class="num">09</span><h2>Tools — giving the model hands</h2><span class="tag">tools.py</span></div>
+<div data-src="s10" class="slide">
+  <div class="sh"><span class="num">09</span><h2>Box 4 &#8212; the mouth: turning any model into one shape</h2>
+    <span class="tag">providers.py</span></div>
   <div class="body">
     <div class="left">
-      <h4>A tool is just three things</h4>
-      <div class="srcfile">llmcode/tools.py &#8212; the Tool dataclass</div>
-      <pre class="sm"><span class="kw">Tool</span>(
-    name=<span class="str">"read_file"</span>,
-    description=<span class="str">"Read a text file. Use before answering about code."</span>,
-    parameters={<span class="str">"type"</span>:<span class="str">"object"</span>, <span class="str">"required"</span>:[<span class="str">"path"</span>],   <span class="cmt"># JSON Schema →</span>
-                <span class="str">"properties"</span>:{<span class="str">"path"</span>:{<span class="str">"type"</span>:<span class="str">"string"</span>},   <span class="cmt"># sent to the model</span>
-                              <span class="str">"offset"</span>:{<span class="str">"type"</span>:<span class="str">"integer"</span>},
-                              <span class="str">"limit"</span>:{<span class="str">"type"</span>:<span class="str">"integer"</span>}}},
-    fn=_read_file,                       <span class="cmt"># the Python that runs</span>
-    requires_confirmation=<span class="kw">False</span>,         <span class="cmt"># reads are safe</span>
-)</pre>
-      <p><b>1.</b> a description the model reads &#183; <b>2.</b> the Python that actually runs &#183;
-      <b>3.</b> whether to ask you first.</p>
-      <div class="key"><span class="t">Every tool answers the same way</span>
-      <p>Either <code>{"ok": true, &#8230;}</code> or <code>{"ok": false, "error": &#8230;}</code> &#8212; never a crash.
-      A crash would end your turn. An error just tells the model what went wrong, so it can try something else.</p></div>
-      <div class="note"><span class="t">The description is doing real work</span>
-      <p>Write "Read a file" and the model reads whole files. Write "Read a file &#8212; for big ones,
-      ask for a range" and it starts asking for ranges.<br>
-      <b>Same code underneath. Completely different behaviour.</b></p></div>
+      <div class="qa"><div class="q">The contract: three event types, nothing else</div>
+      <div class="a">Whatever model you loaded, this box yields a stream of plain dicts. The brain
+      is written against <em>these</em>, so it never learns which model you're running.</div></div>
+      <div class="srcfile">llmcode/providers.py &#8212; every provider yields only these</div>
+      <pre class="sm">{<span class="str">"type"</span>:<span class="str">"text"</span>,      <span class="str">"text"</span>: <span class="cmt">… a fragment of the reply …</span>}
+{<span class="str">"type"</span>:<span class="str">"tool_call"</span>, <span class="str">"id"</span>, <span class="str">"name"</span>, <span class="str">"arguments"</span>: {<span class="cmt">… a dict …</span>}}
+{<span class="str">"type"</span>:<span class="str">"done"</span>,      <span class="str">"finish_reason"</span>, <span class="str">"output_tokens"</span>}</pre>
+      <div class="a"><b>Rules:</b> arguments arrive already parsed into a dict, tool calls all come
+      before <code>done</code>, and there is <b>exactly one</b> <code>done</code>, always last.</div>
+      <div class="qa"><div class="q">The fiddly part: reassembling a request from fragments</div>
+      <div class="a">The reply streams in. One request's arguments arrive split across dozens of
+      fragments, and two simultaneous requests arrive <b>interleaved</b> &#8212; told apart only by an
+      index number.</div></div>
+      <div class="srcfile">llmcode/providers.py &#8212; the accumulation loop</div>
+      <pre class="sm"><span class="kw">for</span> tc <span class="kw">in</span> delta.tool_calls:
+    idx  = tc.index <span class="kw">or</span> <span class="num">0</span>                  <span class="cmt"># which call this belongs to</span>
+    slot = tool_buf.setdefault(idx, {<span class="str">"id"</span>:<span class="kw">None</span>,<span class="str">"name"</span>:<span class="kw">None</span>,<span class="str">"args"</span>:[]})
+    <span class="kw">if</span> tc.id:              slot[<span class="str">"id"</span>]   = tc.id
+    <span class="kw">if</span> tc.function.name:   slot[<span class="str">"name"</span>] = tc.function.name
+    <span class="kw">if</span> tc.function.arguments:
+        slot[<span class="str">"args"</span>].append(tc.function.arguments)   <span class="cmt"># collect…</span>
+
+<span class="cmt"># …and only when the stream ends:</span>
+args = json.loads(<span class="str">""</span>.join(slot[<span class="str">"args"</span>]))          <span class="cmt"># …join ONCE</span></pre>
+      <div class="a">Fragments go into a <b>list</b>, joined once. Gluing strings one at a time
+      re-copies the whole thing each fragment &#8212; with a 2,000-line file arriving in pieces, that
+      alone is the difference between instant and painfully slow.</div>
     </div>
     <div class="right">
-      <h3>The eleven tools</h3>
+      <div class="qa"><div class="q">Why seven parsers live here</div>
+      <div class="a">Many local models never use the proper channel. They <b>type the request out as
+      text</b> and expect the client to spot it. Each family invented its own syntax:</div></div>
       <table>
-      <tr><th style="width:30%">Tool</th><th>What it does, and what protects you</th></tr>
-      <tr><td><code>read_file</code></td><td>Can read just part of a file. Refuses to dump huge generated files.</td></tr>
-      <tr><td><code>write_file</code></td><td>Asks first. Can only write inside your project folder.</td></tr>
-      <tr><td><code>edit_file</code></td><td>Swaps one exact piece of text. Forgives small spacing differences.</td></tr>
-      <tr><td><code>run_bash</code></td><td>Asks first. Gives up if it hangs. Cuts huge output. <b>Your API keys are never passed to it.</b></td></tr>
-      <tr><td><code>glob</code> / <code>grep</code></td><td>Find files by name / find text inside them. Both stop at a sensible number of results.</td></tr>
-      <tr><td><code>repo_map</code></td><td>A short map of the project: files and what they contain.</td></tr>
-      <tr><td><code>code_search</code></td><td>Search your code by words, or by meaning.</td></tr>
-      <tr><td><code>web_fetch</code></td><td>Fetch a web page &#8212; but it is <b>blocked from reaching anything inside your own network</b>.</td></tr>
-      <tr><td><code>spawn_agent</code></td><td>Hand a job to a separate helper assistant.</td></tr>
-      <tr><td><code>todo_write</code></td><td>Lets the model keep its own to-do list.</td></tr>
+      <tr><th style="width:26%">Family</th><th>What arrives as plain text</th></tr>
+      <tr><td><b>proper channel</b></td><td>a real <code>tool_calls</code> field &#8212; easy</td></tr>
+      <tr><td><b>DeepSeek</b></td><td><code>&lt;&#65372;tool&#9601;call&#9601;begin&#65372;&gt;</code> then JSON</td></tr>
+      <tr><td><b>Qwen &#183; Hermes</b></td><td><code>&lt;tool_call&gt;{"name":&#8230;}&lt;/tool_call&gt;</code></td></tr>
+      <tr><td><b>Mistral</b></td><td><code>[TOOL_CALLS][{&#8230;}]</code></td></tr>
+      <tr><td><b>Llama 3.x</b></td><td><code>&lt;function=name&gt;{&#8230;}</code> or <code>&lt;|python_tag|&gt;</code></td></tr>
+      <tr><td><b>Qwen XML</b></td><td><code>&lt;parameter=path&gt;main.py&lt;/parameter&gt;</code></td></tr>
+      <tr><td><b>our fallback</b></td><td>a fenced <code>json</code> block we taught it to emit</td></tr>
       </table>
-      <div class="problem"><span class="t">Two real bugs this cost us</span>
-      <p>&#8226; Our own docs said writes couldn't escape the project folder. For <code>run_bash</code>
-      that was <b>simply not true</b>. A safety promise that isn't real is worse than no promise,
-      because people relax.<br>
-      &#8226; Writing a file whose <em>contents</em> looked like a tool request corrupted it &#8212; the
-      reader got confused about where the file ended.</p></div>
+      <div class="problem"><span class="t">Why the XML one is dangerous, not just annoying</span>
+      <p>A model opens <code>&lt;parameter=content&gt;</code>, pastes a whole Python file, and often
+      <b>never closes the tag</b>. The parser must decide where the value ends.</p>
+      <p>Too early: half the file is lost. Too late: <b>the next request's markup gets written into
+      the user's source file</b>. That actually happened.</p></div>
+      <div class="key"><span class="t">Two rules that keep it safe</span>
+      <p>&#8226; <b>Two tool-shaped blocks in one reply &#8594; run neither.</b> Running just the first
+      silently drops the second and the model never learns it vanished.<br>
+      &#8226; <b>A block inside prose or a <code>&lt;think&gt;</code> section is ignored.</b> Otherwise a
+      model <em>explaining</em> <code>rm -rf</code> would run it.</p></div>
     </div>
   </div>
   <div class="foot"><span>llmc-code &#183; how it works</span><span>9</span></div>
 </div>
 
-<div data-src="s07" class="slide">
-  <div class="sh"><span class="num">10</span><h2>Custom #1 &#8212; every model speaks a different language</h2>
-    <span class="tag">providers.py</span></div>
+<div data-src="s11" class="slide">
+  <div class="sh"><span class="num">10</span><h2>Seven dialects in, one shape out</h2>
+    <span class="tag">providers.py &#8594; tools.py</span></div>
   <div class="body">
-    <div class="left center"><figure><svg viewBox="0 0 760 428" xmlns="http://www.w3.org/2000/svg">
+    <div class="left center"><figure style="width:96%"><svg viewBox="0 0 760 428" xmlns="http://www.w3.org/2000/svg">
   <rect class="bx-d" x="4" y="6" width="352" height="44" rx="4"/>
   <text class="tt" x="14" y="22">1 &#183; native &#8212; the happy path</text>
   <text class="tmz" x="14" y="40">tool_calls:[{function:{name:"read_file","arguments":"{…}"}}]</text>
@@ -944,166 +942,157 @@ figcaption{ font-size:8.6pt; color:var(--ink-faint); margin-top:2mm; }
   <text class="ts" x="613" y="330" text-anchor="middle">the agent loop never learns which dialect arrived</text>
 </svg></figure></div>
     <div class="right">
-      <div class="wwh" style="flex-direction:column;margin-top:0">
-        <div class="why"><span class="lbl">Why</span>
-        <p>Cloud models all ask for things the same way. Local models come from a dozen labs, each with
-        its own idea &#8212; and many <b>don't use the proper channel at all</b>. They type the request
-        out as ordinary text and hope you notice.</p></div>
-        <div class="what"><span class="lbl">What</span>
-        <p>A reader that understands <b>seven ways of saying the same thing</b>: one proper format, five
-        that model families made up, and one we invented for models that can do none of them.</p></div>
-        <div class="how"><span class="lbl">How</span>
-        <p>Spot the style, pull out the name and details, turn it into one plain Python value.
-        <b>The rest of the program only ever sees one shape.</b></p></div>
-      </div>
-      <div class="problem" style="margin-top:3mm"><span class="t">The bug that forced this</span>
-      <p>Writing files did not work for <em>weeks</em>. Always the same error: <em>"requires a string
-      'path'"</em>.</p>
-      <p>Two problems stacked up. The model wrote its request in a style we couldn't read yet &#8212;
-      <b>and</b> it called the option <code>file_path</code>, because that is what it saw most in
-      training, while our tool called it <code>path</code>.</p></div>
-      <div class="note"><span class="t">The genuinely hard part: where does the text stop?</span>
-      <p>A model will often say "here comes the file content", paste an entire Python file, and then
-      <b>never say where it ended</b>. So we have to guess the end point.</p>
-      <p>Guess too early and half the file is lost. Guess too late and <b>the next request gets
-      written into the user's source file</b>. That second one actually happened.</p></div>
+      <div class="qa"><div class="q">Even after parsing, the option names are wrong</div>
+      <div class="a">Local models learned from other tools' documentation, so they use <em>those</em>
+      names. The fix is one lookup table &#8212; and its comments are the interesting part:</div></div>
+      <div class="srcfile">llmcode/tools.py &#8212; _ARG_ALIASES</div>
+      <pre class="sm"><span class="str">"read_file"</span>:  {<span class="str">"path"</span>: (<span class="str">"file_path"</span>, <span class="str">"filename"</span>, <span class="str">"target_file"</span>, …)},
+<span class="str">"write_file"</span>: {<span class="str">"path"</span>: (<span class="str">"file_path"</span>, …),
+   <span class="cmt"># deliberately NO new_string/new_str here — those are edit_file's</span>
+   <span class="cmt"># `new` key; mapping them to write_file content would turn a</span>
+   <span class="cmt"># mis-targeted edit into a DESTRUCTIVE whole-file overwrite.</span>
+              <span class="str">"content"</span>: (<span class="str">"file_text"</span>, <span class="str">"text"</span>, <span class="str">"body"</span>, <span class="str">"code"</span>, …)},
+<span class="str">"run_bash"</span>:   {<span class="str">"command"</span>: (<span class="str">"cmd"</span>, <span class="str">"shell"</span>, <span class="str">"script"</span>, …)},</pre>
+      <div class="a">A guessing table is dangerous. One plausible alias was left out <b>because the
+      wrong guess would overwrite a whole file with a two-line fragment</b>.</div>
+      <div class="qa"><div class="q">The rule that makes guessing safe</div></div>
+      <pre class="sm">cur = args.get(canonical)
+<span class="kw">if</span> cur <span class="kw">not in</span> (<span class="kw">None</span>, <span class="str">""</span>): <span class="kw">continue</span>   <span class="cmt"># model gave a value — it wins</span>
+<span class="kw">if</span> cur == <span class="str">""</span>:            <span class="kw">continue</span>   <span class="cmt"># "" means empty file — keep it</span>
+<span class="kw">for</span> syn <span class="kw">in</span> syns:                       <span class="cmt"># else: fill the blank</span>
+    <span class="kw">if</span> args.get(syn): out[canonical] = args[syn]; <span class="kw">break</span></pre>
+      <div class="a">An alias can <b>only fill a blank</b>, never overrule what the model said. And the
+      dict is only copied if something actually changed &#8212; so the arguments you approved in the
+      confirmation prompt are exactly the ones that run.</div>
+      <div class="key"><span class="t">Be generous reading, strict acting</span>
+      <p>Accept seven formats, wrong key names, missing closing tags &#8212; but <b>refuse to act when
+      the input is ambiguous</b>. Misreading costs one wasted round. Acting on a misreading costs
+      the user's files.</p></div>
     </div>
   </div>
   <div class="foot"><span>llmc-code &#183; how it works</span><span>10</span></div>
 </div>
 
-<style>#s-alias li{font-size:10pt;margin-bottom:1.2mm}#s-alias td{padding:1.3mm 2.5mm}#s-alias th{padding:1.3mm 2.5mm}</style>
-<div data-src="s08" id="s-alias" class="slide">
-  <div class="sh"><span class="num">11</span><h2>Custom #2 &#8212; wrong argument names, and refusing to guess</h2>
-    <span class="tag">tools.py</span></div>
+<div data-src="s12" class="slide">
+  <div class="sh"><span class="num">11</span><h2>Box 5 &#8212; keeping the chat small: the setup</h2>
+    <span class="tag">where context lives, and how it's measured</span></div>
   <div class="body">
     <div class="left">
-      <p>Even once we can read the request, the <b>option names are often wrong</b>. Local models learned
-      from other tools' docs, so they use <em>those</em> names &#8212; <code>file_path</code> where we
-      say <code>path</code>.</p>
-      <div class="srcfile">llmcode/tools.py &#8212; the alias table (excerpt)</div>
-      <pre class="sm" style="font-size:7pt">_ARG_ALIASES = {
-  <span class="str">"read_file"</span>: {
-     <span class="str">"path"</span>: (<span class="str">"file_path"</span>, <span class="str">"filepath"</span>, <span class="str">"filename"</span>, <span class="str">"file"</span>, <span class="str">"target_file"</span>)},
-  <span class="str">"write_file"</span>: {
-     <span class="str">"path"</span>: (<span class="str">"file_path"</span>, <span class="str">"filepath"</span>, …),
-     <span class="cmt"># NOTE: deliberately NO new_string/new_str here — those are edit_file's</span>
-     <span class="cmt"># `new` key; mapping them to write_file content would turn a mis-targeted</span>
-     <span class="cmt"># edit into a DESTRUCTIVE whole-file overwrite with just the fragment.</span>
-     <span class="str">"content"</span>: (<span class="str">"file_text"</span>, <span class="str">"text"</span>, <span class="str">"body"</span>, <span class="str">"data"</span>, <span class="str">"code"</span>)},
-  <span class="str">"edit_file"</span>: {
-     <span class="str">"old"</span>: (<span class="str">"old_string"</span>, <span class="str">"old_str"</span>, <span class="str">"search"</span>, <span class="str">"find"</span>),
-     <span class="str">"new"</span>: (<span class="str">"new_string"</span>, <span class="str">"new_str"</span>, <span class="str">"replace"</span>)},
-}</pre>
-      <div class="key"><span class="t">Read that comment in the middle again</span>
-      <p>This table <b>guesses what the model meant</b>. One obvious-looking guess was deliberately left
-      out, because getting it wrong would <b>overwrite a whole file with a two-line fragment</b>.
-      Knowing which guesses <em>not</em> to make is the whole skill.</p></div>
+      <div class="qa"><div class="q">Where is "the context" stored?</div>
+      <div class="a">It is <b>not</b> a separate thing. The context <em>is</em> <code>agent.messages</code>
+      &#8212; the list from slide 2, in RAM, mirrored to
+      <code>~/.llmcode/sessions/&lt;proj&gt;.json</code> after each turn.
+      <br>"Managing context" means <b>rewriting strings inside that list</b> before we send it.</div></div>
+      <div class="qa"><div class="q">Why not just send the whole list every time?</div>
+      <div class="a">Because the model has no memory, so we <em>do</em> resend it all &#8212; and that
+      costs three different things:</div></div>
+      <table>
+      <tr><th style="width:24%">Cost</th><th>What happens</th></tr>
+      <tr><td><b>Time</b></td><td>It reads every word before writing one. Reading time grows with the
+      list; typing speed doesn't. So it just sits there longer.</td></tr>
+      <tr><td><b>Space</b></td><td>A local model holds a fixed amount. Past that, the oldest entries
+      fall off <b>silently</b> &#8212; possibly the instruction that mattered.</td></tr>
+      <tr><td><b>Accuracy</b></td><td>Your question gets buried in stale tool output and it starts
+      answering about a file it read six steps ago.</td></tr>
+      </table>
+      <div class="problem"><span class="t">Measured, in this project</span>
+      <p><em>"what happened?"</em> &#8212; four words &#8212; shipped <b>55,000 words</b> of list and took
+      <b>~20 minutes</b>. Over half of it was tool results from finished steps.</p></div>
     </div>
     <div class="right">
-      <h3>The rule that keeps the guessing safe</h3>
-      <pre class="sm" style="font-size:7pt"><span class="kw">for</span> canonical, syns <span class="kw">in</span> aliases.items():
-    cur = args.get(canonical)
-    <span class="kw">if</span> cur <span class="kw">not in</span> (<span class="kw">None</span>, <span class="str">""</span>):
-        <span class="kw">continue</span>      <span class="cmt"># model gave a real value — authoritative</span>
-    <span class="kw">if</span> cur == <span class="str">""</span>:
-        <span class="kw">continue</span>      <span class="cmt"># explicit empty — intentional, keep it</span>
-    <span class="kw">for</span> syn <span class="kw">in</span> syns:    <span class="cmt"># else backfill from the first alias present</span>
-        …</pre>
-      <ul>
-        <li><b>A guess can only fill in a blank.</b> It can never overrule something the model actually said.</li>
-        <li><b>"Nothing" is a real answer.</b> Empty content means "make an empty file" &#8212; that is an instruction, not a gap to fill.</li>
-        <li><b>Nothing is touched unless we actually fix something</b> &#8212; so what you were shown in the confirmation prompt is exactly what runs.</li>
-      </ul>
-      <h3>And two places we deliberately refuse to guess</h3>
-      <table>
-      <tr><th style="width:38%">What happened</th><th>What we do about it</th></tr>
-      <tr><td>Two tool-shaped blocks in one reply</td><td><b>Run none of them.</b> If we ran only the first, the second would vanish silently and the
-      model would never find out &#8212; it would carry on believing both had happened.</td></tr>
-      <tr><td>A block inside prose or a <code>&lt;think&gt;</code> section</td><td><b>Ignore it.</b> Otherwise, a model <em>explaining</em> how <code>rm -rf</code> works would
-      actually delete your files.</td></tr>
-      </table>
-      <div class="key"><span class="t">The rule worth taking away</span>
-      <p><b>Be generous about what you try to understand. Be strict about what you actually do.</b></p>
-      <p>Misunderstanding costs one wasted turn. Acting on a misunderstanding costs the user's files.</p></div>
+      <div class="qa"><div class="q">Step 1: how do we know how big it is?</div>
+      <div class="a">We don't use a real tokenizer &#8212; that's a large download per model. We use a
+      deliberately crude estimate over the whole list:</div></div>
+      <div class="srcfile">llmcode/tokens.py &#8212; the entire module</div>
+      <pre>def estimate_text_tokens(s: str) -> int:
+    return len(s) // <span class="num">4</span>       <span class="cmt"># characters ÷ 4. That's it.</span></pre>
+      <div class="a">It is wrong by roughly 15%, and that is fine &#8212; <b>every limit it feeds is a
+      number we chose ourselves</b>. It is also kept as a <b>running total</b>: when a message is
+      appended we add just that message's cost, instead of re-measuring the whole list. Re-measuring
+      each time made turn 20 cost twenty times turn 1.</div>
+      <div class="qa"><div class="q">Step 2: how big is this turn allowed to be?</div>
+      <div class="a">A budget is computed <b>per message</b>, before anything is sent:</div></div>
+      <div class="srcfile">llmcode/agent.py &#8212; _compute_turn_budget()</div>
+      <pre class="sm">base = <span class="num">12_000</span>                       <span class="cmt"># the configured default</span>
+base = base * request_weight(text)   <span class="cmt"># 1.0 … 3.0</span>
+    <span class="cmt"># +0.5 if over 400 chars   +0.5 if over 1200 chars</span>
+    <span class="cmt"># +1.5 if it says audit / refactor / migrate / codebase…</span>
+<span class="kw">if</span> classify_request(text) == <span class="str">"trivial"</span>:
+    base = min(base, <span class="num">12_000</span> // <span class="num">2</span>)     <span class="cmt"># "thanks" gets half</span>
+budget = max(<span class="num">4_000</span>, base)            <span class="cmt"># never starve a turn</span></pre>
+      <div class="note"><span class="t">The budget is a target, not a knife</span>
+      <p>Nothing is deleted here. This just sets the number that the next two slides &#8212; shortening
+      and summarising &#8212; try to get the list <em>under</em>.</p></div>
     </div>
   </div>
   <div class="foot"><span>llmc-code &#183; how it works</span><span>11</span></div>
 </div>
 
-<style>#s-slow td{padding:1.3mm 2.5mm}#s-slow th{padding:1.3mm 2.5mm}#s-slow .card{padding:2.4mm}</style>
-<div data-src="s09" id="s-slow" class="slide">
-  <div class="sh"><span class="num">12</span><h2>Keeping the chat small &#8212; why not just send everything?</h2>
-    <span class="tag">box 5 of 10 &#183; orange, top left</span></div>
+<div data-src="s13" class="slide">
+  <div class="sh"><span class="num">12</span><h2>Box 5 &#8212; how a part of the context is taken out</h2>
+    <span class="tag">the trim, line by line</span></div>
   <div class="body">
     <div class="left">
-      <div class="qa"><div class="q">First, the thing that makes this necessary</div>
-      <div class="a">The model has <b>no memory between messages</b>. So every single turn, we send the
-      <em>entire</em> conversation again from the beginning &#8212; and it reads all of it before writing
-      one word of the reply.<br>
-      Imagine a colleague who forgets everything between sentences and has to re-read the whole
-      meeting transcript each time you speak. That is exactly what is happening.</div></div>
-      <div class="qa"><div class="q">So why not just send it all and let it sort it out?</div>
-      <div class="a">Three reasons, and only the first is the obvious one:</div></div>
-      <table>
-      <tr><th style="width:26%">Reason</th><th>What actually happens</th></tr>
-      <tr><td><b>1. It gets slow</b></td>
-          <td>Reading time grows with the chat. Typing speed doesn't change &#8212; so it just
-          <b>sits in silence for longer and longer</b> before it starts answering.</td></tr>
-      <tr><td><b>2. It doesn't fit</b></td>
-          <td>A local model can only hold so much. Past that point the oldest messages fall off
-          <b>silently</b> &#8212; including, quite possibly, the instruction that mattered most.</td></tr>
-      <tr><td><b>3. The answers get worse</b></td>
-          <td>This is the one people miss. Your actual question ends up buried in thousands of lines
-          of stale tool output, and the model starts answering about a file it read six steps ago.
-          <b>More context is not more understanding.</b></td></tr>
-      </table>
-      <div class="problem"><span class="t">The measurement that started all this</span>
-      <p>Someone typed <em>"what happened?"</em> &#8212; four words. We sent <b>55,000 words</b> of old
-      conversation with it. The reply took <b>about 20 minutes</b>.</p>
-      <p><b>Over half</b> of what we sent was old tool output &#8212; files read six steps earlier that
-      nobody needed any more.</p></div>
+      <div class="qa"><div class="q">The idea in one sentence</div>
+      <div class="a">Walk the list, find tool results from <b>turns that are already finished</b>,
+      and replace each one's <code>content</code> string with its <b>first 500 characters plus a
+      note</b>. Nothing is deleted &#8212; the entry stays exactly where it was.</div></div>
+      <div class="srcfile">llmcode/agent.py &#8212; _trim_stale_tool_outputs(), the core</div>
+      <pre class="sm"><span class="cmt"># 1. find the LAST user message — that is the boundary</span>
+user_idxs = [i <span class="kw">for</span> i, m <span class="kw">in</span> enumerate(self.messages)
+             <span class="kw">if</span> m[<span class="str">"role"</span>] == <span class="str">"user"</span>]
+boundary = user_idxs[-<span class="num">1</span>]
+
+<span class="cmt"># 2. walk everything BEFORE it (skip [0], the system message)</span>
+<span class="kw">for</span> m <span class="kw">in</span> self.messages[<span class="num">1</span>:boundary]:
+    <span class="kw">if</span> m[<span class="str">"role"</span>] == <span class="str">"tool"</span>:
+        c = m[<span class="str">"content"</span>]
+        <span class="kw">if</span> len(c) &gt; <span class="num">500</span> <span class="kw">and</span> _TRIM_MARKER <span class="kw">not in</span> c:
+            m[<span class="str">"content"</span>] = (c[:<span class="num">500</span>] +
+                f<span class="str">"\n…[+{len(c)-500} chars ⟪ctx-trimmed⟫ — "</span>
+                 <span class="str">"older tool output; re-run or re-read it]"</span>)
+            mutated = <span class="kw">True</span></pre>
+      <div class="a">The same pass also reaches <b>inside</b> old <code>write_file</code> and
+      <code>edit_file</code> requests and cuts their <code>content</code> / <code>old</code> /
+      <code>new</code> fields to <b>160 characters</b> &#8212; a whole file you wrote six steps ago is
+      still sitting in that request, and it is usually the single biggest thing in the list.</div>
     </div>
     <div class="right">
-      <div class="qa"><div class="q">So how do we pick just the part that's needed?</div>
-      <div class="a">Five steps, run in this order at the start of every turn &#8212; cheapest first, and
-      each one only does something if the one before wasn't enough:</div></div>
+      <div class="qa"><div class="q">Four engineering details that make it safe</div></div>
       <table>
-      <tr><th style="width:7%">#</th><th style="width:30%">Step</th><th>What it decides</th></tr>
-      <tr><td><b>1</b></td><td><b>Judge the question</b></td>
-          <td>Quick question, or real work? "thanks" and "refactor the parser" should not get the
-          same treatment.</td></tr>
-      <tr><td><b>2</b></td><td><b>Set a size budget</b></td>
-          <td>A number for <em>this</em> turn. Small for a quick question, up to 3&#215; for a
-          whole-project job.</td></tr>
-      <tr><td><b>3</b></td><td><b>Shorten what's stale</b></td>
-          <td>Tool results from <em>finished</em> steps get cut to their first few lines, with a note
-          saying how to get the rest back.</td></tr>
-      <tr><td><b>4</b></td><td><b>Look up what's relevant</b></td>
-          <td>Search past conversations for the few bits that match this question, and attach only
-          those. <span class="ts">(box 7 &#8212; RAG)</span></td></tr>
-      <tr><td><b>5</b></td><td><b>Summarise, if still too big</b></td>
-          <td>Ask the model to condense the old turns into one short note. This costs a round trip,
-          so it's the last resort.</td></tr>
+      <tr><th style="width:28%">Detail</th><th>Why it has to be that way</th></tr>
+      <tr><td><b>The boundary is the last user message</b></td>
+          <td>Everything after it belongs to the turn happening <em>now</em>. A follow-up like
+          "and the other file?" needs that in full. Only finished turns are touched.</td></tr>
+      <tr><td><b>Only <code>content</code> changes</b><br><span class="ts">never the list itself</span></td>
+          <td>No entry is removed, none reordered, no <code>tool_call_id</code> touched. So the
+          pairing rule from slide 2 <b>cannot</b> break. The list is the same length before and
+          after.</td></tr>
+      <tr><td><b>The marker check</b><br><code>⟪ctx-trimmed⟫ not in c</code></td>
+          <td>This runs on <b>every turn</b> over the same entries. Without the check it would cut
+          the already-cut note again next turn, and again, eating its own explanation until nothing
+          was left. The marker is a deliberately weird string so real file content can never contain
+          it by accident.</td></tr>
+      <tr><td><b>The note says what to do</b></td>
+          <td>Not a silent truncation. The model reads <em>"older tool output &#8212; re-run or
+          re-read it"</em> and goes and re-reads the file. A silent cut makes it invent the missing
+          part instead.</td></tr>
       </table>
-      <div class="key"><span class="t">The rule underneath all five</span>
-      <p><b>The most recent exchange is always kept whole.</b> Everything being shortened or
-      summarised is from turns that are already finished. What you just said, and what just
-      happened, is never touched.</p></div>
-      <div style="display:flex;gap:4mm;margin-top:3mm">
-        <div class="card stat"><div class="n">55k &#8594; 5k</div><div class="l">words sent, same question</div></div>
-        <div class="card stat"><div class="n">20 min &#8594; 24 s</div><div class="l">time to answer, same laptop</div></div>
-      </div>
+      <div class="key"><span class="t">The one subtle bug in here</span>
+      <p>The function reports how much it saved as <code>saved_chars // 4</code>. Integer division
+      can round a <b>real change down to 0</b>. So the caller must decide whether to invalidate the
+      size cache using the separate <code>mutated</code> flag &#8212; <b>never the returned number</b>.
+      A cache invalidated by a lossy signal eventually lies to you.</p></div>
     </div>
   </div>
   <div class="foot"><span>llmc-code &#183; how it works</span><span>12</span></div>
 </div>
 
-<div data-src="s10" class="slide">
-  <div class="sh"><span class="num">13</span><h2>Keeping the chat small &#8212; how the shortening works</h2>
-    <span class="tag">box 5 of 10 &#183; continued</span></div>
+<div data-src="s14" class="slide">
+  <div class="sh"><span class="num">13</span><h2>Box 5 &#8212; and when shortening isn't enough: summarising</h2>
+    <span class="tag">compaction, and why it can be undone</span></div>
   <div class="body col">
-    <figure style="margin:0 auto 2mm auto;width:76%"><svg viewBox="0 0 760 316" xmlns="http://www.w3.org/2000/svg">
+    <figure style="margin:0 auto 2mm auto;width:44%"><svg viewBox="0 0 760 316" xmlns="http://www.w3.org/2000/svg">
   <!-- col 1 -->
   <text class="tt" x="118" y="16" text-anchor="middle">the raw chat</text>
   <text class="ts" x="118" y="32" text-anchor="middle" style="font-weight:600">~55,000 words</text>
@@ -1157,46 +1146,76 @@ figcaption{ font-size:8.6pt; color:var(--ink-faint); margin-top:2mm; }
   <text class="tmz" x="482" y="248">&#8594; don't try again until the</text>
   <text class="tmz" x="482" y="260">chat has grown noticeably</text>
 </svg></figure>
-    <div class="two" style="margin-bottom:2mm">
-      <div class="note"><span class="t">Shortening &#8212; free, and it happens every turn</span>
-      <p>Old tool results get cut to their first few lines. A note is left saying <em>"there was
-      more here &#8212; ask again if you need it."</em></p>
-      <p>Two details matter. The note <b>explains itself</b>, so the model re-reads the file rather
-      than inventing what was in it. And anything already shortened is <b>left alone next time</b>
-      &#8212; otherwise each turn would nibble off another piece until the note ate itself.</p></div>
-      <div class="note"><span class="t">Summarising &#8212; costs a round trip</span>
-      <p>When shortening isn't enough, we ask the model to write <b>one short note</b> covering the
-      old turns: decisions made, files touched, what's still to do.</p>
-      <p>This is <b>not</b> deleting old messages. Deleting is one line of code &#8212; and it throws away
-      every decision you made together.</p></div>
-      <div class="problem"><span class="t">Summarising can backfire &#8212; so we check</span>
-      <p>A small model sometimes writes a summary <b>as long as the thing it summarised</b>.</p>
-      <p>So we keep a copy first. If it didn't save at least a few percent, we <b>put the original
-      back</b>. A fix that doesn't fix anything still costs you time.</p></div>
+    <div class="body" style="gap:5mm">
+      <div class="left">
+        <div class="qa"><div class="q">What it does to the list</div>
+        <div class="a">Takes everything except the <b>last exchange</b>, asks the model to summarise it, and
+        <b>replaces that whole run of entries</b> with one summary entry &#8212; dozens of entries become
+        one. It costs an extra round trip, so it is the last resort.</div></div>
+        <div class="srcfile">llmcode/agent.py &#8212; _maybe_auto_compact()</div>
+        <pre class="sm">est = self._estimate_tokens_cached()
+<span class="kw">if</span> est &lt;= self.context_soft_limit: <span class="kw">return</span>      <span class="cmt"># under budget, nothing to do</span>
+<span class="kw">if</span> est &lt;= self._compact_floor:     <span class="kw">return</span>      <span class="cmt"># already tried at this size</span>
+
+snapshot = self.messages                      <span class="cmt"># ← keep the original</span>
+before, after = self.compact(keep_turns=<span class="num">1</span>)     <span class="cmt"># ask the model</span>
+
+<span class="kw">if</span> before - after &gt;= max(<span class="num">128</span>, before // <span class="num">33</span>):    <span class="cmt"># saved ≥3%? keep it</span>
+    self._compact_floor = <span class="num">0</span>
+<span class="kw">else</span>:
+    self.messages = snapshot                  <span class="cmt"># ← put it back</span>
+    self._compact_floor = int(est * <span class="num">1.1</span>) + <span class="num">1</span>   <span class="cmt"># don't retry until +10%</span></pre>
+      </div>
+      <div class="right">
+        <div class="qa"><div class="q">Why every line of that guard exists</div></div>
+        <table>
+        <tr><th style="width:30%">Line</th><th>The failure it prevents</th></tr>
+        <tr><td><b>snapshot first</b></td><td>A small model sometimes writes a summary <b>as long as
+        the original</b>. You need the original back.</td></tr>
+        <tr><td><b>&#8805; 3% or 128 tokens</b></td><td>A tiny saving isn't worth rewriting the list &#8212;
+        which also throws away the server's cached work (box 6).</td></tr>
+        <tr><td><b><code>_compact_floor</code></b></td><td>Without it, a summary that didn't help
+        would be re-attempted <b>every single turn</b>, paying a round trip each time for nothing.</td></tr>
+        <tr><td><b><code>keep_turns=1</code></b></td><td>Was 2. With 2, the second-to-last turn's bulk
+        stayed in the kept tail and never got summarised &#8212; heavy sessions barely shrank.</td></tr>
+        </table>
+        <div class="key"><span class="t">Summarising is not deleting</span>
+        <p>Deleting old entries is one line, and loses every decision in them. The summary prompt asks
+        specifically for <b>decisions made, files touched, open tasks and key facts</b>.</p></div>
+      </div>
     </div>
   </div>
   <div class="foot"><span>llmc-code &#183; how it works</span><span>13</span></div>
 </div>
 
-<div data-src="s11" class="slide">
-  <div class="sh"><span class="num">14</span><h2>Re-using the server's work &#8212; free speed</h2>
-    <span class="tag">box 6 of 10 &#183; purple, left side</span></div>
+<div data-src="s15" class="slide">
+  <div class="sh"><span class="num">14</span><h2>Box 6 &#8212; never make the server re-read</h2>
+    <span class="tag">why the list is append-only</span></div>
   <div class="body col">
-    <div class="wwh" style="margin:0 0 4mm 0">
-      <div class="why"><span class="lbl">Why this works</span>
-      <p>The server <b>remembers the reading it already did</b>. If your next message starts with
-      exactly the same text as the last one, it can skip straight past all of it &#8212; which is
-      most of your waiting time, for free.</p>
-      <p class="ts">The industry name for this is prompt caching, or <b>CAG</b>.</p></div>
-      <div class="what"><span class="lbl">What we do</span>
-      <p>One rule, everywhere in the code: <b>only ever add to the end of the conversation</b>.
-      Never insert in the middle. Never reorder. Never edit what came before.</p></div>
-      <div class="how"><span class="lbl">How the extras fit in</span>
-      <p>Anything temporary &#8212; things we looked up for this question, a hint for this message
-      &#8212; is stuck on the <b>very end</b>, and only on the first try. The end was never cached
-      anyway, so it costs nothing.</p></div>
+    <div class="body" style="gap:5mm;flex:0 0 auto;margin-bottom:3mm">
+      <div class="left">
+        <div class="qa"><div class="q">What the server remembers</div>
+        <div class="a">When it reads your list, it keeps the work it did. If your <b>next</b> request starts
+        with <em>exactly the same entries, in the same order</em>, it reuses that work and starts
+        where the new text begins. Most of your waiting is that re-reading &#8212; skipping it is free.</div></div>
+        <div class="qa"><div class="q">So what breaks it?</div>
+        <div class="a"><b>Changing anything that isn't at the end.</b> Insert one entry in the
+        middle and everything after it has shifted position &#8212; so all of it must be read again,
+        even though not one word of it changed.</div></div>
+      </div>
+      <div class="right">
+        <div class="qa"><div class="q">Which is a problem, because we <em>do</em> need to add things</div>
+        <div class="a">Every turn we attach recalled memories (box 7) and sometimes a hint. The obvious
+        place is near the question &#8212; in the middle. That would cost the cache every turn.</div></div>
+        <div class="srcfile">llmcode/agent.py &#8212; the whole solution, four lines</div>
+        <pre class="sm"><span class="kw">if</span> _iter == <span class="num">0</span>:                          <span class="cmt"># first pass of this turn only</span>
+    extras = [b <span class="kw">for</span> b <span class="kw">in</span> (mem_block, hint_block) <span class="kw">if</span> b]
+    req_messages = self.messages + extras <span class="cmt"># ← a COPY, extras LAST</span>
+<span class="kw">else</span>:
+    req_messages = self.messages          <span class="cmt"># later passes: unchanged</span></pre>
+      </div>
     </div>
-    <figure style="margin:0 auto 2mm auto;width:84%"><svg viewBox="0 0 760 268" xmlns="http://www.w3.org/2000/svg">
+    <figure style="margin:0 auto 2mm auto;width:58%"><svg viewBox="0 0 760 268" xmlns="http://www.w3.org/2000/svg">
   <text class="tt" x="20" y="16">&#10003; add it to the END &#8212; what we do</text>
   <rect x="20" y="26" width="420" height="30" rx="3" fill="#ecf8f2" stroke="#1d7a53" stroke-width="1.4"/>
   <text class="tms" x="30" y="46">everything so far, exactly as it was</text>
@@ -1227,94 +1246,119 @@ figcaption{ font-size:8.6pt; color:var(--ink-faint); margin-top:2mm; }
   <text class="ts" x="380" y="242" text-anchor="middle">even though not one of those words changed. Where it sits matters, not just what it says.</text>
 </svg></figure>
     <div class="two">
-      <div class="key"><span class="t">Both pictures contain the same information</span>
-      <p>The only difference is <b>where the new note was put</b>. Put it at the end and the server
-      skips almost everything. Put it in the middle and the server has to re-read every word after
-      it &#8212; even though none of those words changed.</p></div>
-      <div class="note"><span class="t">The same rule shows up three more times</span>
-      <p>&#8226; A message with no picture stays plain text, because attaching one changes its shape.<br>
-      &#8226; The tool descriptions are built once and re-used, so their order can't drift.<br>
-      &#8226; A summary that didn't help gets undone &#8212; the code would rather carry extra words
-      than disturb the beginning.</p></div>
+      <div class="key"><span class="t">Three wins from that one <code>+</code></span>
+      <p>&#8226; <code>self.messages</code> is <b>never modified</b>, so its prefix stays byte-stable and
+      the cache keeps paying.<br>
+      &#8226; The extras are <b>never saved to disk</b>, because they were never in the stored list.<br>
+      &#8226; Summarising can never mangle them, because they aren't there to be summarised.</p></div>
+      <div class="note"><span class="t">The same rule, three more places</span>
+      <p>&#8226; A message with no image keeps <code>content</code> as a plain <b>string</b>; attaching
+      an image makes it a list, which is a different prefix.<br>
+      &#8226; The tool descriptions are built once and reused, so their key order can't drift.<br>
+      &#8226; A summary that didn't save enough is <b>rolled back</b> (previous slide) &#8212; the code
+      would rather carry extra words than disturb the front of the list.</p></div>
     </div>
   </div>
   <div class="foot"><span>llmc-code &#183; how it works</span><span>14</span></div>
 </div>
 
-<div data-src="s12" class="slide">
-  <div class="sh"><span class="num">15</span><h2>Looking things up &#8212; remembering without re-reading</h2>
-    <span class="tag">box 7 of 10 &#183; blue, right side</span></div>
-  <div class="body col">
-    <div class="wwh" style="margin:0 0 3mm 0">
-      <div class="why"><span class="lbl">Why</span>
-      <p>We just said: send less history. But some of it genuinely matters. Drop it and the assistant
-      is forgetful; keep it all and it is slow.</p></div>
-      <div class="what"><span class="lbl">What</span>
-      <p>Keep everything in a <b>store</b>. <b>Search</b> it with whatever was just asked. Send only the
-      <b>few pieces that matched</b>. The usual name for this is <b>RAG</b>.</p></div>
-      <div class="how"><span class="lbl">How</span>
-      <p>Two search engines, both written by hand: one for <b>exact words</b>, one for <b>meaning</b>.
-      The results are merged and attached as a single note.</p></div>
+<div data-src="s16" class="slide">
+  <div class="sh"><span class="num">15</span><h2>Box 7 &#8212; the recall store: what is saved, and when</h2>
+    <span class="tag">memory.py</span></div>
+  <div class="body">
+    <div class="left">
+      <div class="qa"><div class="q">What gets stored, and when</div>
+      <div class="a">At the end of every successful turn, <b>one record</b> is added &#8212; the question
+      and the answer, glued together:</div></div>
+      <div class="srcfile">llmcode/agent.py &#8212; right before the turn returns</div>
+      <pre class="sm">self.memory.add(
+    text    = f<span class="str">"Q: {user_text}\nA: {final_text}"</span>,
+    summary = self._cheap_summary(final_text),
+)</pre>
+      <div class="qa"><div class="q">What one record looks like</div></div>
+      <div class="srcfile">llmcode/memory.py &#8212; MemoryRecord</div>
+      <pre class="sm">{<span class="str">"id"</span>:           <span class="str">"r17"</span>,             <span class="cmt"># position when added</span>
+ <span class="str">"text"</span>:         <span class="str">"Q: where is config stored?\nA: ~/.llmcode/…"</span>,
+ <span class="str">"summary"</span>:      <span class="str">"config lives in ~/.llmcode"</span>,
+ <span class="str">"content_hash"</span>: <span class="str">"a7f3c91b2e4d8006"</span>,  <span class="cmt"># sha256(text)[:16]</span>
+ <span class="str">"ts"</span>:           <span class="str">"2026-09-18T09:14:02Z"</span>}</pre>
+      <div class="a">The whole file is a JSON list of those, at
+      <code>~/.llmcode/sessions/&lt;proj&gt;.memory.json</code>.</div>
+      <div class="key"><span class="t">Why <code>content_hash</code> earns its place</span>
+      <p>It does three jobs at once: it <b>stops duplicates</b> being added, it is the <b>key</b>
+      under which that record's vector is stored, and it means the same text is
+      <b>never embedded twice</b> &#8212; even across restarts. Name things by a fingerprint of their
+      content and caching becomes almost free.</p></div>
     </div>
-    <figure style="margin:0 auto 2mm auto;width:78%"><svg viewBox="0 0 760 210" xmlns="http://www.w3.org/2000/svg">
-  <rect class="bx-b" x="10" y="60" width="130" height="52" rx="5"/>
-  <text class="tb" x="75" y="82" text-anchor="middle">the question</text>
-  <text class="ts" x="75" y="100" text-anchor="middle">"where does config live?"</text>
-  <path class="ln-b" d="M140,86 L176,86"/>
-
-  <rect class="bx-a" x="178" y="26" width="150" height="56" rx="5"/>
-  <text class="tb" x="253" y="46" text-anchor="middle">word search</text>
-  <text class="ts" x="253" y="62" text-anchor="middle">exact names, rare words</text>
-  <text class="tmz" x="253" y="75" text-anchor="middle">(BM25)</text>
-
-  <rect class="bx-p" x="178" y="96" width="150" height="56" rx="5"/>
-  <text class="tb" x="253" y="116" text-anchor="middle">meaning search</text>
-  <text class="ts" x="253" y="132" text-anchor="middle">different words, same idea</text>
-  <text class="tmz" x="253" y="145" text-anchor="middle">(embeddings)</text>
-
-  <path class="ln-o" d="M140,80 L174,54"/>
-  <path class="ln-p dash" d="M140,96 L174,120"/>
-  <text class="tt" x="75" y="136" text-anchor="middle">only if the first</text>
-  <text class="tt" x="75" y="150" text-anchor="middle">found nothing</text>
-
-  <path class="ln" d="M328,54 L368,80"/>
-  <path class="ln" d="M328,124 L368,96"/>
-
-  <rect class="bx" x="370" y="60" width="120" height="52" rx="5"/>
-  <text class="tb" x="430" y="82" text-anchor="middle">the best 3</text>
-  <text class="ts" x="430" y="100" text-anchor="middle">merged and ranked</text>
-  <path class="ln" d="M490,86 L526,86"/>
-
-  <rect class="bx-g" x="528" y="46" width="222" height="80" rx="5"/>
-  <text class="tb" x="639" y="68" text-anchor="middle">stuck on the END of the message</text>
-  <text class="ts" x="639" y="88" text-anchor="middle">just for this one question</text>
-  <text class="ts" x="639" y="104" text-anchor="middle">never saved, never sent again</text>
-  <text class="ts" x="639" y="120" text-anchor="middle">so the rest can still be skipped</text>
-
-  <rect class="bx-d" x="178" y="166" width="150" height="34" rx="5"/>
-  <text class="ts" x="253" y="187" text-anchor="middle">.memory.json &#183; per project</text>
-  <path class="ln dash" d="M253,166 L253,156"/>
-</svg></figure>
-    <div class="two">
-      <div class="note"><span class="t">Where it lives</span>
-      <p>One plain file per project, with the numbers in a second file beside it. The index is built
-      once and re-used &#8212; otherwise every search would re-read everything.</p></div>
-      <div class="key"><span class="t">Retrieval runs ONCE per turn</span>
-      <p>Before the loop starts, never inside it. Searching costs time; doing it on every step would
-      undo the speed it was meant to buy. A message like "thanks" skips it completely.</p></div>
-      <div class="note"><span class="t">Failure is always swallowed</span>
-      <p>If the search breaks for any reason, we carry on with nothing. Memory is a <b>bonus</b>.
-      Losing it must never cost you the answer.</p></div>
+    <div class="right">
+      <div class="qa"><div class="q">How a record gets back into the conversation</div>
+      <div class="a">Once per turn, <b>before</b> the loop starts &#8212; never inside it, because
+      searching costs time and doing it every pass would undo the speed it buys:</div></div>
+      <div class="srcfile">llmcode/agent.py &#8212; run(), before the loop</div>
+      <pre class="sm"><span class="kw">if</span> self._memory_active() <span class="kw">and</span> self.memory.records \
+        <span class="kw">and</span> turn_intent != <span class="str">"trivial"</span>:       <span class="cmt"># "thanks" skips it</span>
+    <span class="kw">try</span>:
+        records = self.memory.retrieve(user_text, provider, …)
+    <span class="kw">except</span> Exception:
+        records = []                    <span class="cmt"># never break a turn</span>
+    mem_block = {<span class="str">"role"</span>:<span class="str">"user"</span>, <span class="str">"content"</span>: render(records),
+                 <span class="str">"_memory"</span>: <span class="kw">True</span>}      <span class="cmt"># ← tagged, not stored</span></pre>
+      <div class="a">That block is appended to a <b>copy</b> of the list (box 6), so it is sent but
+      never kept. The <code>_memory</code> tag also means <code>session.py</code> strips it before
+      saving &#8212; recalled text never gets re-saved as if it were new conversation.</div>
+      <div class="qa"><div class="q">Three design choices worth copying</div>
+      <div class="a">
+      &#8226; <b>Role is <code>"user"</code>, not <code>"system"</code>.</b> A system entry arriving
+      <em>after</em> tool results is rejected by some strict chat templates. A user entry is accepted
+      anywhere.<br>
+      &#8226; <b>Only on the first pass.</b> Re-sending it on every tool round wastes words and breaks
+      the cacheable tail.<br>
+      &#8226; <b>Failure is swallowed.</b> Recall is a bonus; losing it must never cost the answer.</div></div>
     </div>
   </div>
   <div class="foot"><span>llmc-code &#183; how it works</span><span>15</span></div>
 </div>
 
-<div data-src="s13" class="slide">
-  <div class="sh"><span class="num">16</span><h2>Looking things up &#8212; how the word search ranks</h2>
-    <span class="tag">box 7 of 10 &#183; continued</span></div>
-  <div class="body col">
-    <figure style="margin-bottom:2mm"><svg viewBox="0 0 760 196" xmlns="http://www.w3.org/2000/svg">
+<div data-src="s17" class="slide">
+  <div class="sh"><span class="num">16</span><h2>Box 7 &#8212; the word search: the index we build</h2>
+    <span class="tag">BM25, by hand, no libraries</span></div>
+  <div class="body">
+    <div class="left">
+      <div class="qa"><div class="q">First, every record is turned into a bag of words</div></div>
+      <pre class="sm">_tokenize(<span class="str">"Where is the config stored?"</span>)
+  &#8594; lowercase &#8594; split on [a-z0-9]+ &#8594; drop filler words
+  &#8594; [<span class="str">"config"</span>, <span class="str">"stored"</span>]        <span class="cmt"># "where","is","the" dropped</span></pre>
+      <div class="a">The <b>same</b> function runs on records and on your question &#8212; that symmetry
+      is the only reason they ever match.</div>
+      <div class="qa"><div class="q">Then one index is built for the whole store</div></div>
+      <div class="srcfile">llmcode/memory.py &#8212; _BM25Index, built once, reused for every search</div>
+      <pre class="sm">tfs     : list[dict[str,int]]  <span class="cmt"># per record: word → how many times</span>
+lengths : list[int]            <span class="cmt"># per record: how many words</span>
+avgdl   : float                <span class="cmt"># average record length</span>
+df_map  : dict[str,int]        <span class="cmt"># word → how many records have it</span>
+n       : int                  <span class="cmt"># how many records</span></pre>
+      <div class="a">Built in one pass over all records. It is thrown away and rebuilt only when the
+      store changes &#8212; otherwise every search would re-count every word in every record, which is
+      the difference between instant and a visible pause on a few thousand items.</div>
+      <div class="key"><span class="t">Dropping filler words is load-bearing</span>
+      <p>It looks like tidying. It is not. If a question and a record share <em>only</em> the word
+      "the", the score comes out <b>above zero</b> &#8212; and the next slide only reaches for the slow
+      meaning-search when the score is <b>exactly zero</b>.</p>
+      <p>Our list deliberately <b>keeps</b> <code>on</code>, <code>off</code>, <code>no</code>,
+      <code>not</code>: in a command-line tool those are values, not filler.</p></div>
+    </div>
+    <div class="right">
+      <div class="qa"><div class="q">The scoring loop, in full</div></div>
+      <div class="srcfile">llmcode/memory.py &#8212; k1 = 1.5, b = 0.75</div>
+      <pre class="sm"><span class="kw">for</span> term <span class="kw">in</span> q_terms:                <span class="cmt"># a repeated query word counts once</span>
+    f   = tf.get(term, <span class="num">0</span>)        <span class="cmt"># times it's in THIS record</span>
+    <span class="kw">if</span> f == <span class="num">0</span>: <span class="kw">continue</span>
+    n_q = df_map[term]            <span class="cmt"># how many records have it at all</span>
+
+    idf   = log(<span class="num">1</span> + (n - n_q + <span class="num">.5</span>) / (n_q + <span class="num">.5</span>))   <span class="cmt"># ① rare = valuable</span>
+    denom = f + k1 * (<span class="num">1</span> - b + b * (dl / avgdl))    <span class="cmt"># ③ long = penalised</span>
+    s    += idf * (f * (k1 + <span class="num">1</span>)) / denom            <span class="cmt"># ② repeats saturate</span></pre>
+      <figure style="margin:3mm auto 2mm auto;width:100%"><svg viewBox="0 0 760 196" xmlns="http://www.w3.org/2000/svg">
   <!-- panel 1: IDF -->
   <text class="tt" x="20" y="14">1 &#183; rare words count for more</text>
   <rect class="bx-d" x="14" y="22" width="216" height="150" rx="4"/>
@@ -1354,103 +1398,81 @@ figcaption{ font-size:8.6pt; color:var(--ink-faint); margin-top:2mm; }
   <text class="ts" x="532" y="150">Finding a word in 20 lines means</text>
   <text class="ts" x="532" y="163">more than finding it in 2,000.</text>
 </svg></figure>
-    <div class="body" style="gap:5mm">
-      <div class="left">
-        <div class="srcfile">llmcode/memory.py &#8212; the whole scoring loop, nothing hidden</div>
-        <pre class="sm"><span class="kw">for</span> term <span class="kw">in</span> q_terms:
-    f = tf.get(term, <span class="num">0</span>)          <span class="cmt"># times the term is in THIS doc</span>
-    <span class="kw">if</span> f == <span class="num">0</span>: <span class="kw">continue</span>
-    n_q   = df[term]              <span class="cmt"># how many docs have it at all</span>
-    idf   = math.log(<span class="num">1</span> + (n - n_q + <span class="num">.5</span>) / (n_q + <span class="num">.5</span>))   <span class="cmt"># rarity</span>
-    denom = f + k1 * (<span class="num">1</span> - b + b * (dl / avgdl))     <span class="cmt"># length</span>
-    s    += idf * (f * (k1 + <span class="num">1</span>)) / denom          <span class="cmt"># saturating</span></pre>
-        <p><b>Why not just count how many words match?</b> Because every document contains "the".
-        This formula is the classic fix. It still beats fancier methods on <b>code</b>, where an
-        exact function name matters far more than general vibes. Its proper name is <b>BM25</b>.</p>
-      </div>
-      <div class="right">
-        <div class="key"><span class="t">Throwing away "the" and "and" is doing real work</span>
-        <p>It looks like tidying. It isn't. If a question and an old note share <em>only</em> the word
-        "the", the score comes out <b>above zero</b> &#8212; and the next slide only reaches for the
-        meaning search when the score is <b>exactly zero</b>.</p>
-        <p>Removing filler words is what makes <b>"zero" actually mean "nothing in common"</b>.</p></div>
-        <div class="problem"><span class="t">Don't copy a filler-word list off the internet</span>
-        <p>Ours deliberately <b>keeps</b> <code>on</code>, <code>off</code>, <code>no</code> and
-        <code>not</code>. In a command-line tool those aren't filler &#8212; they're <em>values</em>,
-        as in <code>/mcp on</code>.</p>
-        <p>A list copied from somewhere else would have quietly deleted them, and searches for
-        commands would have stopped working.</p></div>
-      </div>
+      <div class="note"><span class="t">Why not just count matching words?</span>
+      <p>Because every record contains "the", long records would win by sheer size, and the tenth
+      occurrence of a word would count as much as the second. Those three corrections
+      <b>are</b> the formula &#8212; and it still beats fancier methods on code, where an exact function
+      name matters more than general similarity.</p></div>
     </div>
   </div>
   <div class="foot"><span>llmc-code &#183; how it works</span><span>16</span></div>
 </div>
 
-<div data-src="s14" class="slide">
-  <div class="sh"><span class="num">17</span><h2>Looking things up &#8212; searching by meaning</h2>
-    <span class="tag">box 7 of 10 &#183; continued</span></div>
+<div data-src="s18" class="slide">
+  <div class="sh"><span class="num">17</span><h2>Box 7 &#8212; the meaning search, and the gate that usually skips it</h2>
+    <span class="tag">memory.py &#183; the hybrid rule</span></div>
   <div class="body">
     <div class="left">
-      <div class="analogy"><span class="t">What "searching by meaning" actually is</span>
-      <p>Every piece of text is turned into a <b>list of 768 numbers</b>. Think of it as a position
-      on a map, where things about the same topic end up near each other.</p>
-      <p><em>"where do my settings live?"</em> lands right next to <em>"the config file is in
-      ~/.llmcode"</em> &#8212; even though they share <b>not one word</b>.</p></div>
-      <p>To compare two of these, we measure the <b>direction</b> they point in, not how far away they
-      are &#8212; distance mostly just reflects how wordy the text was. That is 12 lines of code:</p>
+      <div class="qa"><div class="q">What a vector actually is here</div>
+      <div class="a">A record's text is sent to a second, small model (<code>nomic-embed-text</code>,
+      served by the same LM Studio) which returns <b>768 floating-point numbers</b>. Texts about the
+      same topic come back with similar numbers.</div></div>
+      <div class="qa"><div class="q">Comparing two of them &#8212; the whole function</div></div>
       <div class="srcfile">llmcode/memory.py &#8212; cosine()</div>
-      <pre class="sm">dot = na = nb = <span class="num">0.0</span>
+      <pre class="sm"><span class="kw">if not</span> a <span class="kw">or not</span> b <span class="kw">or</span> len(a) != len(b): <span class="kw">return</span> <span class="num">0.0</span>
+dot = na = nb = <span class="num">0.0</span>
 <span class="kw">for</span> x, y <span class="kw">in</span> zip(a, b):
     dot += x * y      <span class="cmt"># how much they point the same way</span>
-    na  += x * x
-    nb  += y * y
+    na  += x * x      <span class="cmt"># length of a, squared</span>
+    nb  += y * y      <span class="cmt"># length of b, squared</span>
 <span class="kw">if</span> na &lt;= <span class="num">0.0</span> <span class="kw">or</span> nb &lt;= <span class="num">0.0</span>: <span class="kw">return</span> <span class="num">0.0</span>
-<span class="kw">return</span> dot / math.sqrt(na * nb)     <span class="cmt"># 1.0 = identical meaning</span></pre>
-      <div class="note"><span class="t">Notice what it promises</span>
-      <p>It <b>never crashes</b>. Given nonsense it returns zero &#8212; which means "no match", and is
-      exactly the right answer. One corrupted note can never take down your whole turn.</p></div>
+<span class="kw">return</span> dot / sqrt(na * nb)     <span class="cmt"># 1.0 = same direction = same topic</span></pre>
+      <div class="a">We compare <b>direction</b>, not distance &#8212; length mostly reflects how wordy the
+      text was. Note it <b>never raises</b>: garbage in returns <code>0.0</code>, which correctly
+      means "no match", so one corrupt record can't take down a turn.</div>
+      <div class="note"><span class="t">Searching is a loop, not a database</span>
+      <p><code>for each record: cosine(query_vec, record_vec)</code>, keep the top few. Over a few
+      thousand records that is <b>milliseconds</b>. No index structure, no server.</p></div>
     </div>
     <div class="right">
-      <h3>The one decision that made this fast</h3>
-      <p>Running both every time means an extra round trip on every turn &#8212; and on one GPU that can
-      force the whole model to be swapped out and back. So:</p>
-      <div class="srcfile">llmcode/memory.py &#8212; the entire policy, in one condition</div>
-      <pre class="sm">best_bm25 = bm25_full[<span class="num">0</span>][<span class="num">1</span>] <span class="kw">if</span> bm25_full <span class="kw">else</span> <span class="num">0.0</span>
-<span class="kw">if</span> provider <span class="kw">is not</span> <span class="kw">None</span> <span class="kw">and</span> (
-    mode == <span class="str">"embed"</span> <span class="kw">or</span> (mode == <span class="str">"auto"</span> <span class="kw">and</span> best_bm25 &lt;= <span class="num">0.0</span>)
-):
-    embed_idx = self._embed_rank(query, provider, pool_k)</pre>
+      <div class="qa"><div class="q">The decision that made this fast</div>
+      <div class="a">Embedding the question means <b>another round trip</b> to a different model &#8212;
+      and on one GPU that can force your main model to be swapped out and back. Doing that on every
+      turn would cost more than the search saves. So:</div></div>
+      <div class="srcfile">llmcode/memory.py &#8212; retrieve(), the entire policy</div>
+      <pre class="sm">bm25_full = _bm25_score_index(query, self._bm25_index)
+best_bm25 = bm25_full[<span class="num">0</span>][<span class="num">1</span>] <span class="kw">if</span> bm25_full <span class="kw">else</span> <span class="num">0.0</span>
+
+embed_idx = []
+<span class="kw">if</span> provider <span class="kw">and</span> (mode == <span class="str">"embed"</span>
+                 <span class="kw">or</span> (mode == <span class="str">"auto"</span> <span class="kw">and</span> best_bm25 &lt;= <span class="num">0.0</span>)):
+    embed_idx = self._embed_rank(query, provider, pool_k)
+
+ordered = bm25_idx <span class="kw">if not</span> embed_idx \
+          <span class="kw">else</span> self._fuse(bm25_idx, embed_idx, pool_k)</pre>
       <table>
-      <tr><th style="width:36%">Case</th><th>What runs</th><th style="width:22%">Cost</th></tr>
-      <tr><td>Shares real words<br><span class="ts">"where is config.json?"</span></td><td>word search only</td><td>instant &#8212; and this is the usual case</td></tr>
-      <tr><td>A paraphrase<br><span class="ts">"where do settings live?"</span></td><td>word search finds nothing &#8594; try meaning search &#8594; merge</td><td>one extra round trip, only when needed</td></tr>
-      <tr><td>Trivial message<br><span class="ts">"thanks"</span></td><td>nothing</td><td>zero</td></tr>
+      <tr><th style="width:34%">Your question</th><th>What runs</th><th style="width:22%">Cost</th></tr>
+      <tr><td>"where is config.json?"<br><span class="ts">shares real words</span></td>
+          <td>word search only</td><td>instant &#8212; the usual case</td></tr>
+      <tr><td>"where do settings live?"<br><span class="ts">a paraphrase</span></td>
+          <td>word search scores <b>0</b> &#8594; meaning search &#8594; results merged</td>
+          <td>one round trip, only when needed</td></tr>
+      <tr><td>"thanks"</td><td>nothing at all</td><td>zero</td></tr>
       </table>
-      <div class="key"><span class="t">The pattern to steal</span>
-      <p><b>Do the cheap check first. Only pay for the expensive one when the cheap one found
-      nothing.</b> The same shape turns up four times in this codebase.</p></div>
+      <div class="key"><span class="t">The shape, which recurs four times in this codebase</span>
+      <p><b>Run the cheap check. Only pay for the expensive one when the cheap one found
+      nothing.</b> Here; in code search; in the optional re-ranking pass; and in the retry that
+      lifts the reply-length cap.</p></div>
     </div>
   </div>
   <div class="foot"><span>llmc-code &#183; how it works</span><span>17</span></div>
 </div>
 
-<div data-src="s15" class="slide">
-  <div class="sh"><span class="num">18</span><h2>Where meanings are stored &#8212; no database needed</h2>
-    <span class="tag">box 8 of 10 &#183; purple, right side</span></div>
+<div data-src="s19" class="slide">
+  <div class="sh"><span class="num">18</span><h2>Box 8 &#8212; where the vectors are stored</h2>
+    <span class="tag">two files, one checksum, no database</span></div>
   <div class="body col">
-    <div class="wwh" style="margin:0 0 3mm 0">
-      <div class="why"><span class="lbl">Why</span>
-      <p>Those lists of numbers must survive closing the terminal. The usual answer is a special
-      database &#8212; often a whole extra program running in the background. Absurd for a personal
-      tool holding a few thousand items.</p></div>
-      <div class="what"><span class="lbl">What</span>
-      <p>A plain list in memory, one readable file for the text, and a <b>second file holding just
-      the raw numbers</b>. Searching is an ordinary loop.</p></div>
-      <div class="how"><span class="lbl">How</span>
-      <p>Each number takes <b>4 bytes</b> instead of the ~32 an ordinary Python number costs. And
-      saving them as raw bytes avoids turning every single one into text and back again.</p></div>
-    </div>
-    <figure style="margin:0 auto 2mm auto;width:82%"><svg viewBox="0 0 700 250" xmlns="http://www.w3.org/2000/svg">
+    <figure style="margin:0 auto 2mm auto;width:62%"><svg viewBox="0 0 700 250" xmlns="http://www.w3.org/2000/svg">
   <text class="tt" x="10" y="14">in RAM</text>
   <rect class="bx-p" x="10" y="22" width="320" height="56" rx="4"/>
   <text class="tms" x="22" y="42">{"a7f3…": array('f', [0.13, -0.88, 0.04, …]),</text>
@@ -1490,70 +1512,88 @@ figcaption{ font-size:8.6pt; color:var(--ink-faint); margin-top:2mm; }
   <text class="ts" x="372" y="230">and rebuild them. Slow once, never wrong.</text>
 </svg>
 </figure>
-    <div class="two">
-      <div class="key"><span class="t">When this simple approach is the right one</span>
-      <p>Thousands of items, one machine, one person. Looping over 4,000 of them takes
-      <b>milliseconds</b>.</p>
-      <p>You need a real database at <em>millions</em> of items, or when several programs share one
-      index &#8212; <b>not before.</b></p></div>
-      <div class="note"><span class="t">The lesson worth keeping</span>
-      <p>Whenever <b>two files have to agree with each other</b>, one of them must be able to
-      <b>prove</b> it matches. A short fingerprint is the cheapest possible proof.</p>
-      <p>It is the difference between "rebuild once on next launch" and "quietly wrong answers,
-      forever, with no error".</p></div>
+    <div class="body" style="gap:5mm">
+      <div class="left">
+        <div class="qa"><div class="q">Why not just put them in the JSON?</div>
+        <div class="a">768 numbers per record, written as decimal text, is roughly <b>9 KB of digits
+        per record</b> &#8212; and it has to be parsed back one number at a time on every launch. A few
+        thousand records makes the file unopenable and startup slow.</div></div>
+        <div class="qa"><div class="q">So: numbers in their own file, as raw bytes</div>
+        <div class="a">In memory each vector is an <code>array('f')</code> &#8212; <b>4 bytes per
+        number</b>, packed, instead of the ~32 bytes an ordinary Python float costs. Saving is then
+        just writing those bytes straight out, end to end, with <b>no separators and no labels</b>.
+        <br>Finding vector number 5 is arithmetic, not parsing:</div></div>
+        <pre class="sm">stride = dim * <span class="num">4</span>                  <span class="cmt"># 768 × 4 = 3072 bytes each</span>
+offset = i * stride                <span class="cmt"># vector i starts exactly here</span></pre>
+      </div>
+      <div class="right">
+        <div class="qa"><div class="q">The real engineering problem: two files can disagree</div>
+        <div class="a">The records live in the <code>.json</code>; their numbers live in the
+        <code>.vec</code>. If the process dies between writing one and the other, the JSON might
+        claim 200 records while the <code>.vec</code> holds 140 &#8212; and then <b>every record quietly
+        pairs with the wrong numbers</b>. No error. Just wrong answers, forever.</div></div>
+        <div class="key"><span class="t">The fix: make one file prove it matches the other</span>
+        <p>When saving, we fingerprint the exact bytes of the <code>.vec</code> and store that
+        fingerprint <b>inside the JSON</b> as <code>vector_sig</code>.</p>
+        <p>On load we re-fingerprint the file and compare. If it doesn't match &#8212; or the file is
+        short, or missing &#8212; we <b>treat the vectors as empty and re-embed</b>. Slow once; never
+        silently wrong.</p></div>
+        <div class="note"><span class="t">When this simple approach is the right one</span>
+        <p>Thousands of items, one machine, one user &#8212; a loop over 4,000 comparisons is
+        milliseconds. You need a real vector database at <em>millions</em> of items, or when several
+        programs share one index. <b>Not before that.</b></p></div>
+      </div>
     </div>
   </div>
   <div class="foot"><span>llmc-code &#183; how it works</span><span>18</span></div>
 </div>
 
-<div data-src="s16" class="slide">
-  <div class="sh"><span class="num">19</span><h2>Custom #10 &#8212; helping it find the right code</h2>
+<div data-src="s20" class="slide">
+  <div class="sh"><span class="num">19</span><h2>Searching your code, and mapping the project</h2>
     <span class="tag">code_index.py &#183; repo_graph.py</span></div>
   <div class="body">
     <div class="left">
-      <div class="wwh" style="flex-direction:column;margin-top:0">
-        <div class="why"><span class="lbl">Why</span>
-        <p>A small model cannot read a 50-file project. Three files already fill it up. It needs to
-        <b>find the right 40 lines</b>, not read everything and hope.</p></div>
-        <div class="what"><span class="lbl">What</span>
-        <p>A search the model runs <b>itself</b>, using the same two engines as memory &#8212; plus a
-        short map of the project so it knows what exists at all.</p></div>
-        <div class="how"><span class="lbl">How</span>
-        <p>The code is cut up <b>function by function</b>, not every 50 lines &#8212; so every result is a
-        whole, complete thing. Built once, re-used, and always cut short before it gets huge.</p></div>
-      </div>
-      <h3>Three deliberate choices</h3>
-      <table>
-      <tr><th style="width:34%">Choice</th><th>Reason</th></tr>
-      <tr><td><b>AST-aware chunking</b></td><td>A result that starts halfway through a function teaches the model nothing. Where you cut
-      should match where the <em>meaning</em> ends.</td></tr>
-      <tr><td><b>BM25 by default</b><br><span class="ts">embeddings opt-in via <code>/codeembed</code></span></td>
-      <td>Searching code usually means searching for <b>a name</b> you already know. Building a
-      meaning index takes minutes on a laptop; the word search takes milliseconds and usually
-      wins anyway.</td></tr>
-      <tr><td><b>Its own output cap</b><br><span class="ts">smaller than every other tool's</span></td>
-      <td>One search can return a lot. Cutting it shorter than a file read stops a single search from
-      eating the entire turn.</td></tr>
-      </table>
+      <div class="qa"><div class="q">Your code is stored the same way memories are</div></div>
+      <div class="srcfile">llmcode/code_index.py &#8212; CodeChunk</div>
+      <pre class="sm">{<span class="str">"path"</span>:         <span class="str">"llmcode/agent.py"</span>,   <span class="cmt"># relative to the project</span>
+ <span class="str">"start_line"</span>:   <span class="num">2696</span>,                 <span class="cmt"># 1-based, inclusive</span>
+ <span class="str">"end_line"</span>:     <span class="num">2784</span>,
+ <span class="str">"text"</span>:         <span class="str">"    def _trim_stale_tool_outputs(self)…"</span>,
+ <span class="str">"content_hash"</span>: <span class="str">"9c02ab71f4e5d833"</span>}    <span class="cmt"># same trick as memory</span></pre>
+      <div class="a">Saved as a JSON list at
+      <code>~/.llmcode/sessions/&lt;proj&gt;.code_index.json</code>, with its vectors in a
+      <code>.vec</code> sidecar &#8212; the <b>same two-file pattern</b> as the previous slide.</div>
+      <div class="qa"><div class="q">The chunk boundary is the important decision</div>
+      <div class="a">Chunks are cut <b>at function and class boundaries</b>, not every 50 lines. A
+      result that starts halfway through a function teaches the model nothing; where you cut should
+      be where the <em>meaning</em> ends.</div></div>
+      <div class="qa"><div class="q">Re-indexing is incremental</div>
+      <div class="a">On each search we compare each file's <b>modification time and size</b> against
+      what the index recorded. Only changed files are re-chunked; the unchanged ones keep their
+      chunks <em>and their vectors</em>, because the hash is unchanged.</div></div>
+      <div class="note"><span class="t">Why word search is the default here</span>
+      <p>Searching code usually means searching for a <b>name you already know</b>. Building a
+      meaning-index over a whole repo takes minutes on a laptop; the word search takes milliseconds
+      and usually wins anyway. Meaning search is opt-in via <code>/codeembed</code>.</p></div>
     </div>
     <div class="right">
-      <h3>The repo map: which files even matter?</h3>
-      <p>A flat list of 300 filenames tells the model nothing. So we rank them, using the same idea
-      Google originally used to rank web pages &#8212; applied to <b>which file uses which</b>.</p>
-      <div class="key"><span class="t">The intuition</span>
-      <p>A file that many other files depend on is <b>probably important</b> &#8212; just as a web page
-      that many pages link to probably matters. <code>config.py</code> scores high; a one-off
-      script scores low.</p></div>
-      <h3>Then: fit it to a budget</h3>
-      <ul>
-        <li>The map has to fit a size limit &#8212; but you can't know how many entries fit until you
-        actually write them out.</li>
-        <li>So we <b>guess, measure, halve the gap, repeat</b> &#8212; about ten tries to land exactly on
-        the limit. (The same trick as guessing a number between 1 and 1000.)</li>
-        <li>The ranking itself had to be rewritten &#8212; the obvious version re-checked every connection
-        for every file, and made this the slowest tool we had.</li>
-      </ul>
-      <div class="note"><span class="t">The pattern behind all three chapters of RAG</span>
+      <div class="qa"><div class="q">The project map: which files even matter?</div>
+      <div class="a">A flat list of 300 filenames is useless to the model. So we rank them by
+      <b>how many other files depend on them</b> &#8212; the same idea as ranking web pages by who links
+      to them.</div></div>
+      <pre class="sm"><span class="cmt"># 1. build a graph: which file imports which</span>
+<span class="cmt"># 2. run PageRank over it → a score per file</span>
+<span class="cmt"># 3. sort by score: config.py high, one-off script low</span></pre>
+      <div class="qa"><div class="q">Then it must be made to fit a size limit</div>
+      <div class="a">You can't know how many entries fit until you render them. So: render, measure
+      with <code>chars // 4</code>, adjust, repeat &#8212; <b>halving the range each time</b>, like
+      guessing a number between 1 and 1000. About ten tries lands exactly on the budget.</div></div>
+      <div class="problem"><span class="t">The performance bug that hid in here</span>
+      <p>The first PageRank re-scanned <b>every connection for every file</b> on each iteration. On a
+      real repo that made <code>repo_map</code> the slowest tool we had &#8212; the tool whose entire
+      job was to save time.</p>
+      <p>Rewriting it to walk each connection once turned it from noticeable into instant.</p></div>
+      <div class="key"><span class="t">The principle behind this whole slide</span>
       <p><b>Don't give the model more to read. Give it better ways to find what it needs.</b><br>
       A good search tool beats a bigger memory, and costs far less.</p></div>
     </div>
@@ -1561,110 +1601,61 @@ figcaption{ font-size:8.6pt; color:var(--ink-faint); margin-top:2mm; }
   <div class="foot"><span>llmc-code &#183; how it works</span><span>19</span></div>
 </div>
 
-<div data-src="s17" class="slide">
-  <div class="sh"><span class="num">20</span><h2>Custom #11 &#8212; sending a helper to do the reading</h2>
-    <span class="tag">orchestration.py</span></div>
+<div data-src="s21" class="slide">
+  <div class="sh"><span class="num">20</span><h2>Sub-agents &#8212; how the context stays small</h2>
+    <span class="tag">orchestration.py &#183; audit.py</span></div>
   <div class="body">
     <div class="left">
-      <div class="wwh" style="flex-direction:column;margin-top:0">
-        <div class="why"><span class="lbl">Why</span>
-        <p>"Which file handles settings?" might take twenty file reads to answer. Do that in the main
-        conversation and you have filled it with files that turned out not to matter &#8212; and every
-        later turn re-sends them all.</p></div>
-        <div class="what"><span class="lbl">What</span>
-        <p>A tool that starts a <b>second assistant</b> with its own private conversation and a
-        <b>limited set of abilities</b>. It answers in a few lines. Its twenty file reads are
-        <b>thrown away with it</b>.</p></div>
-        <div class="how"><span class="lbl">How</span>
-        <p>Start a fresh assistant with its own instructions and tools, let it finish, and hand its
-        final answer back as if it were any other tool result.</p></div>
-      </div>
-      <div class="key" style="margin-top:3mm"><span class="t">The trade in numbers</span>
-      <p>The helper reads 20 files &#8594; <b>40,000 words in its conversation</b>.<br>
-      The main assistant gets back <b>about 15 lines</b>.<br>
-      The main conversation stays small <b>because of how it is built</b>, not because the model
-      remembered to be careful.</p></div>
+      <div class="qa"><div class="q">A sub-agent is just another Agent object</div>
+      <div class="a">No new class, no new loop. <code>spawn_agent</code> is a <b>tool</b> like any
+      other &#8212; and what it does is construct a second <code>Agent</code>:</div></div>
+      <div class="srcfile">llmcode/orchestration.py &#8212; what the tool actually does</div>
+      <pre class="sm">sub = Agent(
+    provider   = self.provider,          <span class="cmt"># same model</span>
+    messages   = [{<span class="str">"role"</span>:<span class="str">"system"</span>,           <span class="cmt"># FRESH list —</span>
+                   <span class="str">"content"</span>: ROLE_PROMPTS[role]}],  <span class="cmt">#  empty history</span>
+    registry   = subset_of(REGISTRY, ROLE_TOOLS[role]),
+    render_answer = <span class="kw">False</span>,             <span class="cmt"># parent prints, not it</span>
+)
+answer = sub.run(task)                   <span class="cmt"># runs its own full loop</span>
+<span class="kw">return</span> {<span class="str">"ok"</span>: <span class="kw">True</span>, <span class="str">"result"</span>: answer}      <span class="cmt"># ← a normal tool result</span></pre>
+      <div class="a">The helper's own <code>messages</code> list &#8212; possibly 40,000 words of files it
+      read &#8212; is a <b>local variable</b>. When <code>_spawn()</code> returns, it is garbage
+      collected. Only the returned string ever reaches the parent's list.</div>
+      <div class="key"><span class="t">The numbers</span>
+      <p>Helper reads 20 files &#8594; <b>~40,000 words in its list</b>.<br>
+      Parent receives <b>~15 lines</b>, as one <code>role:"tool"</code> entry.<br>
+      The parent's context is protected <b>by construction</b>, not by the model being careful.</p></div>
     </div>
     <div class="right">
-      <h3>Four roles, different tools</h3>
+      <div class="qa"><div class="q">Roles are just different dict subsets</div></div>
       <table>
-      <tr><th style="width:20%">Role</th><th style="width:30%">Tools</th><th>Job</th></tr>
-      <tr><td><b>orchestrator</b></td><td>all + <code>spawn_agent</code></td><td>Plan the work, hand out jobs, check the result</td></tr>
-      <tr><td><b>explorer</b></td><td>read-only</td><td>Look around and report back. <b>Physically cannot break anything</b></td></tr>
-      <tr><td><b>coder</b></td><td>full</td><td>Make one specific change, then check it worked</td></tr>
-      <tr><td><b>reviewer</b></td><td>read-only</td><td>Find problems before we call it finished</td></tr>
+      <tr><th style="width:22%">Role</th><th>registry contains</th><th style="width:26%">Job</th></tr>
+      <tr><td><b>orchestrator</b></td><td>everything + <code>spawn_agent</code></td><td>plan, delegate, check</td></tr>
+      <tr><td><b>explorer</b></td><td><code>read_file glob grep repo_map</code></td><td>investigate, report</td></tr>
+      <tr><td><b>coder</b></td><td>the full set</td><td>make one change, verify it</td></tr>
+      <tr><td><b>reviewer</b></td><td>read-only</td><td>criticise before it's called done</td></tr>
       </table>
-      <div class="note"><span class="t">Safety by simply not giving it the tool</span>
-      <p>The explorer <b>has no way to write files at all</b>. No clever wording in a file it reads
-      can trick it into deleting something, because the ability isn't there.</p>
-      <p><b>Take the tool away. Don't ask the model nicely.</b></p></div>
-      <h3>The same idea, scaled up: <code>/audit</code></h3>
-      <ul>
-        <li>Reviewing a whole project doesn't fit in a local model's head. Not close.</li>
-        <li>So we <b>split it up</b>: review each small piece with a fresh helper, then merge all the
-        findings into one report.</li>
-        <li>Each helper stays small and fast &#8212; the exact opposite of one giant request.</li>
-      </ul>
-      <div class="key"><span class="t">Generalisable</span>
-      <p>When a job doesn't fit, <b>don't go looking for a bigger model &#8212; split the job.</b></p></div>
+      <div class="key"><span class="t">Security by absence, not by instruction</span>
+      <p>An explorer has <b>no <code>write_file</code> key in its registry dict</b>. No wording in a
+      file it reads can talk it into writing, because there is nothing to call. Take the capability
+      away &#8212; don't ask the model nicely.</p></div>
+      <div class="qa"><div class="q">The same trick, scaled up: <code>/audit</code></div>
+      <div class="a">Reviewing a whole project doesn't fit in a local model's head. So:</div></div>
+      <pre class="sm"><span class="num">1.</span> pack files into chunks of ~<span class="num">1500</span> lines   <span class="cmt"># max 250 files, 24 chunks</span>
+<span class="num">2.</span> <span class="kw">for</span> each chunk: a fresh Agent reviews <b>only that chunk</b>
+<span class="num">3.</span> collect the short findings (not the file contents)
+<span class="num">4.</span> one more Agent, <b>with no tools at all</b>, merges them</pre>
+      <div class="a">And when it hits those caps it <b>says so loudly</b> rather than reporting
+      "clean" &#8212; a silent partial review is worse than no review.</div>
     </div>
   </div>
   <div class="foot"><span>llmc-code &#183; how it works</span><span>20</span></div>
 </div>
 
-<div data-src="s18" id="s-heat" class="slide">
-  <div class="sh"><span class="num">21</span><h2>Keeping the laptop cool</h2>
-    <span class="tag">box 10 of 10 &#183; red, left side</span></div>
-  <div class="body">
-    <div class="left">
-      <div class="wwh" style="flex-direction:column;margin-top:0">
-        <div class="why"><span class="lbl">Why</span>
-        <p>A cloud tool never thinks about hardware. On <b>your</b> laptop, an hour of flat-out work
-        means screaming fans &#8212; then the machine <b>deliberately slows itself down</b> to cool off.
-        The longer you work, the worse it gets.</p></div>
-        <div class="what"><span class="lbl">What</span>
-        <p>Two features <b>no cloud tool has</b>:<br>
-        &#8226; a forced <b>one-minute break</b> after roughly ten minutes of solid work<br>
-        &#8226; <b>shorter replies and small pauses</b> between turns</p></div>
-        <div class="how"><span class="lbl">How</span>
-        <p>The break happens at the <b>top of the loop</b>, where nothing is half-finished. Both are on
-        by default, and both switch themselves off when output is piped &#8212; so scripts and tests
-        never sit there waiting.</p></div>
-      </div>
-      <div class="note" style="margin-top:3mm"><span class="t">Why the top of the loop</span>
-      <p>Pausing in the middle of a step would leave a request with no matching result sitting in the
-      conversation &#8212; and most servers <b>reject the whole thing</b> when they see that.</p>
-      <p>The position isn't arbitrary &#8212; it makes breaking <b>impossible</b>, not just unlikely.
-      Ctrl-C is handled at the same spot, for the same reason.</p></div>
-    </div>
-    <div class="right">
-      <div class="problem"><span class="t">The bug that gentle mode caused</span>
-      <p>We capped how much the model could write, to keep the GPU cool. On a normal answer, hitting
-      the cap just cuts off a sentence.</p>
-      <p>But when it <em>writes a file</em>, the file content travels <b>inside the request itself</b>.
-      Cut that off and the request is incomplete &#8212; the model thought it had written the file,
-      the user thought so too, and <b>nothing reached the disk</b>.</p>
-      <p><b>The fix, in three parts:</b> the cap is now <b>skipped entirely whenever tools are on the
-      table</b>; the default was raised <b>1,024 &#8594; 4,096</b>; and anything still cut off is retried
-      <b>once</b> with no cap at all.</p>
-      <p><b>And the twist:</b> cutting off then retrying meant the model wrote the answer <em>twice</em>
-      &#8212; which produced <b>more</b> heat than the cap ever saved.</p></div>
-      <div class="key"><span class="t">The lesson</span>
-      <p><b>A limit you set for one reason will be hit by something you never thought about.</b>
-      Whenever you add a cap, ask what <em>else</em> travels down that path.</p></div>
-      <div class="note"><span class="t">The honest reframe</span>
-      <p>We spent a long time trying to make it <em>type</em> faster. Typing speed was <b>never</b> the
-      problem &#8212; it sat near 95 words a second throughout. The real pain was the <b>waiting</b>.</p>
-      <p>Nobody experiences "words per second". They experience <b>"I pressed Enter, and then I
-      waited."</b> That is the number to improve.</p></div>
-    </div>
-  </div>
-  <div class="foot"><span>llmc-code &#183; how it works</span><span>21</span></div>
-</div>
-
 <style>#s-safety li{font-size:9.7pt;margin-bottom:1.1mm}#s-safety td{padding:1.2mm 2.5mm}#s-safety th{padding:1.2mm 2.5mm}#s-safety h3{margin:0 0 1.5mm 0}</style>
-<div data-src="s19" class="slide" id="s-safety" style="padding-bottom:7mm">
-  <div class="sh"><span class="num">22</span><h2>Custom #13 &#8212; never trusting the model</h2>
+<div data-src="s22" class="slide" id="s-safety" style="padding-bottom:7mm">
+  <div class="sh"><span class="num">21</span><h2>Never trusting the model</h2>
     <span class="tag">guards &#183; safety &#183; privacy</span></div>
   <div class="body">
     <div class="left">
@@ -1713,11 +1704,61 @@ figcaption{ font-size:8.6pt; color:var(--ink-faint); margin-top:2mm; }
       <em>because</em> of it. Say which mechanism enforces a guarantee &#8212; or don't make it.</p></div>
     </div>
   </div>
+  <div class="foot"><span>llmc-code &#183; how it works</span><span>21</span></div>
+</div>
+
+<div data-src="s23" id="s-heat" class="slide">
+  <div class="sh"><span class="num">22</span><h2>Box 10 &#8212; keeping the laptop cool</h2>
+    <span class="tag">box 10 &#183; cooldown.py &#183; gentle mode</span></div>
+  <div class="body">
+    <div class="left">
+      <div class="wwh" style="flex-direction:column;margin-top:0">
+        <div class="why"><span class="lbl">Why</span>
+        <p>A cloud tool never thinks about hardware. On <b>your</b> laptop, an hour of flat-out work
+        means screaming fans &#8212; then the machine <b>deliberately slows itself down</b> to cool off.
+        The longer you work, the worse it gets.</p></div>
+        <div class="what"><span class="lbl">What</span>
+        <p>Two features <b>no cloud tool has</b>:<br>
+        &#8226; a forced <b>one-minute break</b> after roughly ten minutes of solid work<br>
+        &#8226; <b>shorter replies and small pauses</b> between turns</p></div>
+        <div class="how"><span class="lbl">How</span>
+        <p>The break happens at the <b>top of the loop</b>, where nothing is half-finished. Both are on
+        by default, and both switch themselves off when output is piped &#8212; so scripts and tests
+        never sit there waiting.</p></div>
+      </div>
+      <div class="note" style="margin-top:3mm"><span class="t">Why the top of the loop</span>
+      <p>Pausing in the middle of a step would leave a request with no matching result sitting in the
+      conversation &#8212; and most servers <b>reject the whole thing</b> when they see that.</p>
+      <p>The position isn't arbitrary &#8212; it makes breaking <b>impossible</b>, not just unlikely.
+      Ctrl-C is handled at the same spot, for the same reason.</p></div>
+    </div>
+    <div class="right">
+      <div class="problem"><span class="t">The bug that gentle mode caused</span>
+      <p>We capped how much the model could write, to keep the GPU cool. On a normal answer, hitting
+      the cap just cuts off a sentence.</p>
+      <p>But when it <em>writes a file</em>, the file content travels <b>inside the request itself</b>.
+      Cut that off and the request is incomplete &#8212; the model thought it had written the file,
+      the user thought so too, and <b>nothing reached the disk</b>.</p>
+      <p><b>The fix, in three parts:</b> the cap is now <b>skipped entirely whenever tools are on the
+      table</b>; the default was raised <b>1,024 &#8594; 4,096</b>; and anything still cut off is retried
+      <b>once</b> with no cap at all.</p>
+      <p><b>And the twist:</b> cutting off then retrying meant the model wrote the answer <em>twice</em>
+      &#8212; which produced <b>more</b> heat than the cap ever saved.</p></div>
+      <div class="key"><span class="t">The lesson</span>
+      <p><b>A limit you set for one reason will be hit by something you never thought about.</b>
+      Whenever you add a cap, ask what <em>else</em> travels down that path.</p></div>
+      <div class="note"><span class="t">The honest reframe</span>
+      <p>We spent a long time trying to make it <em>type</em> faster. Typing speed was <b>never</b> the
+      problem &#8212; it sat near 95 words a second throughout. The real pain was the <b>waiting</b>.</p>
+      <p>Nobody experiences "words per second". They experience <b>"I pressed Enter, and then I
+      waited."</b> That is the number to improve.</p></div>
+    </div>
+  </div>
   <div class="foot"><span>llmc-code &#183; how it works</span><span>22</span></div>
 </div>
 
-<div data-src="s20" class="slide">
-  <div class="sh"><span class="num">23</span><h2>Custom #14 &#8212; other people's tools, and testing without a GPU</h2>
+<div data-src="s24" class="slide">
+  <div class="sh"><span class="num">23</span><h2>Other people's tools, and testing with a fake model</h2>
     <span class="tag">mcp.py &#183; providers.py</span></div>
   <div class="body">
     <div class="left">
@@ -1769,7 +1810,7 @@ figcaption{ font-size:8.6pt; color:var(--ink-faint); margin-top:2mm; }
   <div class="foot"><span>llmc-code &#183; how it works</span><span>23</span></div>
 </div>
 
-<div data-src="s21" class="slide">
+<div data-src="s25" class="slide">
   <div class="sh"><span class="num">24</span><h2>Recap &#8212; and how to build your own</h2>
     <span class="tag">take-aways</span></div>
   <div class="body" style="font-size:96%">
@@ -1777,16 +1818,16 @@ figcaption{ font-size:8.6pt; color:var(--ink-faint); margin-top:2mm; }
       <h3>What we built, in one line each</h3>
       <table style="font-size:9pt">
       <tr><th style="width:30%">The part</th><th>The idea behind it</th></tr>
-      <tr><td><b>The loop</b></td><td>Let the model ask for things. Do them. Show it what happened. Repeat until it just answers.</td></tr>
-      <tr><td><b>Tools</b></td><td>Always cut output short, never crash, and write error messages <em>for the model to read</em>.</td></tr>
-      <tr><td><b>Dialect parsing</b></td><td>Understand seven ways of asking &#8212; but refuse to act when it's unclear.</td></tr>
-      <tr><td><b>Context mgmt</b></td><td>Measure, budget, shorten, summarise. Send what <em>this</em> question needs, nothing more.</td></tr>
-      <tr><td><b>CAG</b></td><td>Only ever add to the end, so the server can skip re-reading. Free speed.</td></tr>
-      <tr><td><b>RAG</b></td><td>Search a store instead of pasting everything in. Cheap check first, expensive one only if needed.</td></tr>
-      <tr><td><b>Vector store</b></td><td>Raw numbers in a second file, plus a fingerprint so a crash can't scramble them.</td></tr>
-      <tr><td><b>Sub-agents</b></td><td>When a job doesn't fit, split the job.</td></tr>
-      <tr><td><b>Hardware</b></td><td>Breaks and shorter replies &#8212; the laptop is part of the system too.</td></tr>
-      <tr><td><b>Safety</b></td><td>Treat the model as untrusted. Ask first, fence it in, strip secrets, keep an undo.</td></tr>
+      <tr><td><b>The loop</b></td><td>One Python list. Append the reply, run what it asked for, append the result, repeat.</td></tr>
+      <tr><td><b>Tools</b></td><td>A 5-field dataclass in one dict. Cap output at the source, return errors as data, never raise.</td></tr>
+      <tr><td><b>Dialect parsing</b></td><td>Seven parsers in, three event types out. Refuse to act when the input is ambiguous.</td></tr>
+      <tr><td><b>Context mgmt</b></td><td>chars&#247;4 to measure, a per-message budget, shorten old entries in place, summarise as a last resort.</td></tr>
+      <tr><td><b>CAG</b></td><td>Never modify the stored list &#8212; send <code>self.messages + extras</code>, a copy.</td></tr>
+      <tr><td><b>RAG</b></td><td>One JSON file of records + a word index. Meaning search only when the word score is exactly 0.</td></tr>
+      <tr><td><b>Vector store</b></td><td>4 bytes per number in a <code>.vec</code> file, plus a checksum stored in the JSON.</td></tr>
+      <tr><td><b>Sub-agents</b></td><td>A second Agent with a fresh list and a smaller registry. Its reading is thrown away.</td></tr>
+      <tr><td><b>Hardware</b></td><td>A pause at the top of the loop, where nothing is half-written.</td></tr>
+      <tr><td><b>Safety</b></td><td>Counters with real numbers, a confirmation gate, a scrubbed environment, file copies before edits.</td></tr>
       </table>
       <div class="key"><span class="t">If you remember one thing</span>
       <p><b>The model is not the program.</b> Around 95% of this code is the machinery <em>around</em>
@@ -1794,7 +1835,7 @@ figcaption{ font-size:8.6pt; color:var(--ink-faint); margin-top:2mm; }
     </div>
     <div class="right">
       <h3>Start here: a working assistant in 20 lines</h3>
-      <p>Everything here grew out of the loop on slide 4. Type it, run it, then grow it &#8212; each exercise rebuilds one slide:</p>
+      <p>Everything here grew out of the loop on slide 6. Type it, run it, then grow it &#8212; each exercise rebuilds one slide:</p>
       <table style="font-size:9pt">
       <tr><th style="width:8%">#</th><th style="width:44%">Exercise</th><th>What you'll discover</th></tr>
       <tr><td>1</td><td>Add writing and editing files</td><td>Edits fail over invisible spacing. You'll invent a forgiving match.</td></tr>
