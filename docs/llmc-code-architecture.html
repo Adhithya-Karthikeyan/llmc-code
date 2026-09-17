@@ -254,7 +254,7 @@ figcaption{ font-size:8.6pt; color:var(--ink-faint); margin-top:2mm; }
   <rect class="bx-b" x="230" y="56" width="640" height="52" rx="6"/>
   <text class="tt" x="242" y="72" fill="#1f5fa8">interface layer</text>
   <text class="tm" x="300" y="95" style="font-weight:700">repl.py</text>
-  <text class="ts" x="352" y="95">input &#183; 40 slash commands &#183; themes &#183; spinner &#183; live render</text>
+  <text class="ts" x="352" y="95">input &#183; 35 slash commands &#183; themes &#183; spinner &#183; buffered render</text>
   <text class="tm" x="718" y="95" style="font-weight:700">__main__.py</text>
   <text class="ts" x="800" y="95">CLI flags</text>
   <path class="ln-b" d="M550,108 L550,126"/>
@@ -415,8 +415,8 @@ figcaption{ font-size:8.6pt; color:var(--ink-faint); margin-top:2mm; }
   <rect class="bx-p" x="510" y="26" width="210" height="60" rx="5"/>
   <circle cx="528" cy="42" r="10" fill="#6a3fa0"/><text class="tms" x="528" y="46" text-anchor="middle" style="fill:#fff;font-size:11px;font-weight:700">3</text>
   <text class="tb" x="546" y="46">Sent to the model</text>
-  <text class="ts" x="522" y="66">streamed back token by token,</text>
-  <text class="ts" x="522" y="79">printed as it arrives</text>
+  <text class="ts" x="522" y="66">streamed over HTTP; a spinner runs</text>
+  <text class="ts" x="522" y="79">while tokens arrive</text>
 
   <path class="ln-b" d="M250,56 L275,56"/>
   <path class="ln-b" d="M485,56 L510,56"/>
@@ -469,7 +469,8 @@ figcaption{ font-size:8.6pt; color:var(--ink-faint); margin-top:2mm; }
       happened</b>, then act again. Each pass it knows strictly more than the last.</p></div>
       <div class="what"><span class="lbl">What ends it</span>
       <p>A reply with <b>no tool calls</b>. Plain words mean the model has nothing left to look up
-      &#8212; so its words are the answer.</p></div>
+      &#8212; so its words are the answer. The text is <b>buffered, then rendered once</b> as markdown,
+      so headings and code fences display properly instead of as literal <code>##</code>.</p></div>
       <div class="how"><span class="lbl">How it stays safe</span>
       <p>A hard iteration cap (80), plus eight more guards. Writes and shell commands ask you
       first; reads just run.</p></div>
@@ -1296,9 +1297,9 @@ figcaption{ font-size:8.6pt; color:var(--ink-faint); margin-top:2mm; }
     <div class="left">
       <div class="wwh" style="flex-direction:column;margin-top:0">
         <div class="why"><span class="lbl">Why</span>
-        <p>A cloud agent never thinks about the hardware. An agent on <b>your</b> laptop runs the
-        GPU flat out for an hour, the fans scream, the chassis burns, and the machine thermally
-        throttles &#8212; so it gets <em>slower</em> the longer you work.</p></div>
+        <p>A cloud agent never thinks about hardware. An agent on <b>your</b> laptop runs the GPU flat
+        out for an hour, the fans scream, and the machine thermally throttles &#8212; so it gets
+        <em>slower</em> the longer you work.</p></div>
         <div class="what"><span class="lbl">What</span>
         <p>Two features that exist in <b>no cloud agent</b>:<br>
         &#8226; <b>Cooldown</b> &#8212; a forced ~1-minute break after every ~10 minutes of
@@ -1318,21 +1319,17 @@ figcaption{ font-size:8.6pt; color:var(--ink-faint); margin-top:2mm; }
       <div class="problem"><span class="t">The bug that gentle mode caused</span>
       <p>The output cap (1,024 tokens) was meant to keep the GPU cool. For a chat answer, hitting
       it just truncates some prose.</p>
-      <p>For <code>write_file</code> it was <b>silent data loss</b> &#8212; the entire file content
-      travels <em>inside the tool call's JSON arguments</em>. Truncated arguments meant the model
-      believed it wrote the file, the user believed it too, and <b>nothing landed on disk</b>.</p>
-      <p><b>Fix:</b> when the model stops because it hit the cap (<code>finish_reason ==
-      "length"</code>), retry the same request <b>once</b> with the cap lifted.</p></div>
+      <p>For <code>write_file</code> it was <b>silent data loss</b> &#8212; the whole file content travels
+      <em>inside the tool call's JSON arguments</em>. Truncated arguments meant the model believed it
+      wrote the file, the user believed it too, and <b>nothing landed on disk</b>.</p>
+      <p><b>The fix, in three parts:</b> the cap is <b>skipped entirely on any turn that offers tools</b> (<code>gentle_for_this_call = gentle_mode and not tools</code>); the default rose <b>1,024 &#8594; 4,096</b>; and a generation that still stops on the cap is retried <b>once</b> uncapped.</p>
+      <p><b>The second-order lesson:</b> truncate-then-retry meant <em>two</em> generations &#8212; <b>more</b> heat than the cap ever saved. On tool turns, pacing is the heat lever now, not the cap.</p></div>
       <div class="key"><span class="t">The lesson</span>
       <p><b>A limit you set for one reason will be hit by something you never considered.</b>
       Whenever you add a cap, ask: what else travels through this path?</p></div>
       <h3>The honest reframe</h3>
-      <p>We chased tok/s for a long time. The real finding was different:</p>
-      <ul>
-        <li>Decode speed was <b>never</b> the problem &#8212; it sat near 95 tok/s throughout.</li>
-        <li>The pain was <b>wall-clock</b>: heavy features on by default, and enormous prompts.</li>
-        <li>Turning defaults down and shrinking context beat every tuning flag.</li>
-      </ul>
+      <p>We chased tok/s for a long time. Decode speed was <b>never</b> the problem &#8212; it sat near
+      95 tok/s throughout. The pain was <b>wall-clock</b>: heavy defaults and huge prompts.</p>
       <div class="note"><span class="t">Measure the thing the user feels</span>
       <p>The user does not experience tok/s. They experience <b>"I pressed Enter and waited"</b>.
       Optimise that number.</p></div>
@@ -1341,52 +1338,53 @@ figcaption{ font-size:8.6pt; color:var(--ink-faint); margin-top:2mm; }
   <div class="foot"><span>llmc-code &#183; how it works</span><span>17</span></div>
 </div>
 
-<div class="slide">
+<style>#s-safety li{font-size:9.7pt;margin-bottom:1.1mm}#s-safety td{padding:1.2mm 2.5mm}#s-safety th{padding:1.2mm 2.5mm}#s-safety h3{margin:0 0 1.5mm 0}</style>
+<div class="slide" id="s-safety" style="padding-bottom:7mm">
   <div class="sh"><span class="num">18</span><h2>Custom #13 &#8212; never trusting the model</h2>
     <span class="tag">guards &#183; safety &#183; privacy</span></div>
   <div class="body">
     <div class="left">
-      <h3>Nine guards, because the loop must always end</h3>
-      <table>
+      <h3 style="margin-bottom:1.5mm">Nine guards, because the loop must always end</h3>
+      <table style="font-size:8.9pt">
       <tr><th style="width:44%">Guard</th><th>Bound</th></tr>
       <tr><td>Iteration cap</td><td>80 passes</td></tr>
       <tr><td>All-parse-errors circuit breaker</td><td>3 bad batches</td></tr>
       <tr><td>Identical-batch loop guard</td><td>4 repeats</td></tr>
-      <tr><td>Empty-turn nudge <span class="ts">(model thought, said nothing)</span></td><td>2 retries</td></tr>
-      <tr><td>Unexecuted-markup nudge</td><td>one shot</td></tr>
-      <tr><td>Truncation retry <span class="ts">(cap ate a write)</span></td><td>once per pass</td></tr>
-      <tr><td>Constrained-decode retry <span class="ts">(bad JSON args)</span></td><td>once per call</td></tr>
+      <tr><td>Empty-turn nudge <span class="ts">(thought, said nothing)</span></td><td>2 retries</td></tr>
+            <tr><td>Truncation retry <span class="ts">(cap ate a write)</span></td><td>once per pass</td></tr>
+      <tr><td>Constrained-decode retry <span class="ts">(bad JSON args)</span> &#183; markup nudge</td><td>once each</td></tr>
       <tr><td>Cancel check <span class="ts">(Ctrl-C can't corrupt history)</span></td><td>every pass</td></tr>
-      <tr><td>Read-budget nudge <span class="ts">(stop reading, start searching)</span></td><td>once per turn</td></tr>
+      <tr><td>Read-budget nudge <span class="ts">(read less, search more)</span></td><td>once per turn</td></tr>
       </table>
-      <div class="key"><span class="t">A guard that catches healthy behaviour is a bug</span>
+      <div class="key" style="font-size:9.5pt"><span class="t">A guard that catches healthy behaviour is a bug</span>
       <p>The first circuit breaker counted <b>any</b> parse error and killed working sessions. A
       model that emits one good call and one malformed call <em>is still making progress</em>. It
       now only counts when the <b>whole batch</b> failed &#8212; and one good call resets it.</p></div>
     </div>
     <div class="right">
-      <h3>Safety: the model is untrusted input</h3>
-      <ul>
+      <h3 style="margin-bottom:1.5mm">Safety: the model is untrusted input</h3>
+      <ul style="font-size:10.2pt">
         <li><b>Confirmation gates</b> on every write, edit and shell command.</li>
-        <li><b>Workspace confinement</b> &#8212; paths resolving outside the launch directory are
-        refused.</li>
+        <li><b>Workspace confinement</b> on the <em>file</em> tools (read / write / edit / glob / grep /
+        repo_map) &#8212; paths resolving outside the launch directory are refused.</li>
         <li><b>Secret scrubbing</b> &#8212; child processes get an allowlisted env; API keys,
         <code>AWS_*</code>, <code>GITHUB_TOKEN</code> are never inherited.</li>
-        <li><b>Undo checkpoints</b> &#8212; files are snapshotted before the agent edits them.</li>
-        <li><b>SSRF guard</b> on <code>web_fetch</code> &#8212; loopback, private, link-local and
-        cloud-metadata IPs refused; connection pinned to the validated IP; re-checked on <em>every
-        redirect</em>.</li>
-        <li><b>Self-healing</b> &#8212; a failed tool call is auto-corrected (e.g. a wrong path)
-        and retried, bounded.</li>
+                <li><b>SSRF guard</b> on <code>web_fetch</code> &#8212; loopback, private and cloud-metadata IPs
+        refused; connection pinned to the validated IP; re-checked on <em>every redirect</em>.</li>
+        <li><b>Undo checkpoints</b> &#8212; files are snapshotted before every edit.</li>
+        <li><b>Self-healing</b> &#8212; a failed tool call is auto-corrected and retried, bounded.</li>
       </ul>
-      <div class="note"><span class="t"><code>--private</code>: an enforced offline lockdown</span>
+      <div class="note" style="font-size:9.4pt"><span class="t"><code>--private</code>: an enforced offline lockdown</span>
       <p>Not a promise &#8212; a mechanism. The model URL <b>must</b> be loopback and is IP-pinned;
-      <code>web_fetch</code> is <b>removed from the toolset</b>; <code>run_bash</code> runs under a
-      no-network sandbox and <b>fails closed</b> if the sandbox is unavailable; the HTTP client is
-      built with <code>trust_env=False</code> so proxy variables cannot tunnel traffic out.</p></div>
-      <div class="problem"><span class="t">The most valuable bug we ever fixed</span>
-      <p>The docs claimed writes were "workspace-confined". <b>They weren't.</b> A false security
-      claim is worse than no claim &#8212; people relax <em>because</em> of it.</p></div>
+      <code>web_fetch</code> is <b>removed from the toolset</b>; <code>run_bash</code> runs in a
+      no-network sandbox and <b>fails closed</b> if it is unavailable; the HTTP client uses
+      <code>trust_env=False</code> so proxy variables cannot tunnel traffic out.</p></div>
+      <div class="problem" style="font-size:9.4pt"><span class="t">The most valuable bug we ever fixed</span>
+      <p>The docs claimed writes were "workspace-confined". For <code>run_bash</code> that was
+      <b>false</b> &#8212; it is a raw shell, and there is no path check in it at all. Its real
+      boundary is the <b>confirmation gate</b> plus the scrubbed environment.</p>
+      <p><b>A false claim is worse than none</b> &#8212; people relax <em>because</em> of it. Name the
+      mechanism that enforces a guarantee, or don't claim it.</p></div>
     </div>
   </div>
   <div class="foot"><span>llmc-code &#183; how it works</span><span>18</span></div>
