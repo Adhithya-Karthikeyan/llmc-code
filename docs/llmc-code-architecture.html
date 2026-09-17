@@ -101,7 +101,7 @@ td code{ font-size:8.6pt; }
 
 /* figures */
 figure{ margin:0; text-align:center; }
-figure svg{ max-width:100%; height:auto; }
+figure svg{ width:100%; max-width:100%; height:auto; display:block; }
 figcaption{ font-size:8.6pt; color:var(--ink-faint); margin-top:2mm; }
 
 /* title slide */
@@ -131,6 +131,19 @@ figcaption{ font-size:8.6pt; color:var(--ink-faint); margin-top:2mm; }
 .big{ font-family:var(--serif); font-size:17pt; color:#12293d; line-height:1.3; }
 .stat{ text-align:center; }
 .stat .n{ font-family:var(--serif); font-size:26pt; color:var(--blue); font-weight:600; line-height:1; }
+
+/* module cards */
+.modgrid{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:3.2mm; }
+.mod{ border:1px solid var(--rule); border-radius:4px; padding:2.4mm 3mm; background:#fbfdff; }
+.mod .nm{ font-family:var(--mono); font-size:10pt; font-weight:700; color:#12293d;
+          margin:0 0 .6mm 0; }
+.mod .sub{ font-size:8.4pt; color:var(--ink-faint); margin:0 0 1.8mm 0; line-height:1.3; }
+.mod .r{ display:flex; gap:2mm; font-size:8.7pt; line-height:1.38; margin-bottom:1.3mm; }
+.mod .r:last-child{ margin-bottom:0; }
+.mod .r > b{ font-family:var(--mono); font-size:7pt; letter-spacing:.11em; text-transform:uppercase;
+           min-width:8.5mm; flex-shrink:0; padding-top:.5mm; }
+.mod .why > b{ color:var(--amber); } .mod .what > b{ color:var(--blue); } .mod .how > b{ color:var(--green); }
+.mod .r span b{ font-weight:650; color:#0f2436; }
 .stat .l{ font-size:9pt; color:var(--ink-soft); margin-top:1.5mm; }
 </style>
 </head>
@@ -172,76 +185,74 @@ figcaption{ font-size:8.6pt; color:var(--ink-faint); margin-top:2mm; }
        letter-spacing:.12em; text-transform:uppercase; }
   .cap{ font-family:"Inter",Helvetica,Arial,sans-serif; font-size:11px; fill:#7a8799; }
 </style></svg>
-<div class="slide title-slide">
+<div data-src="s01" class="slide title-slide">
   <div class="kick">a walkthrough for students</div>
-  <h1>How an AI coding agent<br>is actually built</h1>
+  <h1>How an AI coding agent<br>actually works</h1>
   <div class="rule"></div>
-  <div class="sub">Inside <b>llmc-code</b> — a Claude-Code-style assistant that runs entirely on
-  your own laptop. We open every box: the loop, the tools, the memory, the search engine.</div>
+  <div class="sub">Inside <b>llmc-code</b> &#8212; a coding assistant that runs on your own laptop.
+  No cloud. No API bill. We open every part and explain it in plain words.</div>
   <div class="badges">
     <span>~13,000 lines of Python</span><span>26 modules</span><span>1,355 tests</span>
-    <span>3 dependencies</span><span>100% local</span>
+    <span>3 libraries</span><span>100% offline</span>
   </div>
-  <div class="meta">Every slide answers three questions &#8212; WHY it exists &#183; WHAT it is &#183; HOW it works</div>
+  <div class="meta">Every slide answers three things &#8212; WHY we needed it &#183; WHAT it is &#183; HOW it works</div>
 </div>
 
-<div class="slide">
+<div data-src="s02" class="slide">
   <div class="sh"><span class="num">01</span><h2>The problem we are solving</h2>
     <span class="tag">why this exists</span></div>
   <div class="body">
     <div class="left">
-      <h3>You can download a good model today. You still can't <em>use</em> it.</h3>
-      <p>LM Studio will happily run a 30-billion-parameter coding model on your laptop. What you
-      get is a <b>chat box</b>. What you wanted is something that reads your repo, edits files,
-      runs your tests and fixes what broke.</p>
-      <div class="problem"><span class="t">The gap</span>
-      <p>A model can only turn text into text. It cannot open a file, run a command, remember
-      yesterday, or stop itself when it is confused.<br>
-      <b>Something has to sit between the model and your computer.</b> That something is a
-      <b>harness</b>, and building one is what this deck is about.</p></div>
-      <h3>Why not just use the cloud tools?</h3>
+      <h3>You can download a great model today. You still can't use it to code.</h3>
+      <p>A language model does exactly one thing: <b>you give it text, it gives you text back</b>.
+      That's all. It cannot open a file. It cannot run your tests. It forgets everything the
+      moment it replies.</p>
+      <p>So when you load a model in LM Studio, you get a <b>chat box</b>. What you actually wanted
+      was something that reads your project, changes your code, runs your tests, sees what broke,
+      and fixes it.</p>
+      <div class="problem"><span class="t">The missing piece</span>
+      <p>Something has to sit <b>between the model and your computer</b>. It gives the model a way
+      to ask for things, does those things for it, and shows it what happened.</p>
+      <p>That middle program is called a <b>harness</b>. Building one is what this deck is about.</p></div>
+      <h3>Why run it on your own machine?</h3>
       <ul>
-        <li><b>Privacy</b> — your source code never leaves the machine.</li>
-        <li><b>Cost</b> — no per-token bill, no rate limits.</li>
-        <li><b>It works offline</b> — on a plane, in a lab, behind an air gap.</li>
+        <li><b>Your code stays yours.</b> Nothing is uploaded anywhere.</li>
+        <li><b>It's free to use.</b> No per-word charges, no limits.</li>
+        <li><b>It works with no internet.</b> On a plane, in a lab, anywhere.</li>
       </ul>
-      <div class="key"><span class="t">But local changes everything</span>
-      <p>A cloud harness can assume a big, fast, well-behaved model. <b>We can assume none of
-      that.</b> Every custom piece in the second half of this deck exists because of that one
-      difference.</p></div>
     </div>
     <div class="right">
-      <h3>Four constraints — and what each one forced us to build</h3>
+      <div class="key" style="margin-top:0"><span class="t">But running locally changes everything</span>
+      <p>A cloud tool can assume a huge, fast, well-behaved model. <b>We can't assume any of
+      that.</b> Our model is smaller, slower, and messier. Almost every custom part in this deck
+      exists because of that one difference.</p></div>
+      <h3>Five things local models force you to build</h3>
       <table>
-      <tr><th style="width:34%">Constraint</th><th>What we had to build</th></tr>
-      <tr><td><b>Small, messy models</b><br><span class="ts">no guaranteed tool-call format</span></td>
-          <td><b>7 tool-call parsers</b> + an argument-alias layer, because every model family
-          invents its own syntax</td></tr>
-      <tr><td><b>One laptop GPU</b><br><span class="ts">prefill cost dominates</span></td>
-          <td><b>Context management + CAG</b>: turn budgets, stale trimming, compaction,
-          prompt-cache reuse</td></tr>
-      <tr><td><b>Small context windows</b><br><span class="ts">and slow to fill</span></td>
-          <td><b>RAG + a vector store</b>: search memory and code, send only what this
-          question needs</td></tr>
-      <tr><td><b>Consumer hardware gets hot</b></td>
-          <td><b>Cooldown + gentle mode</b>: forced breaks and output caps so a long session
-          doesn't cook the machine</td></tr>
-      <tr><td><b>It edits real files</b></td>
-          <td>Confirmation gates, workspace confinement, undo checkpoints, an offline lockdown
-          mode</td></tr>
-      <tr><td><b>3 dependencies only</b></td>
-          <td>BM25, cosine similarity, a vector store, PageRank and an MCP client &#8212;
-          <b>all hand-written</b></td></tr>
+      <tr><th style="width:36%">The difficulty</th><th>What we had to build</th></tr>
+      <tr><td><b>Every model asks for things differently</b></td>
+          <td><b>7 different readers</b> for the same request, plus a layer that fixes wrong
+          spellings of the same option name</td></tr>
+      <tr><td><b>Long chats get very slow</b><br><span class="ts">the model re-reads everything each time</span></td>
+          <td><b>Context management</b> &#8212; keep the conversation small, and re-use the work the
+          server already did</td></tr>
+      <tr><td><b>The model can only hold a little text at once</b></td>
+          <td><b>Search</b> &#8212; store everything, then look up only the few bits this question
+          needs</td></tr>
+      <tr><td><b>Laptops get hot</b></td>
+          <td><b>Forced breaks and shorter replies</b>, so an hour of work doesn't cook the
+          machine</td></tr>
+      <tr><td><b>It changes your real files</b></td>
+          <td><b>Ask-before-you-act, undo, and limits on where it can write</b></td></tr>
       </table>
-      <div class="note"><span class="t">In one line</span>
-      <p><b>A harness for running LLMs locally</b> = the loop, the tools, and everything needed to
-      make a small model on modest hardware behave like a useful engineer.</p></div>
+      <div class="note"><span class="t">In one sentence</span>
+      <p>We are building the program that turns <b>"a model on your laptop"</b> into
+      <b>"an assistant that gets work done on your laptop."</b></p></div>
     </div>
   </div>
   <div class="foot"><span>llmc-code &#183; how it works</span><span>1</span></div>
 </div>
 
-<div class="slide">
+<div data-src="s03" class="slide">
   <div class="sh"><span class="num">02</span><h2>The complete architecture</h2>
     <span class="tag">every module, one picture</span></div>
   <figure style="margin-bottom:2mm"><svg viewBox="0 0 1100 474" xmlns="http://www.w3.org/2000/svg">
@@ -252,7 +263,7 @@ figcaption{ font-size:8.6pt; color:var(--ink-faint); margin-top:2mm; }
 
   <!-- INTERFACE -->
   <rect class="bx-b" x="230" y="56" width="640" height="52" rx="6"/>
-  <text class="tt" x="242" y="72" fill="#1f5fa8">interface layer</text>
+  <text class="tt" x="242" y="72" fill="#1f5fa8">what you see and type</text>
   <text class="tm" x="300" y="95" style="font-weight:700">repl.py</text>
   <text class="ts" x="352" y="95">input &#183; 35 slash commands &#183; themes &#183; spinner &#183; buffered render</text>
   <text class="tm" x="718" y="95" style="font-weight:700">__main__.py</text>
@@ -261,100 +272,100 @@ figcaption{ font-size:8.6pt; color:var(--ink-faint); margin-top:2mm; }
 
   <!-- BRAIN -->
   <rect class="bx-g" x="230" y="126" width="640" height="86" rx="6"/>
-  <text class="tt" x="242" y="142" fill="#1d7a53">the brain &#8212; the agent loop</text>
+  <text class="tt" x="242" y="142" fill="#1d7a53">the brain &#8212; decides what to do next</text>
   <rect class="bx" x="244" y="150" width="196" height="52" rx="4"/>
   <text class="tm" x="342" y="169" text-anchor="middle" style="font-weight:700">agent.py</text>
-  <text class="ts" x="342" y="186" text-anchor="middle">decide &#8594; call &#8594; read &#8594; repeat</text>
-  <text class="tms" x="342" y="198" text-anchor="middle">+ 9 runaway guards</text>
+  <text class="ts" x="342" y="186" text-anchor="middle">try, see what happened, repeat</text>
+  <text class="tms" x="342" y="198" text-anchor="middle">+ 9 ways it knows to stop</text>
   <rect class="bx" x="452" y="150" width="196" height="52" rx="4"/>
   <text class="tm" x="550" y="169" text-anchor="middle" style="font-weight:700">orchestration.py</text>
-  <text class="ts" x="550" y="186" text-anchor="middle">spawn_agent sub-agents</text>
+  <text class="ts" x="550" y="186" text-anchor="middle">sends a helper off to do a job</text>
   <text class="tms" x="550" y="198" text-anchor="middle">explorer &#183; coder &#183; reviewer</text>
   <rect class="bx" x="660" y="150" width="196" height="52" rx="4"/>
   <text class="tm" x="758" y="169" text-anchor="middle" style="font-weight:700">prompts.py</text>
-  <text class="ts" x="758" y="186" text-anchor="middle">role system prompts</text>
+  <text class="ts" x="758" y="186" text-anchor="middle">the instructions we give the model</text>
   <text class="tms" x="758" y="198" text-anchor="middle">explore &#8594; plan &#8594; act &#8594; validate</text>
 
   <!-- CONTEXT ENGINE (left) -->
   <rect class="bx-a" x="6" y="126" width="214" height="118" rx="6"/>
-  <text class="tt" x="18" y="142" fill="#a8611f">context management</text>
-  <text class="tms" x="18" y="160">&#9642; _compute_turn_budget()</text>
-  <text class="tms" x="30" y="172" style="fill:#7a8799">size the prompt to the request</text>
-  <text class="tms" x="18" y="188">&#9642; _trim_stale_tool_outputs()</text>
-  <text class="tms" x="30" y="200" style="fill:#7a8799">old results &#8594; 500 chars</text>
-  <text class="tms" x="18" y="216">&#9642; _maybe_auto_compact()</text>
-  <text class="tms" x="30" y="228" style="fill:#7a8799">LLM-summarise old turns</text>
-  <text class="tms" x="18" y="240" style="fill:#a8611f">tokens.py &#183; chars // 4</text>
+  <text class="tt" x="18" y="142" fill="#a8611f">keeping the chat small</text>
+  <text class="tms" x="18" y="160">&#9642; how much history does this</text>
+  <text class="tms" x="30" y="172" style="fill:#7a8799">question actually deserve?</text>
+  <text class="tms" x="18" y="188">&#9642; shorten results from</text>
+  <text class="tms" x="30" y="200" style="fill:#7a8799">earlier, finished steps</text>
+  <text class="tms" x="18" y="216">&#9642; summarise old turns</text>
+  <text class="tms" x="30" y="228" style="fill:#7a8799">into one short note</text>
+  <text class="tms" x="18" y="240" style="fill:#a8611f">size = characters / 4</text>
   <path class="ln-o" d="M220,168 L242,168"/>
 
   <!-- CAG (left lower) -->
   <rect class="bx-p" x="6" y="256" width="214" height="72" rx="6"/>
-  <text class="tt" x="18" y="272" fill="#6a3fa0">CAG &#183; prompt-cache reuse</text>
-  <text class="tms" x="18" y="290">history is APPEND-ONLY</text>
-  <text class="tms" x="18" y="304">&#8594; server KV-cache keeps hitting</text>
-  <text class="tms" x="18" y="318">recall rides the request TAIL only</text>
+  <text class="tt" x="18" y="272" fill="#6a3fa0">re-using the server's work</text>
+  <text class="tms" x="18" y="290">only ever ADD to the end,</text>
+  <text class="tms" x="18" y="304">never change what came before</text>
+  <text class="tms" x="18" y="318">&#8594; the server skips re-reading it</text>
   <path class="ln-p" d="M113,256 L113,246"/>
 
   <!-- GOVERNOR (left bottom) -->
   <rect class="bx-r" x="6" y="340" width="214" height="80" rx="6"/>
-  <text class="tt" x="18" y="356" fill="#a8324a">hardware governor</text>
-  <text class="tms" x="18" y="374">cooldown.py &#8212; 1 min break</text>
-  <text class="tms" x="30" y="386" style="fill:#7a8799">every 10 min of work</text>
-  <text class="tms" x="18" y="402">gentle mode &#8212; output cap</text>
-  <text class="tms" x="30" y="414" style="fill:#7a8799">keeps the laptop GPU cool</text>
+  <text class="tt" x="18" y="356" fill="#a8324a">keeping the laptop cool</text>
+  <text class="tms" x="18" y="374">cooldown.py &#8212; a 1 minute break</text>
+  <text class="tms" x="30" y="386" style="fill:#7a8799">after every 10 minutes of work</text>
+  <text class="tms" x="18" y="402">gentle mode &#8212; shorter replies</text>
+  <text class="tms" x="30" y="414" style="fill:#7a8799">and small pauses between turns</text>
 
   <!-- RETRIEVAL (right) -->
   <rect class="bx-b" x="880" y="126" width="214" height="118" rx="6"/>
-  <text class="tt" x="892" y="142" fill="#1f5fa8">RAG &#183; retrieval</text>
-  <text class="tms" x="892" y="160">memory.py &#8212; past conversation</text>
-  <text class="tms" x="904" y="172" style="fill:#7a8799">BM25 &#8594; embeddings, auto-gated</text>
-  <text class="tms" x="892" y="190">code_index.py &#8212; your source</text>
-  <text class="tms" x="904" y="202" style="fill:#7a8799">AST chunks + hybrid search</text>
-  <text class="tms" x="892" y="220">repo_graph.py &#8212; PageRank map</text>
-  <text class="tms" x="892" y="238">rerank.py &#8212; second-pass scoring</text>
+  <text class="tt" x="892" y="142" fill="#1f5fa8">looking things up (RAG)</text>
+  <text class="tms" x="892" y="160">memory.py &#8212; past conversations</text>
+  <text class="tms" x="904" y="172" style="fill:#7a8799">words first, then meaning</text>
+  <text class="tms" x="892" y="190">code_index.py &#8212; your own code</text>
+  <text class="tms" x="904" y="202" style="fill:#7a8799">split up function by function</text>
+  <text class="tms" x="892" y="220">repo_graph.py &#8212; the key files</text>
+  <text class="tms" x="892" y="238">rerank.py &#8212; a closer look</text>
   <path class="ln-b" d="M878,168 L858,168"/>
 
   <!-- VECTOR STORE (right) -->
   <rect class="bx-p" x="880" y="256" width="214" height="72" rx="6"/>
-  <text class="tt" x="892" y="272" fill="#6a3fa0">the vector store</text>
-  <text class="tms" x="892" y="290">array('f') float32 in RAM</text>
-  <text class="tms" x="892" y="304">.vec packed sidecar on disk</text>
-  <text class="tms" x="892" y="318">+ torn-write signature guard</text>
+  <text class="tt" x="892" y="272" fill="#6a3fa0">where meanings are stored</text>
+  <text class="tms" x="892" y="290">each number takes 4 bytes</text>
+  <text class="tms" x="892" y="304">saved as raw bytes (.vec)</text>
+  <text class="tms" x="892" y="318">+ a checksum to catch a crash</text>
   <path class="ln-p" d="M987,256 L987,246"/>
 
   <!-- STATE (right bottom) -->
   <rect class="bx-d" x="880" y="340" width="214" height="80" rx="6"/>
-  <text class="tt" x="892" y="356">local state &#183; ~/.llmcode</text>
-  <text class="tms" x="892" y="374">config.py &#8212; settings, /doctor</text>
-  <text class="tms" x="892" y="392">session.py &#8212; resume per project</text>
-  <text class="tms" x="892" y="410">checkpoint.py &#8212; undo snapshots</text>
+  <text class="tt" x="892" y="356">saved on your disk</text>
+  <text class="tms" x="892" y="374">config.py &#8212; your settings</text>
+  <text class="tms" x="892" y="392">session.py &#8212; past sessions</text>
+  <text class="tms" x="892" y="410">checkpoint.py &#8212; undo</text>
 
   <!-- ACTIONS -->
   <path class="ln-g" d="M550,212 L550,230"/>
   <rect class="bx-a" x="230" y="230" width="640" height="76" rx="6"/>
-  <text class="tt" x="242" y="246" fill="#a8611f">the hands &#8212; actions on your machine</text>
+  <text class="tt" x="242" y="246" fill="#a8611f">the hands &#8212; does things on your machine</text>
   <rect class="bx" x="244" y="254" width="300" height="44" rx="4"/>
   <text class="tm" x="394" y="272" text-anchor="middle" style="font-weight:700">tools.py</text>
   <text class="tmz" x="394" y="286" text-anchor="middle">read_file &#183; write_file &#183; edit_file &#183; run_bash &#183; glob</text>
   <text class="tmz" x="394" y="297" text-anchor="middle">grep &#183; repo_map &#183; web_fetch &#183; code_search &#183; todo_write</text>
   <rect class="bx" x="556" y="254" width="146" height="44" rx="4"/>
   <text class="tm" x="629" y="272" text-anchor="middle" style="font-weight:700">mcp.py</text>
-  <text class="tms" x="629" y="288" text-anchor="middle">external tool servers</text>
+  <text class="tms" x="629" y="288" text-anchor="middle">other people's tools</text>
   <rect class="bx" x="714" y="254" width="142" height="44" rx="4"/>
   <text class="tm" x="785" y="272" text-anchor="middle" style="font-weight:700">remediation.py</text>
-  <text class="tms" x="785" y="288" text-anchor="middle">self-heal a failed call</text>
+  <text class="tms" x="785" y="288" text-anchor="middle">retries a failed call</text>
 
   <!-- PROVIDER -->
   <path class="ln" d="M394,306 L394,324"/>
   <path class="ln" d="M550,306 L550,324"/>
   <rect class="bx-p" x="230" y="324" width="640" height="76" rx="6"/>
-  <text class="tt" x="242" y="340" fill="#6a3fa0">the mouth &#8212; providers.py</text>
-  <text class="tms" x="244" y="360">&#9642; streams chat completions</text>
-  <text class="tms" x="244" y="376">&#9642; parses 7 tool-call dialects</text>
-  <text class="tms" x="244" y="392">&#9642; normalises every model to one event stream</text>
-  <text class="tms" x="556" y="360">&#9642; embeddings() &#8212; powers RAG</text>
-  <text class="tms" x="556" y="376">&#9642; MockProvider &#8212; scripted &amp; offline</text>
-  <text class="tms" x="556" y="392">&#9642; private mode &#8212; loopback-pinned</text>
+  <text class="tt" x="242" y="340" fill="#6a3fa0">the mouth &#8212; talks to the model</text>
+  <text class="tms" x="244" y="360">&#9642; sends the chat, gets the reply back bit by bit</text>
+  <text class="tms" x="244" y="376">&#9642; understands 7 ways models ask for things</text>
+  <text class="tms" x="244" y="392">&#9642; makes every model look the same to our code</text>
+  <text class="tms" x="556" y="360">&#9642; turns text into numbers, for searching</text>
+  <text class="tms" x="556" y="376">&#9642; a fake model for tests &#8212; no GPU needed</text>
+  <text class="tms" x="556" y="392">&#9642; private mode &#8212; locked to this machine</text>
 
   <!-- EXTERNALS -->
   <path class="ln-o" d="M244,292 L226,292 L226,414 L252,414 L252,424"/>
@@ -362,13 +373,13 @@ figcaption{ font-size:8.6pt; color:var(--ink-faint); margin-top:2mm; }
   <path class="ln" d="M629,298 L629,314 L875,314 L875,420 L960,420 L960,424"/>
   <rect class="bx-d" x="150" y="428" width="205" height="42" rx="5"/>
   <text class="t" x="252" y="447" text-anchor="middle" style="font-weight:600">Your files &amp; shell</text>
-  <text class="tms" x="252" y="462" text-anchor="middle">the thing that can break</text>
+  <text class="tms" x="252" y="462" text-anchor="middle">the part that can actually break</text>
   <rect class="bx-d" x="430" y="428" width="240" height="42" rx="5"/>
   <text class="t" x="550" y="447" text-anchor="middle" style="font-weight:600">LM Studio &#183; localhost:1234</text>
-  <text class="tms" x="550" y="462" text-anchor="middle">your model + embed model, on your GPU</text>
+  <text class="tms" x="550" y="462" text-anchor="middle">your model, running on your GPU</text>
   <rect class="bx-d" x="855" y="428" width="210" height="42" rx="5"/>
   <text class="t" x="960" y="447" text-anchor="middle" style="font-weight:600">MCP servers</text>
-  <text class="tms" x="960" y="462" text-anchor="middle">child processes, stdio JSON-RPC</text>
+  <text class="tms" x="960" y="462" text-anchor="middle">small helper programs</text>
 </svg>
 </figure>
   <div style="display:flex;gap:4mm;align-items:center;margin:0 0 3mm 0;font-size:9.2pt;color:#4a5769">
@@ -380,43 +391,205 @@ figcaption{ font-size:8.6pt; color:var(--ink-faint); margin-top:2mm; }
     <span style="margin-left:auto"><b>26 modules</b> &#183; ~13,000 lines &#183; 3 dependencies</span>
   </div>
   <div class="wwh">
-    <div class="why"><span class="lbl">Why it is shaped like this</span>
-    <p>The <b>brain never touches your disk or the network</b>. It only asks the hands
-    (<code>tools.py</code>) and the mouth (<code>providers.py</code>). That one rule makes the
-    whole system testable without a GPU.</p></div>
-    <div class="what"><span class="lbl">What the side panels are</span>
-    <p>Left = <b>making it fast and safe on a laptop</b> (context, CAG, cooldown). Right =
-    <b>making it knowledgeable</b> (RAG, vectors, local state). Neither exists in a cloud agent
-    &#8212; they are our local-first additions.</p></div>
+    <div class="why"><span class="lbl">Why it is built in layers</span>
+    <p>The brain <b>never touches your files or the network itself</b>. It can only ask the hands
+    and the mouth to do it. That one rule is what lets us swap the real model for a fake one and
+    test the whole thing without a GPU.</p></div>
+    <div class="what"><span class="lbl">What the side panels do</span>
+    <p><b>Left:</b> keep it fast and keep the laptop cool. <b>Right:</b> help it remember and look
+    things up. A cloud tool needs neither &#8212; both exist purely because this runs on your own
+    machine.</p></div>
     <div class="how"><span class="lbl">How to read it</span>
-    <p>Top-down is one request. Left and right are services the brain calls <em>before</em> and
-    <em>around</em> each model call. The bottom row is the only part that is not our code.</p></div>
+    <p>Go <b>top to bottom</b> for one question. The panels on either side are helpers the brain
+    calls <em>before</em> and <em>around</em> each trip to the model. Only the bottom row is not
+    our code.</p></div>
   </div>
   <div class="foot"><span>llmc-code &#183; how it works</span><span>2</span></div>
 </div>
 
-<div class="slide">
-  <div class="sh"><span class="num">03</span><h2>What happens when you press Enter</h2><span class="tag">data flow</span></div>
+<div data-src="s03a" class="slide">
+  <div class="sh"><span class="num">03</span><h2>Every module &#8212; 1 of 3: what you see, and what decides</h2>
+    <span class="tag">module by module</span></div>
+  <div class="body col">
+    <div class="modgrid">
+      <div class="mod"><div class="nm">repl.py</div><div class="sub">4,000 lines &#183; the app you actually touch</div>
+        <div class="r why"><b>why</b><span>A bare Python <code>input()</code> can't do history, colours, or a status bar &#8212; and a slow local model feels broken without something moving on screen.</span></div>
+        <div class="r what"><b>what</b><span>The prompt you type into, 35 slash commands, 6 colour themes, and the bar pinned at the bottom.</span></div>
+        <div class="r how"><b>how</b><span>One library owns typing, another owns colour. They are kept apart so they never fight over the cursor.</span></div></div>
+
+      <div class="mod"><div class="nm">__main__.py</div><div class="sub">396 lines &#183; the front door</div>
+        <div class="r why"><b>why</b><span>A flag typed once for a quick test must not silently become your permanent setting.</span></div>
+        <div class="r what"><b>what</b><span>Reads the command-line flags, then either opens the chat or runs one prompt and exits.</span></div>
+        <div class="r how"><b>how</b><span>Every flag starts as "not given". Only flags you actually typed are applied, and only <code>--save</code> writes them to disk.</span></div></div>
+
+      <div class="mod"><div class="nm">spinner.py</div><div class="sub">492 lines &#183; proof it's alive</div>
+        <div class="r why"><b>why</b><span>A local model can think for 30 seconds. Without movement on screen, people assume it crashed.</span></div>
+        <div class="r what"><b>what</b><span>A small animation with a timer, and the current speed in words per second.</span></div>
+        <div class="r how"><b>how</b><span>It redraws on the <em>same line</em> and always erases itself before anything else prints &#8212; so it can never smear into the answer. Piped output turns it off completely.</span></div></div>
+
+      <div class="mod"><div class="nm">images.py</div><div class="sub">192 lines &#183; show, don't tell</div>
+        <div class="r why"><b>why</b><span>Sometimes a screenshot of the broken screen explains more than a paragraph.</span></div>
+        <div class="r what"><b>what</b><span>Drag a picture onto the prompt, or type <code>/image</code>, and it goes to the model with your message.</span></div>
+        <div class="r how"><b>how</b><span>It only treats a word as a picture if that file really exists, so writing "check logo.png" stays ordinary text.</span></div></div>
+
+      <div class="mod"><div class="nm">mentions.py</div><div class="sub">~300 lines &#183; point at a file</div>
+        <div class="r why"><b>why</b><span>If you already know the file, making the model hunt for it wastes a whole round trip.</span></div>
+        <div class="r what"><b>what</b><span>Type <code>@config.py</code> and the file's contents are attached before the message is sent.</span></div>
+        <div class="r how"><b>how</b><span>Tab-completion guesses as you type, and it skips the same junk folders the search tools skip.</span></div></div>
+
+      <div class="mod"><div class="nm">agent.py</div><div class="sub">3,108 lines &#183; the decider</div>
+        <div class="r why"><b>why</b><span>Something has to run the try &#8594; look &#8594; try again cycle, and know when to stop.</span></div>
+        <div class="r what"><b>what</b><span>The loop itself, the list of messages, and the rules that keep the conversation small.</span></div>
+        <div class="r how"><b>how</b><span>Ask the model. If it asked for something, do it and add the result. If it just talked, that's the answer. Repeat, up to 80 times.</span></div></div>
+
+      <div class="mod"><div class="nm">orchestration.py</div><div class="sub">~330 lines &#183; send a helper</div>
+        <div class="r why"><b>why</b><span>Reading 20 files to answer one question would fill up the main conversation with junk.</span></div>
+        <div class="r what"><b>what</b><span>A way to start a <b>second, separate assistant</b> for one job, which reports back in a few lines.</span></div>
+        <div class="r how"><b>how</b><span>The helper gets its own private conversation and a limited set of abilities. When it finishes, all its reading is thrown away.</span></div></div>
+
+      <div class="mod"><div class="nm">prompts.py</div><div class="sub">323 lines &#183; the instructions</div>
+        <div class="r why"><b>why</b><span>How the assistant behaves is decided far more by <em>what we tell it</em> than by clever code.</span></div>
+        <div class="r what"><b>what</b><span>The standing instructions for four jobs: planner, explorer, coder, reviewer.</span></div>
+        <div class="r how"><b>how</b><span>Plain English rules like "look before you change anything" and "read at most three files, then search instead".</span></div></div>
+
+      <div class="mod" style="background:#f4f8fc"><div class="nm">Why this split?</div><div class="sub">the rule that holds it together</div>
+        <div class="r what"><b>rule</b><span><b>agent.py never opens a file and never opens a connection.</b> It can only ask other modules to.</span></div>
+        <div class="r how"><b>pay-off</b><span>That means we can hand it a <b>fake model</b> and a <b>fake filesystem</b> and test the entire thing &#8212; which is why 1,355 tests run in seconds with no GPU.</span></div></div>
+    </div>
+  </div>
+  <div class="foot"><span>llmc-code &#183; how it works</span><span>3</span></div>
+</div>
+
+<div data-src="s03b" class="slide">
+  <div class="sh"><span class="num">04</span><h2>Every module &#8212; 2 of 3: doing things on your machine</h2>
+    <span class="tag">module by module</span></div>
+  <div class="body col">
+    <div class="modgrid">
+      <div class="mod"><div class="nm">tools.py</div><div class="sub">1,738 lines &#183; the hands</div>
+        <div class="r why"><b>why</b><span>This is the <em>only</em> place the assistant can affect the real world. Keeping it in one file means all the safety checks live in one place.</span></div>
+        <div class="r what"><b>what</b><span>Read a file, write a file, change part of a file, run a command, find files, search text, map the project, fetch a web page.</span></div>
+        <div class="r how"><b>how</b><span>Each one describes itself to the model, then runs plain Python. It <b>never crashes</b> &#8212; a failure comes back as a message the model can read and react to.</span></div></div>
+
+      <div class="mod"><div class="nm">providers.py</div><div class="sub">1,770 lines &#183; the mouth</div>
+        <div class="r why"><b>why</b><span>Every model family asks for things in its own made-up format. The rest of the code should never have to care.</span></div>
+        <div class="r what"><b>what</b><span>Sends the conversation to LM Studio and reads the reply back as it arrives. Also holds the fake model used by the tests.</span></div>
+        <div class="r how"><b>how</b><span>It understands <b>7 different formats</b> and converts them all into one simple shape: either "here is some text" or "please run this".</span></div></div>
+
+      <div class="mod"><div class="nm">mcp.py</div><div class="sub">741 lines &#183; other people's tools</div>
+        <div class="r why"><b>why</b><span>Our 11 tools can't cover everything. Other people have already built tools for databases, note vaults, and so on.</span></div>
+        <div class="r what"><b>what</b><span>A way to start someone else's tool program and offer its abilities to the model alongside our own.</span></div>
+        <div class="r how"><b>how</b><span>We start it as a small background program and talk to it through its input and output. <b>We never trust what it says about itself</b> &#8212; you decide what it's allowed to do.</span></div></div>
+
+      <div class="mod"><div class="nm">remediation.py</div><div class="sub">~270 lines &#183; second chance</div>
+        <div class="r why"><b>why</b><span>Most failures are tiny &#8212; a slightly wrong file path. Making the model spend a whole round fixing that is wasteful.</span></div>
+        <div class="r what"><b>what</b><span>Catches a failed request, corrects the obvious mistake, and quietly tries again.</span></div>
+        <div class="r how"><b>how</b><span>Strictly limited retries, so a genuinely broken request fails fast instead of looping.</span></div></div>
+
+      <div class="mod"><div class="nm">checkpoint.py</div><div class="sub">461 lines &#183; undo</div>
+        <div class="r why"><b>why</b><span>People approve far more changes when they know they can take them back.</span></div>
+        <div class="r what"><b>what</b><span>Before any file is changed, a copy of the old version is saved. <code>/undo</code> puts it back.</span></div>
+        <div class="r how"><b>how</b><span>Copies are kept per project and per session. Writing always goes to a temp file first, then swaps &#8212; so a crash can't leave half a file.</span></div></div>
+
+      <div class="mod"><div class="nm">hooks.py</div><div class="sub">443 lines &#183; your own rules</div>
+        <div class="r why"><b>why</b><span>Asking the model nicely is not a guarantee. Some rules need to be enforced by something that isn't the model.</span></div>
+        <div class="r what"><b>what</b><span>Your own commands, run automatically before or after a tool. A "before" hook can <b>block the action entirely</b>.</span></div>
+        <div class="r how"><b>how</b><span>If your check fails &#8212; or takes too long &#8212; the action is refused. A safety check that can't finish must never quietly allow things.</span></div></div>
+
+      <div class="mod"><div class="nm">rules.py</div><div class="sub">~120 lines &#183; house style</div>
+        <div class="r why"><b>why</b><span>Every project has conventions. Repeating them in every message is tedious.</span></div>
+        <div class="r what"><b>what</b><span>Reads a rules file from your project and puts it at the top of every conversation.</span></div>
+        <div class="r how"><b>how</b><span>Looks for <code>AGENTS.md</code> and a few other names, caps the length, and presents it as instructions you wrote.</span></div></div>
+
+      <div class="mod"><div class="nm">gitint.py</div><div class="sub">~220 lines &#183; git without leaving</div>
+        <div class="r why"><b>why</b><span>After a change you immediately want to see the diff and commit. Switching windows breaks the flow.</span></div>
+        <div class="r what"><b>what</b><span><code>/diff</code> and <code>/commit</code>, right in the chat.</span></div>
+        <div class="r how"><b>how</b><span>It just calls <code>git</code> and turns every possible failure &#8212; no git, not a repo, timed out &#8212; into a tidy message instead of a crash.</span></div></div>
+
+      <div class="mod"><div class="nm">audit.py</div><div class="sub">~230 lines &#183; review the whole project</div>
+        <div class="r why"><b>why</b><span>A whole codebase does not fit in a local model's head. Not even close.</span></div>
+        <div class="r what"><b>what</b><span><code>/audit</code> &#8212; reviews the entire project anyway.</span></div>
+        <div class="r how"><b>how</b><span>Split the code into small pieces, review each one with a fresh helper, then merge the findings. <b>When a job is too big, split the job &#8212; don't ask for a bigger head.</b></span></div></div>
+    </div>
+  </div>
+  <div class="foot"><span>llmc-code &#183; how it works</span><span>4</span></div>
+</div>
+
+<div data-src="s03c" class="slide">
+  <div class="sh"><span class="num">05</span><h2>Every module &#8212; 3 of 3: remembering, searching, staying fast</h2>
+    <span class="tag">module by module</span></div>
+  <div class="body col">
+    <div class="modgrid">
+      <div class="mod"><div class="nm">memory.py</div><div class="sub">812 lines &#183; past conversations</div>
+        <div class="r why"><b>why</b><span>Re-sending every past message is slow. Throwing them away makes the assistant forgetful. We want neither.</span></div>
+        <div class="r what"><b>what</b><span>Every question-and-answer pair is saved. When you ask something new, only the few relevant old ones are pulled back in.</span></div>
+        <div class="r how"><b>how</b><span>First a <b>word search</b> (fast). Only if that finds nothing do we try a <b>meaning search</b> (slower). Cheap check first, expensive check only when needed.</span></div></div>
+
+      <div class="mod"><div class="nm">code_index.py</div><div class="sub">816 lines &#183; searching your code</div>
+        <div class="r why"><b>why</b><span>A small model can't read a 50-file project. Reading three files already fills it up.</span></div>
+        <div class="r what"><b>what</b><span>A search the model can run itself, to find the right 40 lines instead of reading whole files.</span></div>
+        <div class="r how"><b>how</b><span>Your code is split <b>function by function</b>, not every-50-lines &#8212; so every result is a whole, complete piece that makes sense on its own.</span></div></div>
+
+      <div class="mod"><div class="nm">repo_graph.py</div><div class="sub">479 lines &#183; which files matter</div>
+        <div class="r why"><b>why</b><span>Showing the model a flat list of 300 filenames tells it nothing useful.</span></div>
+        <div class="r what"><b>what</b><span>A ranked map of the project: the important files first.</span></div>
+        <div class="r how"><b>how</b><span>A file used by many other files is probably important. That's the same idea Google used to rank web pages by who links to them.</span></div></div>
+
+      <div class="mod"><div class="nm">rerank.py</div><div class="sub">~160 lines &#183; a closer look</div>
+        <div class="r why"><b>why</b><span>A fast search gets you roughly the right 50 results. You only want the best 5.</span></div>
+        <div class="r what"><b>what</b><span>A second pass that re-orders the shortlist more carefully.</span></div>
+        <div class="r how"><b>how</b><span>Off by default. It only runs when the fast search was unsure &#8212; carefulness costs time, so we spend it only where it pays.</span></div></div>
+
+      <div class="mod"><div class="nm">tokens.py</div><div class="sub">25 lines &#183; measuring</div>
+        <div class="r why"><b>why</b><span>You can't keep a conversation small if you can't measure it. A proper measuring tool is a big download.</span></div>
+        <div class="r what"><b>what</b><span>A rough estimate: <b>characters divided by 4</b>.</span></div>
+        <div class="r how"><b>how</b><span>It's off by about 15%, and that is completely fine &#8212; every limit it feeds into is a number we picked ourselves anyway.</span></div></div>
+
+      <div class="mod"><div class="nm">cooldown.py</div><div class="sub">~160 lines &#183; let it breathe</div>
+        <div class="r why"><b>why</b><span>An hour of flat-out work makes a laptop hot, and a hot laptop <em>slows itself down</em> to protect its parts.</span></div>
+        <div class="r what"><b>what</b><span>A one-minute break after roughly every ten minutes of continuous work.</span></div>
+        <div class="r how"><b>how</b><span>The pause happens at the <b>top of the loop</b>, where nothing is half-finished. Pausing mid-step would leave a broken conversation behind.</span></div></div>
+
+      <div class="mod"><div class="nm">config.py</div><div class="sub">768 lines &#183; your settings</div>
+        <div class="r why"><b>why</b><span>Settings that silently change themselves are infuriating.</span></div>
+        <div class="r what"><b>what</b><span>Your preferences in <code>~/.llmcode</code>, plus <code>/doctor</code>, which checks your setup and tells you what's wrong.</span></div>
+        <div class="r how"><b>how</b><span>Three layers: built-in defaults, then your saved file, then flags you typed. Each layer only overrides what it actually specifies.</span></div></div>
+
+      <div class="mod"><div class="nm">session.py</div><div class="sub">~220 lines &#183; picking up again</div>
+        <div class="r why"><b>why</b><span>Closing the terminal shouldn't throw away an hour of context.</span></div>
+        <div class="r what"><b>what</b><span>Saves the conversation per project folder, so tomorrow you can carry on.</span></div>
+        <div class="r how"><b>how</b><span>Written to a temp file then swapped into place, so a crash never corrupts it. <b>Stored on your disk only &#8212; never sent anywhere.</b></span></div></div>
+
+      <div class="mod" style="background:#f4f8fc"><div class="nm">The pattern to notice</div><div class="sub">it shows up in four of these modules</div>
+        <div class="r what"><b>shape</b><span><b>Try the cheap thing first. Only pay for the expensive thing if the cheap one found nothing.</b></span></div>
+        <div class="r how"><b>where</b><span>Word search before meaning search &#183; plain search before the careful re-ranking &#183; shortening old text before summarising it &#183; a quick retry before giving up.</span></div>
+        <div class="r why"><b>why</b><span>On one laptop GPU, the expensive path isn't just slower &#8212; it can force the whole model to be swapped out and back in.</span></div></div>
+    </div>
+  </div>
+  <div class="foot"><span>llmc-code &#183; how it works</span><span>5</span></div>
+</div>
+
+<div data-src="s04" class="slide">
+  <div class="sh"><span class="num">06</span><h2>What happens when you press Enter</h2><span class="tag">the main flow</span></div>
   <div class="body col">
     <figure style="flex:1"><svg viewBox="0 0 760 322" xmlns="http://www.w3.org/2000/svg">
   <!-- row 1 -->
   <rect class="bx-b" x="40" y="26" width="210" height="60" rx="5"/>
   <circle cx="58" cy="42" r="10" fill="#1f5fa8"/><text class="tms" x="58" y="46" text-anchor="middle" style="fill:#fff;font-size:11px;font-weight:700">1</text>
   <text class="tb" x="76" y="46">You type</text>
-  <text class="ts" x="52" y="66">Your text is captured and the</text>
-  <text class="ts" x="52" y="79">request is classified (simple? complex?)</text>
+  <text class="ts" x="52" y="66">we judge: quick question,</text>
+  <text class="ts" x="52" y="79">or real work?</text>
 
   <rect class="bx-b" x="275" y="26" width="210" height="60" rx="5"/>
   <circle cx="293" cy="42" r="10" fill="#1f5fa8"/><text class="tms" x="293" y="46" text-anchor="middle" style="fill:#fff;font-size:11px;font-weight:700">2</text>
-  <text class="tb" x="311" y="46">Context is assembled</text>
-  <text class="ts" x="287" y="66">system prompt + trimmed history</text>
-  <text class="ts" x="287" y="79">+ recalled memories + tool schemas</text>
+  <text class="tb" x="311" y="46">We build the message</text>
+  <text class="ts" x="287" y="66">instructions + trimmed history +</text>
+  <text class="ts" x="287" y="79">anything we looked up + the tool list</text>
 
   <rect class="bx-p" x="510" y="26" width="210" height="60" rx="5"/>
   <circle cx="528" cy="42" r="10" fill="#6a3fa0"/><text class="tms" x="528" y="46" text-anchor="middle" style="fill:#fff;font-size:11px;font-weight:700">3</text>
   <text class="tb" x="546" y="46">Sent to the model</text>
-  <text class="ts" x="522" y="66">streamed over HTTP; a spinner runs</text>
-  <text class="ts" x="522" y="79">while tokens arrive</text>
+  <text class="ts" x="522" y="66">it replies bit by bit; a spinner</text>
+  <text class="ts" x="522" y="79">runs while we wait</text>
 
   <path class="ln-b" d="M250,56 L275,56"/>
   <path class="ln-b" d="M485,56 L510,56"/>
@@ -425,9 +598,9 @@ figcaption{ font-size:8.6pt; color:var(--ink-faint); margin-top:2mm; }
   <!-- row 2 -->
   <rect class="bx-g" x="510" y="110" width="210" height="60" rx="5"/>
   <circle cx="528" cy="126" r="10" fill="#1d7a53"/><text class="tms" x="528" y="130" text-anchor="middle" style="fill:#fff;font-size:11px;font-weight:700">4</text>
-  <text class="tb" x="546" y="130">Reply is decoded</text>
-  <text class="ts" x="522" y="150">plain words? → it's an answer.</text>
-  <text class="ts" x="522" y="163">a tool call? → there's work to do.</text>
+  <text class="tb" x="546" y="130">We read the reply</text>
+  <text class="ts" x="522" y="150">just words? → that's the answer.</text>
+  <text class="ts" x="522" y="163">a request? → there's work to do.</text>
 
   <rect class="bx-a" x="275" y="110" width="210" height="60" rx="5"/>
   <circle cx="293" cy="126" r="10" fill="#a8611f"/><text class="tms" x="293" y="130" text-anchor="middle" style="fill:#fff;font-size:11px;font-weight:700">5</text>
@@ -438,8 +611,8 @@ figcaption{ font-size:8.6pt; color:var(--ink-faint); margin-top:2mm; }
   <rect class="bx-a" x="40" y="110" width="210" height="60" rx="5"/>
   <circle cx="58" cy="126" r="10" fill="#a8611f"/><text class="tms" x="58" y="130" text-anchor="middle" style="fill:#fff;font-size:11px;font-weight:700">6</text>
   <text class="tb" x="76" y="130">The tool runs</text>
-  <text class="ts" x="52" y="150">real Python touches real files;</text>
-  <text class="ts" x="52" y="163">the result is capped and appended</text>
+  <text class="ts" x="52" y="150">real Python, your real files;</text>
+  <text class="ts" x="52" y="163">the result is cut short and added on</text>
 
   <path class="ln-g" d="M510,140 L485,140"/>
   <path class="ln-o" d="M275,140 L250,140"/>
@@ -457,35 +630,34 @@ figcaption{ font-size:8.6pt; color:var(--ink-faint); margin-top:2mm; }
 
   <rect class="bx" x="390" y="232" width="330" height="60" rx="5"/>
   <circle cx="408" cy="248" r="10" fill="#5a6c80"/><text class="tms" x="408" y="252" text-anchor="middle" style="fill:#fff;font-size:11px;font-weight:700">8</text>
-  <text class="tb" x="426" y="252">Rendered, saved, measured</text>
-  <text class="ts" x="402" y="272">Markdown is painted, tok/s is shown, the</text>
-  <text class="ts" x="402" y="285">session is written to disk, history is trimmed.</text>
+  <text class="tb" x="426" y="252">Shown and saved</text>
+  <text class="ts" x="402" y="272">the answer is formatted, the speed shown,</text>
+  <text class="ts" x="402" y="285">the chat saved to disk and trimmed.</text>
 
   <path class="ln" d="M370,262 L390,262"/>
 </svg></figure>
     <div class="wwh">
-      <div class="why"><span class="lbl">Why a loop</span>
-      <p>One question-and-answer round cannot fix a bug. The model must look, act, <b>see what
-      happened</b>, then act again. Each pass it knows strictly more than the last.</p></div>
-      <div class="what"><span class="lbl">What ends it</span>
-      <p>A reply with <b>no tool calls</b>. Plain words mean the model has nothing left to look up
-      &#8212; so its words are the answer. The text is <b>buffered, then rendered once</b> as markdown,
-      so headings and code fences display properly instead of as literal <code>##</code>.</p></div>
-      <div class="how"><span class="lbl">How it stays safe</span>
-      <p>A hard iteration cap (80), plus eight more guards. Writes and shell commands ask you
-      first; reads just run.</p></div>
+      <div class="why"><span class="lbl">Why it loops</span>
+      <p>One question and one answer cannot fix a bug. The model has to <b>look, try something,
+      see what happened, then try again</b>. Every time round, it knows more than it did before.</p></div>
+      <div class="what"><span class="lbl">What makes it stop</span>
+      <p>An answer with <b>no requests in it</b>. If the model just talks, it means it has nothing
+      left to look up &#8212; so what it said <em>is</em> the answer, and we stop.</p></div>
+      <div class="how"><span class="lbl">How it stays under control</span>
+      <p>A hard limit of <b>80 times round</b>, plus eight more stop-conditions. Anything that
+      writes a file or runs a command <b>asks you first</b>. Just reading? It goes ahead.</p></div>
     </div>
   </div>
-  <div class="foot"><span>llmc-code &#183; how it works</span><span>3</span></div>
+  <div class="foot"><span>llmc-code &#183; how it works</span><span>6</span></div>
 </div>
 
-<div class="slide">
-  <div class="sh"><span class="num">04</span><h2>The whole agent, in 20 lines</h2><span class="tag">the loop</span></div>
+<div data-src="s05" class="slide">
+  <div class="sh"><span class="num">07</span><h2>The whole agent, in 20 lines</h2><span class="tag">the loop</span></div>
   <div class="body">
     <div class="left">
-      <p>Strip away 3,000 lines of production hardening and <code>Agent.run()</code> is this.
-      <b>This is a real, working agent</b> &#8212; tested with a scripted fake model.</p>
-      <div class="srcfile">the core of every coding agent ever written</div>
+      <p>Take away 3,000 lines of safety checks and polish, and this is the whole thing. It is not
+      pseudo-code &#8212; this runs, and we tested it with a fake model.</p>
+      <div class="srcfile">the heart of every coding assistant ever built</div>
       <pre><span class="kw">def</span> <span class="fn">agent</span>(task, max_steps=<span class="num">12</span>):
     messages = [{<span class="str">"role"</span>:<span class="str">"system"</span>, <span class="str">"content"</span>: SYSTEM},
                 {<span class="str">"role"</span>:<span class="str">"user"</span>,   <span class="str">"content"</span>: task}]
@@ -515,30 +687,30 @@ figcaption{ font-size:8.6pt; color:var(--ink-faint); margin-top:2mm; }
     <span class="kw">return</span> <span class="str">"Stopped: hit the step limit."</span></pre>
     </div>
     <div class="right">
-      <h3>Five decisions hide in those lines</h3>
+      <h3>Five small decisions, each a big deal</h3>
       <table>
-      <tr><th style="width:42%">The line</th><th>Why it matters</th></tr>
-      <tr><td><code>str(out)[:4000]</code></td><td>An uncapped result poisons the context forever. Cap <b>at the source</b>.</td></tr>
-      <tr><td><code>except &#8594; "ERROR: …"</code></td><td>A tool must <b>never raise</b>. The error is fed back so the model can correct itself.</td></tr>
-      <tr><td><code>range(max_steps)</code></td><td>Without it, one confused model loops all night.</td></tr>
-      <tr><td><code>NEEDS_OK</code></td><td>The human stays in the loop for anything destructive.</td></tr>
-      <tr><td>The system prompt</td><td>Behaviour is configured <b>in English</b>. "Explore before you answer" changes everything.</td></tr>
+      <tr><th style="width:42%">The line</th><th>Why it has to be there</th></tr>
+      <tr><td><code>str(out)[:4000]</code></td><td>Tool output is added to the conversation and re-sent forever after. One giant result ruins the rest of the session. So we cut it short <b>right where it is produced</b>.</td></tr>
+      <tr><td><code>except &#8594; "ERROR: …"</code></td><td>If a tool crashes, the whole thing stops. Instead we turn the failure into a message &#8212; and the model reads it and tries something else.</td></tr>
+      <tr><td><code>range(max_steps)</code></td><td>Without a limit, a confused model keeps trying forever. Your laptop runs all night.</td></tr>
+      <tr><td><code>NEEDS_OK</code></td><td>Anything that could break something asks you first. You stay in charge.</td></tr>
+      <tr><td>The system prompt</td><td>We change how it behaves by <b>writing English</b>, not code. Adding "look before you answer" genuinely changes the quality of the result.</td></tr>
       </table>
-      <div class="key"><span class="t">The error rule is the big one</span>
-      <p>Compare two tool errors:<br>
-      &#8226; <code>"error"</code> &#8594; the model guesses, and death-spirals.<br>
-      &#8226; <code>"path not found; did you mean llmcode/agent.py?"</code> &#8594; fixed next turn.<br>
-      <b>Error messages are prompts.</b> Write them for the model, not for a log file.</p></div>
+      <div class="key"><span class="t">The error message is the important one</span>
+      <p>Compare two ways of reporting the same failure:<br>
+      &#8226; <code>"error"</code> &#8594; the model has nothing to go on. It guesses, and keeps guessing wrong.<br>
+      &#8226; <code>"path not found; did you mean llmcode/agent.py?"</code> &#8594; fixed on the very next try.<br>
+      <b>Your error messages are now instructions to the model.</b> Write them for the model to read, not for a log file nobody opens.</p></div>
     </div>
   </div>
-  <div class="foot"><span>llmc-code &#183; how it works</span><span>4</span></div>
+  <div class="foot"><span>llmc-code &#183; how it works</span><span>7</span></div>
 </div>
 
-<div class="slide">
-  <div class="sh"><span class="num">05</span><h2>Tools — giving the model hands</h2><span class="tag">tools.py</span></div>
+<div data-src="s06" class="slide">
+  <div class="sh"><span class="num">08</span><h2>Tools — giving the model hands</h2><span class="tag">tools.py</span></div>
   <div class="body">
     <div class="left">
-      <h4>A tool is three things</h4>
+      <h4>A tool is just three things</h4>
       <div class="srcfile">llmcode/tools.py &#8212; the Tool dataclass</div>
       <pre class="sm"><span class="kw">Tool</span>(
     name=<span class="str">"read_file"</span>,
@@ -550,43 +722,44 @@ figcaption{ font-size:8.6pt; color:var(--ink-faint); margin-top:2mm; }
     fn=_read_file,                       <span class="cmt"># the Python that runs</span>
     requires_confirmation=<span class="kw">False</span>,         <span class="cmt"># reads are safe</span>
 )</pre>
-      <p><b>1.</b> a schema (documentation <em>for the model</em>) &#183;
-         <b>2.</b> a Python function &#183;
-         <b>3.</b> a safety flag.</p>
-      <div class="key"><span class="t">Tool results have ONE shape</span>
-      <p><code>{"ok": true, "result": …}</code> or <code>{"ok": false, "error": …}</code>.
-      They <b>never raise</b>. A crash would end the turn; an error just teaches the model.</p></div>
-      <div class="note"><span class="t">Schema wording is prompt engineering</span>
-      <p>"Read a file" gets you whole-file reads. "Read a file &#8212; use <code>offset</code>/<code>limit</code>
-      for big files" gets you slices. Same code, different behaviour.</p></div>
+      <p><b>1.</b> a description the model reads &#183; <b>2.</b> the Python that actually runs &#183;
+      <b>3.</b> whether to ask you first.</p>
+      <div class="key"><span class="t">Every tool answers the same way</span>
+      <p>Either <code>{"ok": true, &#8230;}</code> or <code>{"ok": false, "error": &#8230;}</code> &#8212; never a crash.
+      A crash would end your turn. An error just tells the model what went wrong, so it can try something else.</p></div>
+      <div class="note"><span class="t">The description is doing real work</span>
+      <p>Write "Read a file" and the model reads whole files. Write "Read a file &#8212; for big ones,
+      ask for a range" and it starts asking for ranges.<br>
+      <b>Same code underneath. Completely different behaviour.</b></p></div>
     </div>
     <div class="right">
       <h3>The eleven tools</h3>
       <table>
-      <tr><th style="width:30%">Tool</th><th>Purpose &amp; the guard on it</th></tr>
-      <tr><td><code>read_file</code></td><td>Slices via offset/limit; huge-file guard; skip-list</td></tr>
-      <tr><td><code>write_file</code></td><td>Confirm + <b>workspace-confined</b></td></tr>
-      <tr><td><code>edit_file</code></td><td>Exact string replace, with a tolerant fallback</td></tr>
-      <tr><td><code>run_bash</code></td><td>Confirm, timeout, 256 KB output ceiling, <b>secrets scrubbed from child env</b></td></tr>
-      <tr><td><code>glob</code> / <code>grep</code></td><td>Find files / find text — both result-capped</td></tr>
-      <tr><td><code>repo_map</code></td><td>Compact structural index of the repo</td></tr>
-      <tr><td><code>code_search</code></td><td>BM25 + embedding search over your code</td></tr>
-      <tr><td><code>web_fetch</code></td><td><b>SSRF-guarded</b>: no loopback/private IPs, IP-pinned, re-checked per redirect</td></tr>
-      <tr><td><code>spawn_agent</code></td><td>Delegate to a scoped sub-agent</td></tr>
-      <tr><td><code>todo_write</code></td><td>The model's own checklist</td></tr>
+      <tr><th style="width:30%">Tool</th><th>What it does, and what protects you</th></tr>
+      <tr><td><code>read_file</code></td><td>Can read just part of a file. Refuses to dump huge generated files.</td></tr>
+      <tr><td><code>write_file</code></td><td>Asks first. Can only write inside your project folder.</td></tr>
+      <tr><td><code>edit_file</code></td><td>Swaps one exact piece of text. Forgives small spacing differences.</td></tr>
+      <tr><td><code>run_bash</code></td><td>Asks first. Gives up if it hangs. Cuts huge output. <b>Your API keys are never passed to it.</b></td></tr>
+      <tr><td><code>glob</code> / <code>grep</code></td><td>Find files by name / find text inside them. Both stop at a sensible number of results.</td></tr>
+      <tr><td><code>repo_map</code></td><td>A short map of the project: files and what they contain.</td></tr>
+      <tr><td><code>code_search</code></td><td>Search your code by words, or by meaning.</td></tr>
+      <tr><td><code>web_fetch</code></td><td>Fetch a web page &#8212; but it is <b>blocked from reaching anything inside your own network</b>.</td></tr>
+      <tr><td><code>spawn_agent</code></td><td>Hand a job to a separate helper assistant.</td></tr>
+      <tr><td><code>todo_write</code></td><td>Lets the model keep its own to-do list.</td></tr>
       </table>
-      <div class="problem"><span class="t">Two real safety bugs we fixed</span>
-      <p>&#8226; The docs claimed writes were "workspace-confined" &#8212; <b>they weren't</b>. A false
-      security claim is worse than none.<br>
-      &#8226; <code>write_file</code> corrupted files whose <em>content</em> contained tool-call
-      markup. The parser swallowed the next call.</p></div>
+      <div class="problem"><span class="t">Two real bugs this cost us</span>
+      <p>&#8226; Our own docs said writes couldn't escape the project folder. For <code>run_bash</code>
+      that was <b>simply not true</b>. A safety promise that isn't real is worse than no promise,
+      because people relax.<br>
+      &#8226; Writing a file whose <em>contents</em> looked like a tool request corrupted it &#8212; the
+      reader got confused about where the file ended.</p></div>
     </div>
   </div>
-  <div class="foot"><span>llmc-code &#183; how it works</span><span>5</span></div>
+  <div class="foot"><span>llmc-code &#183; how it works</span><span>8</span></div>
 </div>
 
-<div class="slide">
-  <div class="sh"><span class="num">06</span><h2>Custom #1 &#8212; every model speaks a different language</h2>
+<div data-src="s07" class="slide">
+  <div class="sh"><span class="num">09</span><h2>Custom #1 &#8212; every model speaks a different language</h2>
     <span class="tag">providers.py</span></div>
   <div class="body">
     <div class="left center"><figure><svg viewBox="0 0 760 428" xmlns="http://www.w3.org/2000/svg">
@@ -655,41 +828,43 @@ figcaption{ font-size:8.6pt; color:var(--ink-faint); margin-top:2mm; }
     <div class="right">
       <div class="wwh" style="flex-direction:column;margin-top:0">
         <div class="why"><span class="lbl">Why</span>
-        <p>Cloud models are served with one strict tool-call format. Local models come from a
-        dozen labs, each with its own chat template. Many <b>do not emit native tool calls at
-        all</b> &#8212; they print the call as ordinary text and expect the client to notice.</p></div>
+        <p>Cloud models all ask for things the same way. Local models come from a dozen labs, each with
+        its own idea &#8212; and many <b>don't use the proper channel at all</b>. They type the request
+        out as ordinary text and hope you notice.</p></div>
         <div class="what"><span class="lbl">What</span>
-        <p>A parsing layer that recognises <b>one native format plus six text dialects</b> &#8212;
-        DeepSeek, Qwen/Hermes, Mistral, Llama (two spellings), Qwen-XML, and a fenced-JSON
-        protocol we invented for models that support nothing.</p></div>
+        <p>A reader that understands <b>seven ways of saying the same thing</b>: one proper format, five
+        that model families made up, and one we invented for models that can do none of them.</p></div>
         <div class="how"><span class="lbl">How</span>
-        <p>Detect the dialect by its marker &#8594; extract name and body &#8594; coerce to a Python
-        dict. Everything downstream sees <b>one shape</b> and never learns a dialect existed.</p></div>
+        <p>Spot the style, pull out the name and details, turn it into one plain Python value.
+        <b>The rest of the program only ever sees one shape.</b></p></div>
       </div>
       <div class="problem" style="margin-top:3mm"><span class="t">The bug that forced this</span>
-      <p><code>write_file</code> failed for weeks with <em>"requires a string 'path'"</em>.
-      Two stacked causes: qwen emitted <b>XML parameters, not JSON</b>, so the native
-      <code>arguments</code> field arrived empty &#8212; and it used <b>Claude's</b> parameter names.</p></div>
-      <div class="note"><span class="t">The hard part: where does a value end?</span>
-      <p>Models often open <code>&lt;parameter=content&gt;</code>, dump an entire Python file, and
-      <b>never close the tag</b>. So a value must end at whichever terminator comes first.
-      Overshoot and you write the <em>next tool call's markup</em> into the user's source file.
-      That is exactly the write-corruption bug we fixed.</p></div>
+      <p>Writing files did not work for <em>weeks</em>. Always the same error: <em>"requires a string
+      'path'"</em>.</p>
+      <p>Two problems stacked up. The model wrote its request in a style we couldn't read yet &#8212;
+      <b>and</b> it called the option <code>file_path</code>, because that is what it saw most in
+      training, while our tool called it <code>path</code>.</p></div>
+      <div class="note"><span class="t">The genuinely hard part: where does the text stop?</span>
+      <p>A model will often say "here comes the file content", paste an entire Python file, and then
+      <b>never say where it ended</b>. So we have to guess the end point.</p>
+      <p>Guess too early and half the file is lost. Guess too late and <b>the next request gets
+      written into the user's source file</b>. That second one actually happened.</p></div>
     </div>
   </div>
-  <div class="foot"><span>llmc-code &#183; how it works</span><span>6</span></div>
+  <div class="foot"><span>llmc-code &#183; how it works</span><span>9</span></div>
 </div>
 
-<div class="slide">
-  <div class="sh"><span class="num">07</span><h2>Custom #2 &#8212; wrong argument names, and refusing to guess</h2>
+<style>#s-alias li{font-size:10pt;margin-bottom:1.2mm}#s-alias td{padding:1.3mm 2.5mm}#s-alias th{padding:1.3mm 2.5mm}</style>
+<div data-src="s08" id="s-alias" class="slide">
+  <div class="sh"><span class="num">10</span><h2>Custom #2 &#8212; wrong argument names, and refusing to guess</h2>
     <span class="tag">tools.py</span></div>
   <div class="body">
     <div class="left">
-      <p>Even once the call is extracted, the <b>names may be wrong</b>. Local models are trained
-      on Claude's and OpenAI's docs, so they call our <code>path</code> parameter
-      <code>file_path</code>, and our <code>old</code> parameter <code>old_string</code>.</p>
+      <p>Even once we can read the request, the <b>option names are often wrong</b>. Local models learned
+      from other tools' docs, so they use <em>those</em> names &#8212; <code>file_path</code> where we
+      say <code>path</code>.</p>
       <div class="srcfile">llmcode/tools.py &#8212; the alias table (excerpt)</div>
-      <pre class="sm">_ARG_ALIASES = {
+      <pre class="sm" style="font-size:7pt">_ARG_ALIASES = {
   <span class="str">"read_file"</span>: {
      <span class="str">"path"</span>: (<span class="str">"file_path"</span>, <span class="str">"filepath"</span>, <span class="str">"filename"</span>, <span class="str">"file"</span>, <span class="str">"target_file"</span>)},
   <span class="str">"write_file"</span>: {
@@ -702,14 +877,14 @@ figcaption{ font-size:8.6pt; color:var(--ink-faint); margin-top:2mm; }
      <span class="str">"old"</span>: (<span class="str">"old_string"</span>, <span class="str">"old_str"</span>, <span class="str">"search"</span>, <span class="str">"find"</span>),
      <span class="str">"new"</span>: (<span class="str">"new_string"</span>, <span class="str">"new_str"</span>, <span class="str">"replace"</span>)},
 }</pre>
-      <div class="key"><span class="t">Read that comment again</span>
-      <p>An alias table is a <b>guessing machine</b>. The author deliberately left out a plausible
-      alias <em>because the failure mode was destructive</em>. Knowing which guess not to make is
-      the whole skill.</p></div>
+      <div class="key"><span class="t">Read that comment in the middle again</span>
+      <p>This table <b>guesses what the model meant</b>. One obvious-looking guess was deliberately left
+      out, because getting it wrong would <b>overwrite a whole file with a two-line fragment</b>.
+      Knowing which guesses <em>not</em> to make is the whole skill.</p></div>
     </div>
     <div class="right">
-      <h3>The rule that makes aliasing safe</h3>
-      <pre class="sm"><span class="kw">for</span> canonical, syns <span class="kw">in</span> aliases.items():
+      <h3>The rule that keeps the guessing safe</h3>
+      <pre class="sm" style="font-size:7pt"><span class="kw">for</span> canonical, syns <span class="kw">in</span> aliases.items():
     cur = args.get(canonical)
     <span class="kw">if</span> cur <span class="kw">not in</span> (<span class="kw">None</span>, <span class="str">""</span>):
         <span class="kw">continue</span>      <span class="cmt"># model gave a real value — authoritative</span>
@@ -718,89 +893,91 @@ figcaption{ font-size:8.6pt; color:var(--ink-faint); margin-top:2mm; }
     <span class="kw">for</span> syn <span class="kw">in</span> syns:    <span class="cmt"># else backfill from the first alias present</span>
         …</pre>
       <ul>
-        <li><b>An alias may only fill a blank</b> — never overrule what the model actually said.</li>
-        <li><b>Explicit empty wins.</b> <code>content: ""</code> means "create an empty file".</li>
-        <li><b>Copy-on-write</b> — so the confirmation prompt you saw and the arguments that ran
-        can never drift apart.</li>
+        <li><b>A guess can only fill in a blank.</b> It can never overrule something the model actually said.</li>
+        <li><b>"Nothing" is a real answer.</b> Empty content means "make an empty file" &#8212; that is an instruction, not a gap to fill.</li>
+        <li><b>Nothing is touched unless we actually fix something</b> &#8212; so what you were shown in the confirmation prompt is exactly what runs.</li>
       </ul>
-      <h3>And two places we deliberately <em>stop</em></h3>
+      <h3>And two places we deliberately refuse to guess</h3>
       <table>
-      <tr><th style="width:38%">Situation</th><th>What we do</th></tr>
-      <tr><td>Two tool-shaped blocks in one reply</td><td><b>Refuse to run any.</b> Executing only
-      the first silently drops the rest &#8212; the model would never learn its second instruction
-      vanished.</td></tr>
-      <tr><td>A block inside prose or a <code>&lt;think&gt;</code> section</td><td><b>Ignore it.</b>
-      Otherwise the model <em>explaining</em> <code>rm -rf</code> would actually run it.</td></tr>
+      <tr><th style="width:38%">What happened</th><th>What we do about it</th></tr>
+      <tr><td>Two tool-shaped blocks in one reply</td><td><b>Run none of them.</b> If we ran only the first, the second would vanish silently and the
+      model would never find out &#8212; it would carry on believing both had happened.</td></tr>
+      <tr><td>A block inside prose or a <code>&lt;think&gt;</code> section</td><td><b>Ignore it.</b> Otherwise, a model <em>explaining</em> how <code>rm -rf</code> works would
+      actually delete your files.</td></tr>
       </table>
-      <div class="key"><span class="t">The transferable rule</span>
-      <p><b>Be liberal in what you accept, strict in what you execute.</b> A missed call costs one
-      turn. A wrong call costs your source file.</p></div>
+      <div class="key"><span class="t">The rule worth taking away</span>
+      <p><b>Be generous about what you try to understand. Be strict about what you actually do.</b></p>
+      <p>Misunderstanding costs one wasted turn. Acting on a misunderstanding costs the user's files.</p></div>
     </div>
   </div>
-  <div class="foot"><span>llmc-code &#183; how it works</span><span>7</span></div>
+  <div class="foot"><span>llmc-code &#183; how it works</span><span>10</span></div>
 </div>
 
-<div class="slide">
-  <div class="sh"><span class="num">08</span><h2>Custom #3 &#8212; why long chats kill a local model</h2>
-    <span class="tag">context management</span></div>
+<style>#s-slow td{padding:1.3mm 2.5mm}#s-slow th{padding:1.3mm 2.5mm}#s-slow .card{padding:2.4mm}</style>
+<div data-src="s09" id="s-slow" class="slide">
+  <div class="sh"><span class="num">11</span><h2>Why long chats get painfully slow</h2>
+    <span class="tag">keeping the chat small</span></div>
   <div class="body">
     <div class="left">
-      <div class="wwh" style="flex-direction:column;margin-top:0">
-        <div class="why"><span class="lbl">Why</span>
-        <p>Every turn re-sends the <b>entire</b> conversation. Answering has two phases:
-        <b>prefill</b> (read the whole prompt &#8212; cost grows with length) and <b>decode</b>
-        (write the reply &#8212; roughly constant). On a laptop GPU, prefill is where the time goes.</p></div>
-        <div class="what"><span class="lbl">What</span>
-        <p>A per-message context budget, plus machinery to keep history under it &#8212; so the
-        model sees <b>what this message needs, and nothing else</b>.</p></div>
-        <div class="how"><span class="lbl">How</span>
-        <p>Four levers, cheapest first: <b>measure &#8594; budget &#8594; trim &#8594; compact</b>.</p></div>
-      </div>
-      <div class="analogy" style="margin-top:3mm"><span class="t">Analogy</span>
-      <p>A colleague with <b>total amnesia between sentences</b>. To answer, they must re-read the
-      entire meeting transcript &#8212; every time. Decode speed is how fast they talk. Prefill is
-      how long they sit re-reading. Fifty pages of stale notes doesn't slow their speech; it makes
-      them silent for two minutes first.</p></div>
+      <div class="analogy" style="margin-top:0"><span class="t">Picture this</span>
+      <p>Imagine a colleague who <b>forgets everything between sentences</b>. To answer your next
+      question they must re-read the <em>entire</em> transcript from the start. Every single time.</p>
+      <p>That is exactly a language model. Every question re-sends the whole conversation, and it
+      reads all of it before writing a word.</p></div>
+      <h3>So there are two speeds, not one</h3>
+      <table>
+      <tr><th style="width:26%">Step</th><th>What happens</th><th style="width:26%">How long</th></tr>
+      <tr><td><b>Reading</b><br><span class="ts">before it says anything</span></td>
+          <td>The instructions, every past message, every tool result.</td>
+          <td><b>Grows with the chat.</b> This is the part that hurts.</td></tr>
+      <tr><td><b>Writing</b><br><span class="ts">the reply itself</span></td>
+          <td>It produces the answer, word by word.</td>
+          <td>Roughly the same speed always (~95 words/sec here).</td></tr>
+      </table>
+      <div class="key"><span class="t">The thing people get wrong</span>
+      <p>Old notes don't make it <em>type</em> slower. They make it <b>sit in silence first</b>. Measure
+      only typing speed and everything looks fine while the user stares at nothing.</p></div>
     </div>
     <div class="right">
-      <div class="problem"><span class="t">The measurement that started this work</span>
-      <p>A user typed <em>"what happened?"</em> &#8212; four words. The program sent
-      <b>55,000 tokens</b> of stale history. The reply took <b>~20 minutes</b>.</p>
-      <p>Auditing showed tool outputs were <b>56%</b> of the history; counting file content stored
-      inside past <code>write_file</code> <em>calls</em>, over <b>90%</b>.</p></div>
+      <div class="problem" style="margin-top:0"><span class="t">The measurement that started all this</span>
+      <p>Someone typed <em>"what happened?"</em> &#8212; four words.</p>
+      <p>The program sent <b>55,000 words of old conversation</b> along with it. The reply took
+      <b>about 20 minutes</b>.</p>
+      <p><b>Over half</b> of it was old tool output &#8212; files read six steps ago that nobody needed
+      any more. Counting file contents saved inside old write requests: <b>over 90%</b>.</p></div>
       <div style="display:flex;gap:4mm;margin:4mm 0">
-        <div class="card stat"><div class="n">55k &#8594; 5k</div><div class="l">tokens sent<br>for the same question</div></div>
-        <div class="card stat"><div class="n">20m &#8594; 24s</div><div class="l">wall clock<br>same model, same laptop</div></div>
+        <div class="card stat"><div class="n">55k &#8594; 5k</div><div class="l">words sent, same question</div></div>
+        <div class="card stat"><div class="n">20 min &#8594; 24 s</div><div class="l">time to answer, same laptop</div></div>
       </div>
-      <h3>The four levers</h3>
+      <h3>Four ways to fix it, cheapest first</h3>
       <table>
-      <tr><th style="width:22%">Lever</th><th>What it does</th><th style="width:24%">Cost</th></tr>
-      <tr><td><b>Measure</b></td><td><code>chars // 4</code> &#8212; no tokenizer dependency</td><td>microseconds</td></tr>
-      <tr><td><b>Budget</b></td><td>Size the prompt to the request (&#215;1&#8211;3; trivial gets half)</td><td>microseconds</td></tr>
-      <tr><td><b>Trim</b></td><td>Old tool results &#8594; 500 chars, deterministically</td><td>milliseconds</td></tr>
-      <tr><td><b>Compact</b></td><td>Model-written summary of old turns</td><td>a whole model call</td></tr>
+      <tr><th style="width:20%">Step</th><th>What it does</th><th style="width:26%">What it costs</th></tr>
+      <tr><td><b>1. Measure</b></td><td>Know how big the chat is right now.</td><td>Nothing</td></tr>
+      <tr><td><b>2. Budget</b></td><td>Decide how much history this question deserves.</td><td>Nothing</td></tr>
+      <tr><td><b>3. Shorten</b></td><td>Cut down old tool results nobody needs any more.</td><td>Almost nothing</td></tr>
+      <tr><td><b>4. Summarise</b></td><td>Ask the model to condense old turns into a short note.</td><td>A whole extra round trip</td></tr>
       </table>
-      <div class="note"><span class="t">Bias your heuristics safely</span>
-      <p>The request classifier <b>deliberately errs upward</b>: when unsure, treat it as a real
-      task. Misjudging a task as trivial <b>breaks the answer</b>; misjudging trivia as a task
-      just wastes a little time.</p></div>
+      <div class="note"><span class="t">Why guess upwards, not downwards</span>
+      <p>Calling something "just a quick question" saves time &#8212; but getting that wrong <b>breaks the
+      answer</b>, while guessing the other way only wastes seconds. So when unsure, we assume
+      <b>real work</b>.</p></div>
     </div>
   </div>
-  <div class="foot"><span>llmc-code &#183; how it works</span><span>8</span></div>
+  <div class="foot"><span>llmc-code &#183; how it works</span><span>11</span></div>
 </div>
 
-<div class="slide">
-  <div class="sh"><span class="num">09</span><h2>Custom #4 &#8212; trimming and compaction</h2>
-    <span class="tag">agent.py</span></div>
+<div data-src="s10" class="slide">
+  <div class="sh"><span class="num">12</span><h2>Shortening, and summarising</h2>
+    <span class="tag">two ways to shrink a chat</span></div>
   <div class="body col">
-    <figure style="margin:0 auto 2mm auto;max-width:83%"><svg viewBox="0 0 760 368" xmlns="http://www.w3.org/2000/svg">
+    <figure style="margin:0 auto 2mm auto;width:76%"><svg viewBox="0 0 760 316" xmlns="http://www.w3.org/2000/svg">
   <!-- col 1 -->
-  <text class="tt" x="118" y="16" text-anchor="middle">raw history</text>
-  <text class="ts" x="118" y="32" text-anchor="middle" style="font-weight:600">~55,000 tok</text>
+  <text class="tt" x="118" y="16" text-anchor="middle">the raw chat</text>
+  <text class="ts" x="118" y="32" text-anchor="middle" style="font-weight:600">~55,000 words</text>
   <rect class="bx-d" x="28" y="42" width="180" height="16" rx="2"/><text class="tmz" x="36" y="54">system prompt</text>
   <rect class="bx-b" x="28" y="60" width="180" height="14" rx="2"/><text class="tmz" x="36" y="71">user: fix the parser</text>
   <rect class="bx" x="28" y="76" width="180" height="14" rx="2"/><text class="tmz" x="36" y="87">assistant: tool_calls</text>
-  <rect class="bx-a" x="28" y="92" width="180" height="58" rx="2"/><text class="tmz" x="36" y="106">tool: read_file config.py</text><text class="tmz" x="36" y="126" style="fill:#a8611f">768 lines, verbatim</text><text class="tmz" x="36" y="142" style="fill:#a8611f">re-sent every turn</text>
+  <rect class="bx-a" x="28" y="92" width="180" height="58" rx="2"/><text class="tmz" x="36" y="106">tool: read_file config.py</text><text class="tmz" x="36" y="126" style="fill:#a8611f">all 768 lines of it</text><text class="tmz" x="36" y="142" style="fill:#a8611f">re-sent on every turn</text>
   <rect class="bx" x="28" y="152" width="180" height="14" rx="2"/><text class="tmz" x="36" y="163">assistant: tool_calls</text>
   <rect class="bx-a" x="28" y="168" width="180" height="46" rx="2"/><text class="tmz" x="36" y="182">tool: run_bash pytest</text><text class="tmz" x="36" y="202" style="fill:#a8611f">full stdout</text>
   <rect class="bx" x="28" y="216" width="180" height="14" rx="2"/><text class="tmz" x="36" y="227">assistant: tool_calls</text>
@@ -811,165 +988,175 @@ figcaption{ font-size:8.6pt; color:var(--ink-faint); margin-top:2mm; }
   <text class="tt" x="230" y="158" text-anchor="middle" fill="#a8611f">trim</text>
 
   <!-- col 2 -->
-  <text class="tt" x="340" y="16" text-anchor="middle">after the per-turn trim</text>
-  <text class="ts" x="340" y="32" text-anchor="middle" style="font-weight:600">~12,000 tok</text>
+  <text class="tt" x="340" y="16" text-anchor="middle">after shortening</text>
+  <text class="ts" x="340" y="32" text-anchor="middle" style="font-weight:600">~12,000 words</text>
   <rect class="bx-d" x="250" y="42" width="180" height="16" rx="2"/><text class="tmz" x="258" y="54">system prompt</text>
   <rect class="bx-b" x="250" y="60" width="180" height="14" rx="2"/><text class="tmz" x="258" y="71">user: fix the parser</text>
   <rect class="bx" x="250" y="76" width="180" height="14" rx="2"/><text class="tmz" x="258" y="87">assistant: tool_calls</text>
-  <rect class="bx-g" x="250" y="92" width="180" height="26" rx="2"/><text class="tmz" x="258" y="104">tool: 500 chars +</text><text class="tmz" x="258" y="115" style="fill:#1d7a53">&#10218;ctx-trimmed&#10219; note</text>
+  <rect class="bx-g" x="250" y="92" width="180" height="26" rx="2"/><text class="tmz" x="258" y="104">tool: first few lines,</text><text class="tmz" x="258" y="115" style="fill:#1d7a53">plus "ask if you need more"</text>
   <rect class="bx" x="250" y="120" width="180" height="14" rx="2"/><text class="tmz" x="258" y="131">assistant: tool_calls</text>
-  <rect class="bx-g" x="250" y="136" width="180" height="26" rx="2"/><text class="tmz" x="258" y="148">tool: 500 chars +</text><text class="tmz" x="258" y="159" style="fill:#1d7a53">&#10218;ctx-trimmed&#10219; note</text>
+  <rect class="bx-g" x="250" y="136" width="180" height="26" rx="2"/><text class="tmz" x="258" y="148">tool: first few lines,</text><text class="tmz" x="258" y="159" style="fill:#1d7a53">plus "ask if you need more"</text>
   <rect class="bx" x="250" y="164" width="180" height="14" rx="2"/><text class="tmz" x="258" y="175">assistant: tool_calls</text>
-  <rect class="bx-g" x="250" y="180" width="180" height="26" rx="2"/><text class="tmz" x="258" y="192">tool: 500 chars +</text><text class="tmz" x="258" y="203" style="fill:#1d7a53">&#10218;ctx-trimmed&#10219; note</text>
+  <rect class="bx-g" x="250" y="180" width="180" height="26" rx="2"/><text class="tmz" x="258" y="192">tool: first few lines,</text><text class="tmz" x="258" y="203" style="fill:#1d7a53">plus "ask if you need more"</text>
   <rect class="bx-b" x="250" y="208" width="180" height="16" rx="2"/><text class="tmz" x="258" y="220">user: what happened?</text>
-  <text class="ts" x="340" y="244" text-anchor="middle">structure identical &#183; ids intact</text>
-  <text class="ts" x="340" y="258" text-anchor="middle">no model call &#183; instant</text>
+  <text class="ts" x="340" y="244" text-anchor="middle">nothing removed, just made shorter</text>
+  <text class="ts" x="340" y="258" text-anchor="middle">no round trip &#8212; instant</text>
 
   <path class="ln-p" d="M436,92 L468,92"/>
-  <text class="tt" x="450" y="84" text-anchor="middle" fill="#6a3fa0">compact</text>
+  
 
   <!-- col 3 -->
-  <text class="tt" x="562" y="16" text-anchor="middle">after compaction</text>
-  <text class="ts" x="562" y="32" text-anchor="middle" style="font-weight:600">~5,000 tok</text>
+  <text class="tt" x="562" y="16" text-anchor="middle">after summarising</text>
+  <text class="ts" x="562" y="32" text-anchor="middle" style="font-weight:600">~5,000 words</text>
   <rect class="bx-d" x="472" y="42" width="180" height="16" rx="2"/><text class="tmz" x="480" y="54">system prompt</text>
   <rect class="bx-p" x="472" y="60" width="180" height="60" rx="2"/>
-  <text class="tmz" x="480" y="74" style="fill:#6a3fa0">system: SUMMARY</text>
+  <text class="tmz" x="480" y="74" style="fill:#6a3fa0">a short note:</text>
   <text class="tmz" x="480" y="88">decisions made, files</text>
   <text class="tmz" x="480" y="100">touched, open tasks,</text>
-  <text class="tmz" x="480" y="112">key facts — model-written</text>
+  <text class="tmz" x="480" y="112">— written by the model itself</text>
   <rect class="bx-b" x="472" y="122" width="180" height="16" rx="2"/><text class="tmz" x="480" y="134">user: what happened?</text>
-  <text class="ts" x="562" y="158" text-anchor="middle">keep_turns=1: only the last</text>
-  <text class="ts" x="562" y="172" text-anchor="middle">exchange survives verbatim</text>
+  <text class="ts" x="562" y="158" text-anchor="middle">only the most recent exchange</text>
+  <text class="ts" x="562" y="172" text-anchor="middle">is kept word for word</text>
   <rect class="bx-r" x="472" y="188" width="180" height="76" rx="3"/>
-  <text class="tt" x="482" y="204" fill="#a8324a">and if it barely helped?</text>
-  <text class="tmz" x="482" y="220">saving &lt; 3% or &lt; 128 tok</text>
-  <text class="tmz" x="482" y="234">&#8594; roll back to the snapshot</text>
-  <text class="tmz" x="482" y="248">&#8594; don't retry until +10%</text>
-  <text class="tmz" x="482" y="260">(churn would cost more)</text>
+  <text class="tt" x="482" y="204" fill="#a8324a">what if it barely helped?</text>
+  <text class="tmz" x="482" y="220">if it saved almost nothing</text>
+  <text class="tmz" x="482" y="234">&#8594; put the original back</text>
+  <text class="tmz" x="482" y="248">&#8594; don't try again until the</text>
+  <text class="tmz" x="482" y="260">chat has grown noticeably</text>
 </svg></figure>
     <div class="two" style="margin-bottom:2mm">
-      <div class="note"><span class="t">trim &#8212; free, every turn</span>
-      <p>Old tool <b>results</b> cut to 500 chars; file content inside old tool <b>calls</b> cut to 160.<br>Three invariants: <b>idempotent</b> (a marker stops it re-cutting its own note), <b>structure-preserving</b> (ids stay paired), <b>actionable</b> (the note says how to get the rest back).</p></div>
-      <div class="note"><span class="t">compact &#8212; costs a model call</span>
-      <p>The model summarises old turns into one note: decisions, files touched, open tasks.
-      <b>Not truncation</b> &#8212; deleting messages loses the decisions inside them.</p></div>
-      <div class="problem"><span class="t">compaction can backfire</span>
-      <p>A weak model sometimes writes a summary as long as the original. So: <b>snapshot first</b>,
-      require a <b>&#8805;3% saving</b>, otherwise <b>roll back</b> and don't retry until history
-      grows 10%. Rewriting history also costs the prompt cache &#8212; see the next slide.</p></div>
+      <div class="note"><span class="t">Shortening &#8212; free, and it happens every turn</span>
+      <p>Old tool results get cut to their first few lines. A note is left saying <em>"there was
+      more here &#8212; ask again if you need it."</em></p>
+      <p>Two details matter. The note <b>explains itself</b>, so the model re-reads the file rather
+      than inventing what was in it. And anything already shortened is <b>left alone next time</b>
+      &#8212; otherwise each turn would nibble off another piece until the note ate itself.</p></div>
+      <div class="note"><span class="t">Summarising &#8212; costs a round trip</span>
+      <p>When shortening isn't enough, we ask the model to write <b>one short note</b> covering the
+      old turns: decisions made, files touched, what's still to do.</p>
+      <p>This is <b>not</b> deleting old messages. Deleting is one line of code &#8212; and it throws away
+      every decision you made together.</p></div>
+      <div class="problem"><span class="t">Summarising can backfire &#8212; so we check</span>
+      <p>A small model sometimes writes a summary <b>as long as the thing it summarised</b>.</p>
+      <p>So we keep a copy first. If it didn't save at least a few percent, we <b>put the original
+      back</b>. A fix that doesn't fix anything still costs you time.</p></div>
     </div>
   </div>
-  <div class="foot"><span>llmc-code &#183; how it works</span><span>9</span></div>
+  <div class="foot"><span>llmc-code &#183; how it works</span><span>12</span></div>
 </div>
 
-<div class="slide">
-  <div class="sh"><span class="num">10</span><h2>Custom #5 &#8212; CAG: free speed from doing nothing</h2>
-    <span class="tag">cache-augmented generation</span></div>
+<div data-src="s11" class="slide">
+  <div class="sh"><span class="num">13</span><h2>Free speed: never make it re-read</h2>
+    <span class="tag">re-using the server's work</span></div>
   <div class="body col">
     <div class="wwh" style="margin:0 0 4mm 0">
-      <div class="why"><span class="lbl">Why</span>
-      <p>The server keeps a <b>KV cache</b>: state for tokens it already read. If your next request starts with the <b>byte-identical</b> prefix, prefill for all of it is <b>skipped</b> &#8212; most of your waiting time, for free.</p></div>
-      <div class="what"><span class="lbl">What</span>
-      <p>One rule, enforced everywhere: <b>history is append-only</b>. Never insert, never reorder,
-      never rewrite the front. <br><em>RAG makes prompts smarter; CAG makes them cheaper.</em></p></div>
-      <div class="how"><span class="lbl">How</span>
-      <p>Anything dynamic &#8212; recalled memories, per-turn hints &#8212; is appended to a
-      <b>copy</b> of the list, at the very end, on the first call only. It rides the uncached tail,
-      which costs nothing.</p></div>
+      <div class="why"><span class="lbl">Why this works</span>
+      <p>The server <b>remembers the reading it already did</b>. If your next message starts with
+      exactly the same text as the last one, it can skip straight past all of it &#8212; which is
+      most of your waiting time, for free.</p>
+      <p class="ts">The industry name for this is prompt caching, or <b>CAG</b>.</p></div>
+      <div class="what"><span class="lbl">What we do</span>
+      <p>One rule, everywhere in the code: <b>only ever add to the end of the conversation</b>.
+      Never insert in the middle. Never reorder. Never edit what came before.</p></div>
+      <div class="how"><span class="lbl">How the extras fit in</span>
+      <p>Anything temporary &#8212; things we looked up for this question, a hint for this message
+      &#8212; is stuck on the <b>very end</b>, and only on the first try. The end was never cached
+      anyway, so it costs nothing.</p></div>
     </div>
-    <figure style="margin:0 auto 2mm auto;max-width:88%"><svg viewBox="0 0 760 268" xmlns="http://www.w3.org/2000/svg">
-  <text class="tt" x="20" y="16">&#10003; append-only &#8212; what we do</text>
+    <figure style="margin:0 auto 2mm auto;width:84%"><svg viewBox="0 0 760 268" xmlns="http://www.w3.org/2000/svg">
+  <text class="tt" x="20" y="16">&#10003; add it to the END &#8212; what we do</text>
   <rect x="20" y="26" width="420" height="30" rx="3" fill="#ecf8f2" stroke="#1d7a53" stroke-width="1.4"/>
-  <text class="tms" x="30" y="46">system + turns 1…9   (unchanged, byte-for-byte)</text>
+  <text class="tms" x="30" y="46">everything so far, exactly as it was</text>
   <rect x="442" y="26" width="120" height="30" rx="3" fill="#eef4fc" stroke="#1f5fa8" stroke-width="1.4"/>
   <text class="tms" x="452" y="46">new user msg</text>
   <rect x="564" y="26" width="130" height="30" rx="3" fill="#f4eefc" stroke="#6a3fa0" stroke-width="1.4" stroke-dasharray="4 3"/>
   <text class="tms" x="574" y="46">recall note</text>
-  <text class="tt" x="230" y="72" text-anchor="middle" fill="#1d7a53">prefill SKIPPED &#8212; served from the KV cache</text>
-  <text class="tt" x="568" y="72" text-anchor="middle" fill="#1f5fa8">only this is re-read</text>
+  <text class="tt" x="230" y="72" text-anchor="middle" fill="#1d7a53">the server SKIPS re-reading all of this</text>
+  <text class="tt" x="568" y="72" text-anchor="middle" fill="#1f5fa8">only this is new</text>
   <path class="ln-g" d="M20,80 L438,80"/>
   <path class="ln-b" d="M442,80 L692,80"/>
 
-  <text class="tt" x="20" y="130" fill="#a8324a">&#10007; insert-in-the-middle &#8212; the tempting mistake</text>
+  <text class="tt" x="20" y="130" fill="#a8324a">&#10007; squeeze it into the MIDDLE &#8212; the tempting mistake</text>
   <rect x="20" y="140" width="150" height="30" rx="3" fill="#ecf8f2" stroke="#1d7a53" stroke-width="1.4"/>
-  <text class="tms" x="30" y="160">system + turns 1…4</text>
+  <text class="tms" x="30" y="160">the first few messages</text>
   <rect x="172" y="140" width="130" height="30" rx="3" fill="#fdeef1" stroke="#a8324a" stroke-width="1.4"/>
   <text class="tms" x="182" y="160">recall note</text>
   <rect x="304" y="140" width="258" height="30" rx="3" fill="#fdeef1" stroke="#a8324a" stroke-width="1.4"/>
-  <text class="tms" x="314" y="160">turns 5…9  (same text, new position)</text>
+  <text class="tms" x="314" y="160">the same messages, now in a different place</text>
   <rect x="564" y="140" width="130" height="30" rx="3" fill="#eef4fc" stroke="#1f5fa8" stroke-width="1.4"/>
   <text class="tms" x="574" y="160">new user msg</text>
   <text class="tt" x="95" y="186" text-anchor="middle" fill="#1d7a53">cached</text>
-  <text class="tt" x="430" y="186" text-anchor="middle" fill="#a8324a">everything from here on must be re-read from scratch</text>
+  <text class="tt" x="430" y="186" text-anchor="middle" fill="#a8324a">everything from here must be read again from scratch</text>
   <path class="ln-g" d="M20,194 L168,194"/>
   <path class="ln-r" d="M172,194 L692,194"/>
 
-  <text class="ts" x="380" y="226" text-anchor="middle">One inserted message near the front throws away the cache for every token after it &#8212;</text>
-  <text class="ts" x="380" y="242" text-anchor="middle">even though not one of those tokens changed. Position is part of the cache key.</text>
+  <text class="ts" x="380" y="226" text-anchor="middle">One message added near the front throws away the saved work for everything after it &#8212;</text>
+  <text class="ts" x="380" y="242" text-anchor="middle">even though not one of those words changed. Where it sits matters, not just what it says.</text>
 </svg></figure>
     <div class="two">
-      <div class="key"><span class="t">The same discipline, three more places</span>
-      <p>&#8226; Text-only messages keep <code>content</code> a plain <b>string</b> (attaching an
-      image makes it a list &#8212; a different prefix).<br>
-      &#8226; Tool schemas are <b>memoised</b>, so key order can't drift.<br>
-      &#8226; A useless compaction is <b>rolled back</b> &#8212; the code would rather carry extra
-      tokens than break the cache.</p></div>
-      <div class="note"><span class="t">Why the recall note is never stored</span>
-      <p>Keeping it out of <code>self.messages</code> wins three times: the prefix stays cacheable,
-      it is <b>never written to the session file</b> (so it can't leak), and compaction can never
-      mangle it &#8212; because it was never there.</p></div>
+      <div class="key"><span class="t">Both pictures contain the same information</span>
+      <p>The only difference is <b>where the new note was put</b>. Put it at the end and the server
+      skips almost everything. Put it in the middle and the server has to re-read every word after
+      it &#8212; even though none of those words changed.</p></div>
+      <div class="note"><span class="t">The same rule shows up three more times</span>
+      <p>&#8226; A message with no picture stays plain text, because attaching one changes its shape.<br>
+      &#8226; The tool descriptions are built once and re-used, so their order can't drift.<br>
+      &#8226; A summary that didn't help gets undone &#8212; the code would rather carry extra words
+      than disturb the beginning.</p></div>
     </div>
   </div>
-  <div class="foot"><span>llmc-code &#183; how it works</span><span>10</span></div>
+  <div class="foot"><span>llmc-code &#183; how it works</span><span>13</span></div>
 </div>
 
-<div class="slide">
-  <div class="sh"><span class="num">11</span><h2>Custom #6 &#8212; RAG: remembering without re-reading</h2>
+<div data-src="s12" class="slide">
+  <div class="sh"><span class="num">14</span><h2>Custom #6 &#8212; RAG: remembering without re-reading</h2>
     <span class="tag">memory.py</span></div>
   <div class="body col">
     <div class="wwh" style="margin:0 0 3mm 0">
       <div class="why"><span class="lbl">Why</span>
-      <p>The last slide said: send less history. But some of it matters &#8212; <em>"we decided to
-      use BM25 by default"</em>. Drop it and the agent is forgetful; keep it all and it is slow.</p></div>
+      <p>We just said: send less history. But some of it genuinely matters. Drop it and the assistant
+      is forgetful; keep it all and it is slow.</p></div>
       <div class="what"><span class="lbl">What</span>
-      <p>Put everything in a <b>store</b>, <b>search</b> it with the current question, and put only
-      the <b>few matching pieces</b> in the prompt. That is <b>RAG</b> &#8212; retrieval-augmented
-      generation.</p></div>
+      <p>Keep everything in a <b>store</b>. <b>Search</b> it with whatever was just asked. Send only the
+      <b>few pieces that matched</b>. The usual name for this is <b>RAG</b>.</p></div>
       <div class="how"><span class="lbl">How</span>
-      <p>Two search engines, both hand-written: <b>BM25</b> for exact words, <b>embeddings</b> for
-      meaning. Results are fused and injected as one ephemeral note.</p></div>
+      <p>Two search engines, both written by hand: one for <b>exact words</b>, one for <b>meaning</b>.
+      The results are merged and attached as a single note.</p></div>
     </div>
-    <figure style="margin-bottom:2mm"><svg viewBox="0 0 760 210" xmlns="http://www.w3.org/2000/svg">
+    <figure style="margin:0 auto 2mm auto;width:78%"><svg viewBox="0 0 760 210" xmlns="http://www.w3.org/2000/svg">
   <rect class="bx-b" x="10" y="60" width="130" height="52" rx="5"/>
   <text class="tb" x="75" y="82" text-anchor="middle">the question</text>
   <text class="ts" x="75" y="100" text-anchor="middle">"where does config live?"</text>
   <path class="ln-b" d="M140,86 L176,86"/>
 
   <rect class="bx-a" x="178" y="26" width="150" height="56" rx="5"/>
-  <text class="tm" x="253" y="48" text-anchor="middle" style="font-weight:700">BM25</text>
-  <text class="ts" x="253" y="66" text-anchor="middle">exact words, rare words</text>
+  <text class="tb" x="253" y="46" text-anchor="middle">word search</text>
+  <text class="ts" x="253" y="62" text-anchor="middle">exact names, rare words</text>
+  <text class="tmz" x="253" y="75" text-anchor="middle">(BM25)</text>
 
   <rect class="bx-p" x="178" y="96" width="150" height="56" rx="5"/>
-  <text class="tm" x="253" y="118" text-anchor="middle" style="font-weight:700">embeddings</text>
-  <text class="ts" x="253" y="136" text-anchor="middle">meaning, paraphrases</text>
+  <text class="tb" x="253" y="116" text-anchor="middle">meaning search</text>
+  <text class="ts" x="253" y="132" text-anchor="middle">different words, same idea</text>
+  <text class="tmz" x="253" y="145" text-anchor="middle">(embeddings)</text>
 
   <path class="ln-o" d="M140,80 L174,54"/>
   <path class="ln-p dash" d="M140,96 L174,120"/>
-  <text class="tt" x="150" y="140">only if needed</text>
+  <text class="tt" x="75" y="136" text-anchor="middle">only if the first</text>
+  <text class="tt" x="75" y="150" text-anchor="middle">found nothing</text>
 
   <path class="ln" d="M328,54 L368,80"/>
   <path class="ln" d="M328,124 L368,96"/>
 
   <rect class="bx" x="370" y="60" width="120" height="52" rx="5"/>
-  <text class="tb" x="430" y="82" text-anchor="middle">top 3 records</text>
-  <text class="ts" x="430" y="100" text-anchor="middle">ranked &amp; fused</text>
+  <text class="tb" x="430" y="82" text-anchor="middle">the best 3</text>
+  <text class="ts" x="430" y="100" text-anchor="middle">merged and ranked</text>
   <path class="ln" d="M490,86 L526,86"/>
 
   <rect class="bx-g" x="528" y="46" width="222" height="80" rx="5"/>
-  <text class="tb" x="639" y="68" text-anchor="middle">appended to the request tail</text>
-  <text class="ts" x="639" y="88" text-anchor="middle">as ONE ephemeral note, on iteration 0,</text>
-  <text class="ts" x="639" y="104" text-anchor="middle">never stored, never persisted</text>
-  <text class="tt" x="639" y="120" text-anchor="middle">(see Chapter 8 — cache-safe)</text>
+  <text class="tb" x="639" y="68" text-anchor="middle">stuck on the END of the message</text>
+  <text class="ts" x="639" y="88" text-anchor="middle">just for this one question</text>
+  <text class="ts" x="639" y="104" text-anchor="middle">never saved, never sent again</text>
+  <text class="ts" x="639" y="120" text-anchor="middle">so the rest can still be skipped</text>
 
   <rect class="bx-d" x="178" y="166" width="150" height="34" rx="5"/>
   <text class="ts" x="253" y="187" text-anchor="middle">.memory.json &#183; per project</text>
@@ -977,42 +1164,41 @@ figcaption{ font-size:8.6pt; color:var(--ink-faint); margin-top:2mm; }
 </svg></figure>
     <div class="two">
       <div class="note"><span class="t">Where it lives</span>
-      <p>A plain <code>.memory.json</code> per project, vectors in a binary sidecar. Record
-      tokenisation is cached across turns, and a corpus-wide index is built once &#8212; otherwise
-      every query would re-tokenise the whole store.</p></div>
+      <p>One plain file per project, with the numbers in a second file beside it. The index is built
+      once and re-used &#8212; otherwise every search would re-read everything.</p></div>
       <div class="key"><span class="t">Retrieval runs ONCE per turn</span>
-      <p>Before the loop, never inside it. Searching is expensive; doing it on every tool round
-      would undo the speed it buys. And it is skipped entirely for a trivial message.</p></div>
+      <p>Before the loop starts, never inside it. Searching costs time; doing it on every step would
+      undo the speed it was meant to buy. A message like "thanks" skips it completely.</p></div>
       <div class="note"><span class="t">Failure is always swallowed</span>
-      <p><code>except Exception: records = []</code>. Memory is an <b>enhancement</b>. Losing it
-      must never cost you the turn.</p></div>
+      <p>If the search breaks for any reason, we carry on with nothing. Memory is a <b>bonus</b>.
+      Losing it must never cost you the answer.</p></div>
     </div>
   </div>
-  <div class="foot"><span>llmc-code &#183; how it works</span><span>11</span></div>
+  <div class="foot"><span>llmc-code &#183; how it works</span><span>14</span></div>
 </div>
 
-<div class="slide">
-  <div class="sh"><span class="num">12</span><h2>Custom #7 &#8212; BM25, written by hand</h2>
+<div data-src="s13" class="slide">
+  <div class="sh"><span class="num">15</span><h2>Custom #7 &#8212; how the word search ranks results</h2>
     <span class="tag">keyword search</span></div>
   <div class="body col">
     <figure style="margin-bottom:2mm"><svg viewBox="0 0 760 196" xmlns="http://www.w3.org/2000/svg">
   <!-- panel 1: IDF -->
-  <text class="tt" x="20" y="14">1 &#183; rarity (IDF)</text>
+  <text class="tt" x="20" y="14">1 &#183; rare words count for more</text>
   <rect class="bx-d" x="14" y="22" width="216" height="150" rx="4"/>
   <text class="ts" x="26" y="44">"the"</text>
   <rect x="80" y="34" width="8" height="12" fill="#c3cedb"/>
-  <text class="tms" x="96" y="44">in every record &#8594; ~0.0</text>
+  <text class="tms" x="96" y="44">appears in everything &#8594; worthless</text>
   <text class="ts" x="26" y="76">"config"</text>
   <rect x="80" y="66" width="52" height="12" fill="#7ea9d4"/>
-  <text class="tms" x="140" y="76">in a few &#8594; 1.6</text>
+  <text class="tms" x="140" y="76">appears in a few &#8594; useful</text>
   <text class="ts" x="26" y="108">"_maybe_auto"</text>
   <rect x="80" y="98" width="110" height="12" fill="#1f5fa8"/>
-  <text class="tms" x="80" y="126">in exactly one &#8594; 3.2</text>
-  <text class="ts" x="26" y="152">A word that is everywhere</text>
+  <text class="tms" x="80" y="126">appears in exactly one &#8594; gold</text>
+  <text class="ts" x="26" y="152">A word that is in everything</text>
   <text class="ts" x="26" y="165">tells you nothing.</text>
 
   <!-- panel 2: saturation -->
-  <text class="tt" x="272" y="14">2 &#183; saturation (k1 = 1.5)</text>
+  <text class="tt" x="272" y="14">2 &#183; repeats count less and less</text>
   <rect class="bx-d" x="266" y="22" width="216" height="150" rx="4"/>
   <line x1="288" y1="150" x2="464" y2="150" stroke="#9fb0c2" stroke-width="1"/>
   <line x1="288" y1="150" x2="288" y2="44" stroke="#9fb0c2" stroke-width="1"/>
@@ -1020,24 +1206,24 @@ figcaption{ font-size:8.6pt; color:var(--ink-faint); margin-top:2mm; }
   <path d="M288,150 L462,46" fill="none" stroke="#c3cedb" stroke-width="1.4" stroke-dasharray="4 3"/>
   <text class="tms" x="392" y="90" style="fill:#1d7a53">BM25</text>
   <text class="tms" x="360" y="42" style="fill:#9fb0c2">naive counting</text>
-  <text class="tms" x="292" y="164">occurrences &#8594;</text>
+  <text class="tms" x="292" y="164">times the word appears &#8594;</text>
   <text class="ts" x="276" y="185" transform="rotate(-90 276 185)">score</text>
 
   <!-- panel 3: length -->
-  <text class="tt" x="524" y="14">3 &#183; length penalty (b = 0.75)</text>
+  <text class="tt" x="524" y="14">3 &#183; long documents get a penalty</text>
   <rect class="bx-d" x="518" y="22" width="228" height="150" rx="4"/>
   <rect x="532" y="40" width="60" height="26" rx="2" class="bx-g"/>
-  <text class="tms" x="600" y="57">short note, 1 hit</text>
+  <text class="tms" x="600" y="57">short note, 1 match</text>
   <text class="tms" x="600" y="70" style="fill:#1d7a53">strong signal</text>
   <rect x="532" y="86" width="200" height="40" rx="2" class="bx-a"/>
-  <text class="tms" x="540" y="102">long dump, 1 hit</text>
+  <text class="tms" x="540" y="102">huge file, 1 match</text>
   <text class="tms" x="540" y="118" style="fill:#a8611f">probably coincidence</text>
   <text class="ts" x="532" y="150">Finding a word in 20 lines means</text>
   <text class="ts" x="532" y="163">more than finding it in 2,000.</text>
 </svg></figure>
     <div class="body" style="gap:5mm">
       <div class="left">
-        <div class="srcfile">llmcode/memory.py &#8212; the entire scoring loop</div>
+        <div class="srcfile">llmcode/memory.py &#8212; the whole scoring loop, nothing hidden</div>
         <pre class="sm"><span class="kw">for</span> term <span class="kw">in</span> q_terms:
     f = tf.get(term, <span class="num">0</span>)          <span class="cmt"># times the term is in THIS doc</span>
     <span class="kw">if</span> f == <span class="num">0</span>: <span class="kw">continue</span>
@@ -1045,37 +1231,40 @@ figcaption{ font-size:8.6pt; color:var(--ink-faint); margin-top:2mm; }
     idf   = math.log(<span class="num">1</span> + (n - n_q + <span class="num">.5</span>) / (n_q + <span class="num">.5</span>))   <span class="cmt"># rarity</span>
     denom = f + k1 * (<span class="num">1</span> - b + b * (dl / avgdl))     <span class="cmt"># length</span>
     s    += idf * (f * (k1 + <span class="num">1</span>)) / denom          <span class="cmt"># saturating</span></pre>
-        <p><b>Why not just count shared words?</b> Because every document contains "the".
-        BM25 is the classic fix, and it still beats fancier methods on <b>code</b>, where exact
-        identifiers matter more than vibes. Two knobs: <code>k1=1.5</code>, <code>b=0.75</code>.</p>
+        <p><b>Why not just count how many words match?</b> Because every document contains "the".
+        This formula is the classic fix. It still beats fancier methods on <b>code</b>, where an
+        exact function name matters far more than general vibes. Its proper name is <b>BM25</b>.</p>
       </div>
       <div class="right">
-        <div class="key"><span class="t">The stopword list is load-bearing</span>
-        <p>Dropping "the"/"and"/"is" looks cosmetic. It isn't: a stopword-only overlap would leave
-        a <b>non-zero</b> BM25 score, so the next slide's gate would never escalate to embeddings
-        &#8212; the exact case it exists for. Removing them makes <b>"score is zero" mean
-        "no real overlap"</b>.</p></div>
-        <div class="problem"><span class="t">Don't copy a stopword list off the internet</span>
-        <p>Ours deliberately <b>keeps</b> <code>on</code>, <code>off</code>, <code>no</code>,
-        <code>not</code> &#8212; in a CLI those are <em>data</em> (<code>/mcp on|off</code>), not
-        filler. A generic list would have silently deleted them.</p></div>
+        <div class="key"><span class="t">Throwing away "the" and "and" is doing real work</span>
+        <p>It looks like tidying. It isn't. If a question and an old note share <em>only</em> the word
+        "the", the score comes out <b>above zero</b> &#8212; and the next slide only reaches for the
+        meaning search when the score is <b>exactly zero</b>.</p>
+        <p>Removing filler words is what makes <b>"zero" actually mean "nothing in common"</b>.</p></div>
+        <div class="problem"><span class="t">Don't copy a filler-word list off the internet</span>
+        <p>Ours deliberately <b>keeps</b> <code>on</code>, <code>off</code>, <code>no</code> and
+        <code>not</code>. In a command-line tool those aren't filler &#8212; they're <em>values</em>,
+        as in <code>/mcp on</code>.</p>
+        <p>A list copied from somewhere else would have quietly deleted them, and searches for
+        commands would have stopped working.</p></div>
       </div>
     </div>
   </div>
-  <div class="foot"><span>llmc-code &#183; how it works</span><span>12</span></div>
+  <div class="foot"><span>llmc-code &#183; how it works</span><span>15</span></div>
 </div>
 
-<div class="slide">
-  <div class="sh"><span class="num">13</span><h2>Custom #8 &#8212; embeddings, and when <em>not</em> to use them</h2>
+<div data-src="s14" class="slide">
+  <div class="sh"><span class="num">16</span><h2>Custom #8 &#8212; searching by meaning, and when not to</h2>
     <span class="tag">the hybrid gate</span></div>
   <div class="body">
     <div class="left">
-      <div class="analogy"><span class="t">What an embedding is</span>
-      <p>A piece of text turned into <b>768 numbers</b> &#8212; a point in space where texts about
-      similar things land near each other. <em>"where do my settings live?"</em> lands near
-      <em>"the config file is in ~/.llmcode"</em> even though they share <b>no words</b>.</p></div>
-      <p>To compare two points we measure the <b>angle</b>, not the distance &#8212; length just
-      reflects how wordy the text was. That is <b>cosine similarity</b>, and it is 12 lines:</p>
+      <div class="analogy"><span class="t">What "searching by meaning" actually is</span>
+      <p>Every piece of text is turned into a <b>list of 768 numbers</b>. Think of it as a position
+      on a map, where things about the same topic end up near each other.</p>
+      <p><em>"where do my settings live?"</em> lands right next to <em>"the config file is in
+      ~/.llmcode"</em> &#8212; even though they share <b>not one word</b>.</p></div>
+      <p>To compare two of these, we measure the <b>direction</b> they point in, not how far away they
+      are &#8212; distance mostly just reflects how wordy the text was. That is 12 lines of code:</p>
       <div class="srcfile">llmcode/memory.py &#8212; cosine()</div>
       <pre class="sm">dot = na = nb = <span class="num">0.0</span>
 <span class="kw">for</span> x, y <span class="kw">in</span> zip(a, b):
@@ -1084,15 +1273,15 @@ figcaption{ font-size:8.6pt; color:var(--ink-faint); margin-top:2mm; }
     nb  += y * y
 <span class="kw">if</span> na &lt;= <span class="num">0.0</span> <span class="kw">or</span> nb &lt;= <span class="num">0.0</span>: <span class="kw">return</span> <span class="num">0.0</span>
 <span class="kw">return</span> dot / math.sqrt(na * nb)     <span class="cmt"># 1.0 = identical meaning</span></pre>
-      <div class="note"><span class="t">Note what the docstring promises</span>
-      <p><em>Never raises, never NaNs.</em> It returns <code>0.0</code> for garbage input &#8212;
-      which is exactly the right answer, and stops one corrupt record taking down a turn.</p></div>
+      <div class="note"><span class="t">Notice what it promises</span>
+      <p>It <b>never crashes</b>. Given nonsense it returns zero &#8212; which means "no match", and is
+      exactly the right answer. One corrupted note can never take down your whole turn.</p></div>
     </div>
     <div class="right">
-      <h3>The decision that made it fast</h3>
-      <p>Running both engines every query means an embedding round-trip every turn &#8212; which on
-      a single GPU may force a <b>model swap</b>. So:</p>
-      <div class="srcfile">llmcode/memory.py &#8212; the whole policy, in one condition</div>
+      <h3>The one decision that made this fast</h3>
+      <p>Running both every time means an extra round trip on every turn &#8212; and on one GPU that can
+      force the whole model to be swapped out and back. So:</p>
+      <div class="srcfile">llmcode/memory.py &#8212; the entire policy, in one condition</div>
       <pre class="sm">best_bm25 = bm25_full[<span class="num">0</span>][<span class="num">1</span>] <span class="kw">if</span> bm25_full <span class="kw">else</span> <span class="num">0.0</span>
 <span class="kw">if</span> provider <span class="kw">is not</span> <span class="kw">None</span> <span class="kw">and</span> (
     mode == <span class="str">"embed"</span> <span class="kw">or</span> (mode == <span class="str">"auto"</span> <span class="kw">and</span> best_bm25 &lt;= <span class="num">0.0</span>)
@@ -1100,42 +1289,40 @@ figcaption{ font-size:8.6pt; color:var(--ink-faint); margin-top:2mm; }
     embed_idx = self._embed_rank(query, provider, pool_k)</pre>
       <table>
       <tr><th style="width:36%">Case</th><th>What runs</th><th style="width:22%">Cost</th></tr>
-      <tr><td>Shares real words<br><span class="ts">"where is config.json?"</span></td><td>BM25 only</td><td>microseconds &#8212; the common case</td></tr>
-      <tr><td>A paraphrase<br><span class="ts">"where do settings live?"</span></td><td>BM25 scores 0 &#8594; escalate to embeddings &#8594; fuse</td><td>one embed call, only when needed</td></tr>
+      <tr><td>Shares real words<br><span class="ts">"where is config.json?"</span></td><td>word search only</td><td>instant &#8212; and this is the usual case</td></tr>
+      <tr><td>A paraphrase<br><span class="ts">"where do settings live?"</span></td><td>word search finds nothing &#8594; try meaning search &#8594; merge</td><td>one extra round trip, only when needed</td></tr>
       <tr><td>Trivial message<br><span class="ts">"thanks"</span></td><td>nothing</td><td>zero</td></tr>
       </table>
       <div class="key"><span class="t">The pattern to steal</span>
-      <p><b>Cheap test first; expensive method only when the cheap one finds nothing.</b> This
-      exact shape appears four times in the codebase &#8212; here, in code search, in the reranker,
-      and in the truncation retry.</p></div>
+      <p><b>Do the cheap check first. Only pay for the expensive one when the cheap one found
+      nothing.</b> The same shape turns up four times in this codebase.</p></div>
     </div>
   </div>
-  <div class="foot"><span>llmc-code &#183; how it works</span><span>13</span></div>
+  <div class="foot"><span>llmc-code &#183; how it works</span><span>16</span></div>
 </div>
 
-<div class="slide">
-  <div class="sh"><span class="num">14</span><h2>Custom #9 &#8212; a vector database in 200 lines</h2>
+<div data-src="s15" class="slide">
+  <div class="sh"><span class="num">17</span><h2>Custom #9 &#8212; storing the numbers, without a database</h2>
     <span class="tag">no Chroma, no FAISS, no NumPy</span></div>
   <div class="body col">
     <div class="wwh" style="margin:0 0 3mm 0">
       <div class="why"><span class="lbl">Why</span>
-      <p>Embeddings must survive a restart. A real vector DB means a new dependency, often a server
-      process &#8212; absurd for a personal CLI holding a few thousand vectors on one machine.</p></div>
+      <p>Those lists of numbers must survive closing the terminal. The usual answer is a special
+      database &#8212; often a whole extra program running in the background. Absurd for a personal
+      tool holding a few thousand items.</p></div>
       <div class="what"><span class="lbl">What</span>
-      <p>A dict of <code>array('f')</code> in RAM, a JSON file for metadata, and a <b>packed
-      float32 sidecar</b> for the numbers. Search is a <code>for</code> loop over cosine
-      similarity.</p></div>
+      <p>A plain list in memory, one readable file for the text, and a <b>second file holding just
+      the raw numbers</b>. Searching is an ordinary loop.</p></div>
       <div class="how"><span class="lbl">How</span>
-      <p><code>array('f')</code> stores 4 bytes per number instead of a boxed Python float
-      (~32 B + pointer). Writing them as raw bytes avoids turning every float into a decimal
-      string in JSON.</p></div>
+      <p>Each number takes <b>4 bytes</b> instead of the ~32 an ordinary Python number costs. And
+      saving them as raw bytes avoids turning every single one into text and back again.</p></div>
     </div>
-    <figure style="margin-bottom:2mm"><svg viewBox="0 0 700 250" xmlns="http://www.w3.org/2000/svg">
+    <figure style="margin:0 auto 2mm auto;width:82%"><svg viewBox="0 0 700 250" xmlns="http://www.w3.org/2000/svg">
   <text class="tt" x="10" y="14">in RAM</text>
   <rect class="bx-p" x="10" y="22" width="320" height="56" rx="4"/>
   <text class="tms" x="22" y="42">{"a7f3…": array('f', [0.13, -0.88, 0.04, …]),</text>
   <text class="tms" x="22" y="58"> "b0c1…": array('f', [0.52,  0.19, -0.7, …])}</text>
-  <text class="tms" x="22" y="72" style="fill:#6a3fa0">float32, 4 bytes each &#8212; not boxed Python floats</text>
+  <text class="tms" x="22" y="72" style="fill:#6a3fa0">4 bytes per number &#8212; not Python's bulky floats</text>
 
   <path class="ln-p" d="M170,78 L170,100"/>
   <text class="tt" x="180" y="94">save</text>
@@ -1143,13 +1330,13 @@ figcaption{ font-size:8.6pt; color:var(--ink-faint); margin-top:2mm; }
   <text class="tt" x="10" y="116">on disk &#8212; two files</text>
   <rect class="bx" x="10" y="124" width="320" height="52" rx="4"/>
   <text class="tms" x="22" y="142" style="font-weight:700">.memory.json</text>
-  <text class="tms" x="22" y="157">records, hashes, dim, vector_sig</text>
-  <text class="tms" x="22" y="171" style="fill:#7a8799">human-readable metadata only</text>
+  <text class="tms" x="22" y="157">the text, plus a fingerprint of the numbers</text>
+  <text class="tms" x="22" y="171" style="fill:#7a8799">readable, and small</text>
 
   <rect class="bx-p" x="10" y="186" width="320" height="52" rx="4"/>
   <text class="tms" x="22" y="204" style="font-weight:700">.memory.json.vec</text>
-  <text class="tms" x="22" y="219">raw float32 bytes, back to back</text>
-  <text class="tms" x="22" y="233" style="fill:#7a8799">stride = dim &#215; 4 &#8212; no separators, no JSON</text>
+  <text class="tms" x="22" y="219">just the raw numbers, back to back</text>
+  <text class="tms" x="22" y="233" style="fill:#7a8799">all the same size &#8212; no labels, no punctuation</text>
 
   <!-- right: byte layout -->
   <text class="tt" x="360" y="14">the .vec byte layout</text>
@@ -1157,340 +1344,344 @@ figcaption{ font-size:8.6pt; color:var(--ink-faint); margin-top:2mm; }
   <rect x="458" y="24" width="96" height="30" rx="2" class="bx-p"/><text class="tmz" x="464" y="43">vector 1 &#183; 3072 B</text>
   <rect x="556" y="24" width="96" height="30" rx="2" class="bx-p"/><text class="tmz" x="562" y="43">vector 2 &#183; 3072 B</text>
   <text class="tms" x="654" y="43">…</text>
-  <text class="ts" x="360" y="70">order matches the hash list in the JSON &#8212; index i &#8594; offset i&#215;stride</text>
+  <text class="ts" x="360" y="70">same order as the list in the other file, so number 5 is easy to find</text>
 
   <rect class="bx-r" x="360" y="86" width="330" height="152" rx="4"/>
-  <text class="tt" x="372" y="104" fill="#a8324a">surviving a crash mid-write</text>
-  <text class="ts" x="372" y="124">Two files can disagree. If the power dies between them,</text>
-  <text class="ts" x="372" y="140">the JSON says 200 vectors and the .vec holds 140 &#8212;</text>
-  <text class="ts" x="372" y="156">every record would silently pair with the WRONG vector.</text>
-  <text class="ts" x="372" y="180" style="font-weight:600">Fix: fingerprint the exact sidecar bytes into the JSON</text>
-  <text class="ts" x="372" y="196" style="font-weight:600">as vector_sig. On load, re-check it.</text>
-  <text class="ts" x="372" y="216">Mismatch, short file, or missing &#8594; treat vectors as empty</text>
-  <text class="ts" x="372" y="230">and re-embed. Endianness is corrected on read.</text>
+  <text class="tt" x="372" y="104" fill="#a8324a">what if the power cuts halfway?</text>
+  <text class="ts" x="372" y="124">Two files can disagree. If we save one and not the other,</text>
+  <text class="ts" x="372" y="140">one says 200 items and the other holds 140 &#8212;</text>
+  <text class="ts" x="372" y="156">and every item quietly matches the WRONG numbers.</text>
+  <text class="ts" x="372" y="180" style="font-weight:600">Fix: save a fingerprint of the numbers file</text>
+  <text class="ts" x="372" y="196" style="font-weight:600">inside the other file. Check it on load.</text>
+  <text class="ts" x="372" y="216">If it doesn't match &#8594; throw the numbers away</text>
+  <text class="ts" x="372" y="230">and rebuild them. Slow once, never wrong.</text>
 </svg>
 </figure>
     <div class="two">
-      <div class="key"><span class="t">When this is the right answer</span>
-      <p>Thousands of vectors, one machine, one user. A loop over 4,000 cosines is <b>milliseconds</b>.
-      You need a real vector DB at millions of vectors, or when many processes share one index &#8212;
-      <b>not before.</b></p></div>
-      <div class="note"><span class="t">The lesson that generalises</span>
-      <p>Whenever <b>two files must agree</b>, one of them has to <b>prove</b> it matches the other.
-      A checksum in the metadata is the cheapest proof there is &#8212; and it is the difference
-      between "re-embed on next launch" and "silently wrong answers forever".</p></div>
-    </div>
-  </div>
-  <div class="foot"><span>llmc-code &#183; how it works</span><span>14</span></div>
-</div>
-
-<div class="slide">
-  <div class="sh"><span class="num">15</span><h2>Custom #10 &#8212; searching the codebase itself</h2>
-    <span class="tag">code_index.py &#183; repo_graph.py</span></div>
-  <div class="body">
-    <div class="left">
-      <div class="wwh" style="flex-direction:column;margin-top:0">
-        <div class="why"><span class="lbl">Why</span>
-        <p>A small model cannot read a 50-file repo. Reading three files already costs more context
-        than it has. It needs to <b>find the right 40 lines</b>, not read everything.</p></div>
-        <div class="what"><span class="lbl">What</span>
-        <p><code>code_search</code> &#8212; a tool the model calls itself, backed by the same hybrid
-        engine as memory, plus <code>repo_map</code>, a compact structural index of the project.</p></div>
-        <div class="how"><span class="lbl">How</span>
-        <p>Chunk by <b>function and class</b>, not by fixed line count, so every hit is a complete,
-        self-contained unit. Index once, cache it, cap the output.</p></div>
-      </div>
-      <h3>Three deliberate choices</h3>
-      <table>
-      <tr><th style="width:34%">Choice</th><th>Reason</th></tr>
-      <tr><td><b>AST-aware chunking</b></td><td>A hit that starts mid-function teaches the model
-      nothing. Chunk boundaries should be <em>meaning</em> boundaries.</td></tr>
-      <tr><td><b>BM25 by default</b><br><span class="ts">embeddings opt-in via <code>/codeembed</code></span></td>
-      <td>Code search is usually an <b>identifier</b> search. Indexing a repo with embeddings costs
-      minutes on a laptop; BM25 costs milliseconds and usually wins.</td></tr>
-      <tr><td><b>Its own output cap</b><br><span class="ts">smaller than every other tool's</span></td>
-      <td>One search can return many chunks. Capping it harder than <code>read_file</code> keeps a
-      single call from eating the turn's whole budget.</td></tr>
-      </table>
-    </div>
-    <div class="right">
-      <h3>The repo map: which files even matter?</h3>
-      <p>Showing the model a flat list of 300 files is useless. We rank them &#8212; with
-      <b>PageRank</b>, Google's original link-ranking algorithm, run over your <b>import graph</b>.</p>
-      <div class="key"><span class="t">The intuition</span>
-      <p>A file imported by many other files is <b>structurally important</b>, exactly as a web page
-      linked by many pages was important. <code>config.py</code> scores high; a one-off script
-      scores low.</p></div>
-      <h3>Then: fit it to a budget</h3>
-      <ul>
-        <li>The map must fit a token budget, but you don't know how many entries fit until you
-        render them.</li>
-        <li>So: <b>binary-search the entry count</b> &#8212; render, estimate tokens
-        (<code>chars // 4</code>), adjust, repeat. About 10 tries to land exactly at the budget.</li>
-        <li>PageRank itself was rewritten to <b>O(N+E)</b> &#8212; the naive version re-scanned all
-        edges per node and made <code>repo_map</code> the slowest tool in the set.</li>
-      </ul>
-      <div class="note"><span class="t">The pattern behind all three chapters of RAG</span>
-      <p><b>Don't give the model more context &#8212; give it better tools for finding context.</b>
-      A good search tool is worth more than a bigger context window, and it is a lot cheaper.</p></div>
-    </div>
-  </div>
-  <div class="foot"><span>llmc-code &#183; how it works</span><span>15</span></div>
-</div>
-
-<div class="slide">
-  <div class="sh"><span class="num">16</span><h2>Custom #11 &#8212; sub-agents: context isolation</h2>
-    <span class="tag">orchestration.py</span></div>
-  <div class="body">
-    <div class="left">
-      <div class="wwh" style="flex-direction:column;margin-top:0">
-        <div class="why"><span class="lbl">Why</span>
-        <p>"Which module handles config?" might need twenty file reads. Do them in the main
-        conversation and you have burned the context window on files that turned out to be
-        irrelevant &#8212; and every later turn re-sends them.</p></div>
-        <div class="what"><span class="lbl">What</span>
-        <p><code>spawn_agent</code> &#8212; a tool that starts a <b>fresh agent</b> with its own
-        private conversation, a <b>restricted toolset</b>, and a role prompt. It returns a short
-        summary. Its twenty file reads are <b>thrown away with it</b>.</p></div>
-        <div class="how"><span class="lbl">How</span>
-        <p>Build a new <code>Agent</code> with the role's system prompt and tool subset, run it to
-        completion, return its final text as the tool result.</p></div>
-      </div>
-      <div class="key" style="margin-top:3mm"><span class="t">The economics</span>
-      <p>Sub-agent reads 20 files &#8594; <b>40,000 tokens in its context</b>.<br>
-      Parent receives <b>~15 lines</b>.<br>
-      The parent's context is protected by construction, not by discipline.</p></div>
-    </div>
-    <div class="right">
-      <h3>Four roles, different tools</h3>
-      <table>
-      <tr><th style="width:20%">Role</th><th style="width:30%">Tools</th><th>Job</th></tr>
-      <tr><td><b>orchestrator</b></td><td>all + <code>spawn_agent</code></td><td>Plan, delegate, validate</td></tr>
-      <tr><td><b>explorer</b></td><td>read-only</td><td>Investigate and report. <b>Cannot damage
-      anything by construction</b></td></tr>
-      <tr><td><b>coder</b></td><td>full</td><td>Implement one scoped change, then validate it</td></tr>
-      <tr><td><b>reviewer</b></td><td>read-only</td><td>Critique before it's called done</td></tr>
-      </table>
-      <div class="note"><span class="t">Security through scoping</span>
-      <p>An explorer <b>has no write tools in its registry</b>. It cannot be prompt-injected into
-      deleting a file, because the capability isn't there. Scope tools by role, not by asking the
-      model nicely.</p></div>
-      <h3>The same idea, scaled up: <code>/audit</code></h3>
-      <ul>
-        <li>Reviewing a whole repo doesn't fit in any local context window.</li>
-        <li>So <b>map-reduce it</b>: split the repo into chunks, review each in a fresh isolated
-        context, then merge the findings.</li>
-        <li>Each worker stays small and fast &#8212; the exact opposite of one giant prompt.</li>
-      </ul>
-      <div class="key"><span class="t">Generalisable</span>
-      <p>When a job doesn't fit in context, <b>don't buy a bigger context &#8212; partition the
-      job.</b></p></div>
-    </div>
-  </div>
-  <div class="foot"><span>llmc-code &#183; how it works</span><span>16</span></div>
-</div>
-
-<div class="slide">
-  <div class="sh"><span class="num">17</span><h2>Custom #12 &#8212; your laptop is not a datacenter</h2>
-    <span class="tag">cooldown.py &#183; gentle mode</span></div>
-  <div class="body">
-    <div class="left">
-      <div class="wwh" style="flex-direction:column;margin-top:0">
-        <div class="why"><span class="lbl">Why</span>
-        <p>A cloud agent never thinks about hardware. An agent on <b>your</b> laptop runs the GPU flat
-        out for an hour, the fans scream, and the machine thermally throttles &#8212; so it gets
-        <em>slower</em> the longer you work.</p></div>
-        <div class="what"><span class="lbl">What</span>
-        <p>Two features that exist in <b>no cloud agent</b>:<br>
-        &#8226; <b>Cooldown</b> &#8212; a forced ~1-minute break after every ~10 minutes of
-        continuous work.<br>
-        &#8226; <b>Gentle mode</b> &#8212; a cap on output tokens plus pacing between turns.</p></div>
-        <div class="how"><span class="lbl">How</span>
-        <p>Cooldown is checked at the <b>top of the agent loop</b> &#8212; a safe checkpoint where
-        nothing is half-written. Both are on by default and disable themselves when output isn't a
-        terminal, so scripts and tests never pause.</p></div>
-      </div>
-      <div class="note" style="margin-top:3mm"><span class="t">Why the top of the loop</span>
-      <p>Pausing <em>mid-turn</em> would leave an <code>assistant(tool_calls)</code> message with no
-      matching results &#8212; which most servers reject outright. Position isn't arbitrary; it is
-      chosen so the invariant <b>cannot</b> break. The same reasoning places the Ctrl-C check.</p></div>
-    </div>
-    <div class="right">
-      <div class="problem"><span class="t">The bug that gentle mode caused</span>
-      <p>The output cap (1,024 tokens) was meant to keep the GPU cool. For a chat answer, hitting
-      it just truncates some prose.</p>
-      <p>For <code>write_file</code> it was <b>silent data loss</b> &#8212; the whole file content travels
-      <em>inside the tool call's JSON arguments</em>. Truncated arguments meant the model believed it
-      wrote the file, the user believed it too, and <b>nothing landed on disk</b>.</p>
-      <p><b>The fix, in three parts:</b> the cap is <b>skipped entirely on any turn that offers tools</b> (<code>gentle_for_this_call = gentle_mode and not tools</code>); the default rose <b>1,024 &#8594; 4,096</b>; and a generation that still stops on the cap is retried <b>once</b> uncapped.</p>
-      <p><b>The second-order lesson:</b> truncate-then-retry meant <em>two</em> generations &#8212; <b>more</b> heat than the cap ever saved. On tool turns, pacing is the heat lever now, not the cap.</p></div>
-      <div class="key"><span class="t">The lesson</span>
-      <p><b>A limit you set for one reason will be hit by something you never considered.</b>
-      Whenever you add a cap, ask: what else travels through this path?</p></div>
-      <h3>The honest reframe</h3>
-      <p>We chased tok/s for a long time. Decode speed was <b>never</b> the problem &#8212; it sat near
-      95 tok/s throughout. The pain was <b>wall-clock</b>: heavy defaults and huge prompts.</p>
-      <div class="note"><span class="t">Measure the thing the user feels</span>
-      <p>The user does not experience tok/s. They experience <b>"I pressed Enter and waited"</b>.
-      Optimise that number.</p></div>
+      <div class="key"><span class="t">When this simple approach is the right one</span>
+      <p>Thousands of items, one machine, one person. Looping over 4,000 of them takes
+      <b>milliseconds</b>.</p>
+      <p>You need a real database at <em>millions</em> of items, or when several programs share one
+      index &#8212; <b>not before.</b></p></div>
+      <div class="note"><span class="t">The lesson worth keeping</span>
+      <p>Whenever <b>two files have to agree with each other</b>, one of them must be able to
+      <b>prove</b> it matches. A short fingerprint is the cheapest possible proof.</p>
+      <p>It is the difference between "rebuild once on next launch" and "quietly wrong answers,
+      forever, with no error".</p></div>
     </div>
   </div>
   <div class="foot"><span>llmc-code &#183; how it works</span><span>17</span></div>
 </div>
 
-<style>#s-safety li{font-size:9.7pt;margin-bottom:1.1mm}#s-safety td{padding:1.2mm 2.5mm}#s-safety th{padding:1.2mm 2.5mm}#s-safety h3{margin:0 0 1.5mm 0}</style>
-<div class="slide" id="s-safety" style="padding-bottom:7mm">
-  <div class="sh"><span class="num">18</span><h2>Custom #13 &#8212; never trusting the model</h2>
-    <span class="tag">guards &#183; safety &#183; privacy</span></div>
+<div data-src="s16" class="slide">
+  <div class="sh"><span class="num">18</span><h2>Custom #10 &#8212; helping it find the right code</h2>
+    <span class="tag">code_index.py &#183; repo_graph.py</span></div>
   <div class="body">
     <div class="left">
-      <h3 style="margin-bottom:1.5mm">Nine guards, because the loop must always end</h3>
-      <table style="font-size:8.9pt">
-      <tr><th style="width:44%">Guard</th><th>Bound</th></tr>
-      <tr><td>Iteration cap</td><td>80 passes</td></tr>
-      <tr><td>All-parse-errors circuit breaker</td><td>3 bad batches</td></tr>
-      <tr><td>Identical-batch loop guard</td><td>4 repeats</td></tr>
-      <tr><td>Empty-turn nudge <span class="ts">(thought, said nothing)</span></td><td>2 retries</td></tr>
-            <tr><td>Truncation retry <span class="ts">(cap ate a write)</span></td><td>once per pass</td></tr>
-      <tr><td>Constrained-decode retry <span class="ts">(bad JSON args)</span> &#183; markup nudge</td><td>once each</td></tr>
-      <tr><td>Cancel check <span class="ts">(Ctrl-C can't corrupt history)</span></td><td>every pass</td></tr>
-      <tr><td>Read-budget nudge <span class="ts">(read less, search more)</span></td><td>once per turn</td></tr>
+      <div class="wwh" style="flex-direction:column;margin-top:0">
+        <div class="why"><span class="lbl">Why</span>
+        <p>A small model cannot read a 50-file project. Three files already fill it up. It needs to
+        <b>find the right 40 lines</b>, not read everything and hope.</p></div>
+        <div class="what"><span class="lbl">What</span>
+        <p>A search the model runs <b>itself</b>, using the same two engines as memory &#8212; plus a
+        short map of the project so it knows what exists at all.</p></div>
+        <div class="how"><span class="lbl">How</span>
+        <p>The code is cut up <b>function by function</b>, not every 50 lines &#8212; so every result is a
+        whole, complete thing. Built once, re-used, and always cut short before it gets huge.</p></div>
+      </div>
+      <h3>Three deliberate choices</h3>
+      <table>
+      <tr><th style="width:34%">Choice</th><th>Reason</th></tr>
+      <tr><td><b>AST-aware chunking</b></td><td>A result that starts halfway through a function teaches the model nothing. Where you cut
+      should match where the <em>meaning</em> ends.</td></tr>
+      <tr><td><b>BM25 by default</b><br><span class="ts">embeddings opt-in via <code>/codeembed</code></span></td>
+      <td>Searching code usually means searching for <b>a name</b> you already know. Building a
+      meaning index takes minutes on a laptop; the word search takes milliseconds and usually
+      wins anyway.</td></tr>
+      <tr><td><b>Its own output cap</b><br><span class="ts">smaller than every other tool's</span></td>
+      <td>One search can return a lot. Cutting it shorter than a file read stops a single search from
+      eating the entire turn.</td></tr>
       </table>
-      <div class="key" style="font-size:9.5pt"><span class="t">A guard that catches healthy behaviour is a bug</span>
-      <p>The first circuit breaker counted <b>any</b> parse error and killed working sessions. A
-      model that emits one good call and one malformed call <em>is still making progress</em>. It
-      now only counts when the <b>whole batch</b> failed &#8212; and one good call resets it.</p></div>
     </div>
     <div class="right">
-      <h3 style="margin-bottom:1.5mm">Safety: the model is untrusted input</h3>
-      <ul style="font-size:10.2pt">
-        <li><b>Confirmation gates</b> on every write, edit and shell command.</li>
-        <li><b>Workspace confinement</b> on the <em>file</em> tools (read / write / edit / glob / grep /
-        repo_map) &#8212; paths resolving outside the launch directory are refused.</li>
-        <li><b>Secret scrubbing</b> &#8212; child processes get an allowlisted env; API keys,
-        <code>AWS_*</code>, <code>GITHUB_TOKEN</code> are never inherited.</li>
-                <li><b>SSRF guard</b> on <code>web_fetch</code> &#8212; loopback, private and cloud-metadata IPs
-        refused; connection pinned to the validated IP; re-checked on <em>every redirect</em>.</li>
-        <li><b>Undo checkpoints</b> &#8212; files are snapshotted before every edit.</li>
-        <li><b>Self-healing</b> &#8212; a failed tool call is auto-corrected and retried, bounded.</li>
+      <h3>The repo map: which files even matter?</h3>
+      <p>A flat list of 300 filenames tells the model nothing. So we rank them, using the same idea
+      Google originally used to rank web pages &#8212; applied to <b>which file uses which</b>.</p>
+      <div class="key"><span class="t">The intuition</span>
+      <p>A file that many other files depend on is <b>probably important</b> &#8212; just as a web page
+      that many pages link to probably matters. <code>config.py</code> scores high; a one-off
+      script scores low.</p></div>
+      <h3>Then: fit it to a budget</h3>
+      <ul>
+        <li>The map has to fit a size limit &#8212; but you can't know how many entries fit until you
+        actually write them out.</li>
+        <li>So we <b>guess, measure, halve the gap, repeat</b> &#8212; about ten tries to land exactly on
+        the limit. (The same trick as guessing a number between 1 and 1000.)</li>
+        <li>The ranking itself had to be rewritten &#8212; the obvious version re-checked every connection
+        for every file, and made this the slowest tool we had.</li>
       </ul>
-      <div class="note" style="font-size:9.4pt"><span class="t"><code>--private</code>: an enforced offline lockdown</span>
-      <p>Not a promise &#8212; a mechanism. The model URL <b>must</b> be loopback and is IP-pinned;
-      <code>web_fetch</code> is <b>removed from the toolset</b>; <code>run_bash</code> runs in a
-      no-network sandbox and <b>fails closed</b> if it is unavailable; the HTTP client uses
-      <code>trust_env=False</code> so proxy variables cannot tunnel traffic out.</p></div>
-      <div class="problem" style="font-size:9.4pt"><span class="t">The most valuable bug we ever fixed</span>
-      <p>The docs claimed writes were "workspace-confined". For <code>run_bash</code> that was
-      <b>false</b> &#8212; it is a raw shell, and there is no path check in it at all. Its real
-      boundary is the <b>confirmation gate</b> plus the scrubbed environment.</p>
-      <p><b>A false claim is worse than none</b> &#8212; people relax <em>because</em> of it. Name the
-      mechanism that enforces a guarantee, or don't claim it.</p></div>
+      <div class="note"><span class="t">The pattern behind all three chapters of RAG</span>
+      <p><b>Don't give the model more to read. Give it better ways to find what it needs.</b><br>
+      A good search tool beats a bigger memory, and costs far less.</p></div>
     </div>
   </div>
   <div class="foot"><span>llmc-code &#183; how it works</span><span>18</span></div>
 </div>
 
-<div class="slide">
-  <div class="sh"><span class="num">19</span><h2>Custom #14 &#8212; MCP, and testing without a GPU</h2>
-    <span class="tag">mcp.py &#183; providers.py</span></div>
+<div data-src="s17" class="slide">
+  <div class="sh"><span class="num">19</span><h2>Custom #11 &#8212; sending a helper to do the reading</h2>
+    <span class="tag">orchestration.py</span></div>
   <div class="body">
     <div class="left">
-      <h3>MCP &#8212; plugging in other people's tools</h3>
       <div class="wwh" style="flex-direction:column;margin-top:0">
         <div class="why"><span class="lbl">Why</span>
-        <p>Our eleven tools cannot cover everything. <b>Model Context Protocol</b> is a standard way
-        for any AI client to talk to any tool server &#8212; a filesystem server, a database server,
-        a notes vault &#8212; without us writing an integration for each.</p></div>
+        <p>"Which file handles settings?" might take twenty file reads to answer. Do that in the main
+        conversation and you have filled it with files that turned out not to matter &#8212; and every
+        later turn re-sends them all.</p></div>
         <div class="what"><span class="lbl">What</span>
-        <p>A <b>741-line, stdlib-only JSON-RPC 2.0 client</b> over stdio. No SDK, no new dependency.
-        Servers are child processes; their tools are merged into the model's tool list as
-        <code>mcp__&lt;server&gt;__&lt;tool&gt;</code>.</p></div>
+        <p>A tool that starts a <b>second assistant</b> with its own private conversation and a
+        <b>limited set of abilities</b>. It answers in a few lines. Its twenty file reads are
+        <b>thrown away with it</b>.</p></div>
         <div class="how"><span class="lbl">How</span>
-        <p>Spawn &#8594; handshake (<code>initialize</code> &#8594; <code>tools/list</code>) &#8594;
-        merge. A server that fails to start is <b>skipped with a warning</b>, never crashes the CLI.</p></div>
+        <p>Start a fresh assistant with its own instructions and tools, let it finish, and hand its
+        final answer back as if it were any other tool result.</p></div>
       </div>
-      <div class="problem" style="margin-top:3mm"><span class="t">Never trust a server's own hints</span>
-      <p>MCP lets a server mark a tool <code>readOnlyHint</code>. A malicious server could mark a
-      <em>destructive</em> tool read-only to auto-run it. So the hint only relaxes the confirmation
-      gate when <b>you</b> opt in per server. <b>The trust decision is the operator's, never the
-      server's.</b></p>
-      <p>Also hardened: tool names validated (no namespace forging), duplicate names skipped rather
-      than overwritten, per-call timeouts, and a timed-out connection treated as <b>poisoned</b> &#8212;
-      the child is killed so a late reply can't corrupt a later call.</p></div>
+      <div class="key" style="margin-top:3mm"><span class="t">The trade in numbers</span>
+      <p>The helper reads 20 files &#8594; <b>40,000 words in its conversation</b>.<br>
+      The main assistant gets back <b>about 15 lines</b>.<br>
+      The main conversation stays small <b>because of how it is built</b>, not because the model
+      remembered to be careful.</p></div>
     </div>
     <div class="right">
-      <h3>The best engineering decision in the project</h3>
-      <p>The provider is an <b>interface</b>, not a class that calls an API. That let us write a
-      second implementation: <code>MockProvider</code> &#8212; a <b>scripted, deterministic fake
-      model</b>.</p>
-      <div class="srcfile">every provider emits the same three events</div>
-      <pre class="sm">{<span class="str">"type"</span>:<span class="str">"text"</span>,      <span class="str">"text"</span>: <span class="cmt">&lt;incremental delta&gt;</span>}
-{<span class="str">"type"</span>:<span class="str">"tool_call"</span>, <span class="str">"id"</span>, <span class="str">"name"</span>, <span class="str">"arguments"</span>: <span class="cmt">&lt;dict&gt;</span>}
-{<span class="str">"type"</span>:<span class="str">"done"</span>,      <span class="str">"finish_reason"</span>, <span class="str">"output_tokens"</span>}   <span class="cmt"># exactly one, last</span></pre>
-      <div style="display:flex;gap:4mm;margin:3mm 0">
-        <div class="card stat"><div class="n">1,355</div><div class="l">tests</div></div>
-        <div class="card stat"><div class="n">0</div><div class="l">need a GPU<br>or a network</div></div>
-        <div class="card stat"><div class="n">3</div><div class="l">dependencies<br>openai &#183; rich &#183; prompt_toolkit</div></div>
-      </div>
-      <div class="key"><span class="t">Why this matters more than it sounds</span>
-      <p>Agent bugs are <b>loop bugs</b>: a dangling tool id, a guard that never resets, history
-      appended in the wrong order. You cannot debug those against a real model &#8212; it is
-      non-deterministic and slow. Against a script, they are <b>unit tests that run in
-      milliseconds</b>.</p></div>
-      <div class="note"><span class="t">Build this seam on day one</span>
-      <p>Retrofitting a provider interface into a codebase that calls the API directly from twelve
-      places is miserable. It is ten minutes of work up front.</p></div>
+      <h3>Four roles, different tools</h3>
+      <table>
+      <tr><th style="width:20%">Role</th><th style="width:30%">Tools</th><th>Job</th></tr>
+      <tr><td><b>orchestrator</b></td><td>all + <code>spawn_agent</code></td><td>Plan the work, hand out jobs, check the result</td></tr>
+      <tr><td><b>explorer</b></td><td>read-only</td><td>Look around and report back. <b>Physically cannot break anything</b></td></tr>
+      <tr><td><b>coder</b></td><td>full</td><td>Make one specific change, then check it worked</td></tr>
+      <tr><td><b>reviewer</b></td><td>read-only</td><td>Find problems before we call it finished</td></tr>
+      </table>
+      <div class="note"><span class="t">Safety by simply not giving it the tool</span>
+      <p>The explorer <b>has no way to write files at all</b>. No clever wording in a file it reads
+      can trick it into deleting something, because the ability isn't there.</p>
+      <p><b>Take the tool away. Don't ask the model nicely.</b></p></div>
+      <h3>The same idea, scaled up: <code>/audit</code></h3>
+      <ul>
+        <li>Reviewing a whole project doesn't fit in a local model's head. Not close.</li>
+        <li>So we <b>split it up</b>: review each small piece with a fresh helper, then merge all the
+        findings into one report.</li>
+        <li>Each helper stays small and fast &#8212; the exact opposite of one giant request.</li>
+      </ul>
+      <div class="key"><span class="t">Generalisable</span>
+      <p>When a job doesn't fit, <b>don't go looking for a bigger model &#8212; split the job.</b></p></div>
     </div>
   </div>
   <div class="foot"><span>llmc-code &#183; how it works</span><span>19</span></div>
 </div>
 
-<div class="slide">
-  <div class="sh"><span class="num">20</span><h2>Recap &#8212; and build your own</h2>
+<div data-src="s18" id="s-heat" class="slide">
+  <div class="sh"><span class="num">20</span><h2>Custom #12 &#8212; your laptop is not a data centre</h2>
+    <span class="tag">cooldown.py &#183; gentle mode</span></div>
+  <div class="body">
+    <div class="left">
+      <div class="wwh" style="flex-direction:column;margin-top:0">
+        <div class="why"><span class="lbl">Why</span>
+        <p>A cloud tool never thinks about hardware. On <b>your</b> laptop, an hour of flat-out work
+        means screaming fans &#8212; then the machine <b>deliberately slows itself down</b> to cool off.
+        The longer you work, the worse it gets.</p></div>
+        <div class="what"><span class="lbl">What</span>
+        <p>Two features <b>no cloud tool has</b>:<br>
+        &#8226; a forced <b>one-minute break</b> after roughly ten minutes of solid work<br>
+        &#8226; <b>shorter replies and small pauses</b> between turns</p></div>
+        <div class="how"><span class="lbl">How</span>
+        <p>The break happens at the <b>top of the loop</b>, where nothing is half-finished. Both are on
+        by default, and both switch themselves off when output is piped &#8212; so scripts and tests
+        never sit there waiting.</p></div>
+      </div>
+      <div class="note" style="margin-top:3mm"><span class="t">Why the top of the loop</span>
+      <p>Pausing in the middle of a step would leave a request with no matching result sitting in the
+      conversation &#8212; and most servers <b>reject the whole thing</b> when they see that.</p>
+      <p>The position isn't arbitrary &#8212; it makes breaking <b>impossible</b>, not just unlikely.
+      Ctrl-C is handled at the same spot, for the same reason.</p></div>
+    </div>
+    <div class="right">
+      <div class="problem"><span class="t">The bug that gentle mode caused</span>
+      <p>We capped how much the model could write, to keep the GPU cool. On a normal answer, hitting
+      the cap just cuts off a sentence.</p>
+      <p>But when it <em>writes a file</em>, the file content travels <b>inside the request itself</b>.
+      Cut that off and the request is incomplete &#8212; the model thought it had written the file,
+      the user thought so too, and <b>nothing reached the disk</b>.</p>
+      <p><b>The fix, in three parts:</b> the cap is now <b>skipped entirely whenever tools are on the
+      table</b>; the default was raised <b>1,024 &#8594; 4,096</b>; and anything still cut off is retried
+      <b>once</b> with no cap at all.</p>
+      <p><b>And the twist:</b> cutting off then retrying meant the model wrote the answer <em>twice</em>
+      &#8212; which produced <b>more</b> heat than the cap ever saved.</p></div>
+      <div class="key"><span class="t">The lesson</span>
+      <p><b>A limit you set for one reason will be hit by something you never thought about.</b>
+      Whenever you add a cap, ask what <em>else</em> travels down that path.</p></div>
+      <div class="note"><span class="t">The honest reframe</span>
+      <p>We spent a long time trying to make it <em>type</em> faster. Typing speed was <b>never</b> the
+      problem &#8212; it sat near 95 words a second throughout. The real pain was the <b>waiting</b>.</p>
+      <p>Nobody experiences "words per second". They experience <b>"I pressed Enter, and then I
+      waited."</b> That is the number to improve.</p></div>
+    </div>
+  </div>
+  <div class="foot"><span>llmc-code &#183; how it works</span><span>20</span></div>
+</div>
+
+<style>#s-safety li{font-size:9.7pt;margin-bottom:1.1mm}#s-safety td{padding:1.2mm 2.5mm}#s-safety th{padding:1.2mm 2.5mm}#s-safety h3{margin:0 0 1.5mm 0}</style>
+<div data-src="s19" class="slide" id="s-safety" style="padding-bottom:7mm">
+  <div class="sh"><span class="num">21</span><h2>Custom #13 &#8212; never trusting the model</h2>
+    <span class="tag">guards &#183; safety &#183; privacy</span></div>
+  <div class="body">
+    <div class="left">
+      <h3 style="margin-bottom:1.5mm">Nine ways it knows to stop</h3>
+      <table style="font-size:8.9pt">
+      <tr><th style="width:44%">What it watches for</th><th>The limit</th></tr>
+      <tr><td>Going round and round</td><td>80 times, then stop</td></tr>
+      <tr><td>Requests we can't read at all</td><td>3 bad rounds</td></tr>
+      <tr><td>Asking for the exact same thing again</td><td>4 repeats</td></tr>
+      <tr><td>It thought, but said nothing</td><td>2 retries</td></tr>
+            <tr><td>The reply got cut off</td><td>once per round</td></tr>
+      <tr><td>The request was malformed</td><td>once each</td></tr>
+      <tr><td>You pressed Ctrl-C</td><td>checked every round</td></tr>
+      <tr><td>It's reading far too much</td><td>nudged once a turn</td></tr>
+      </table>
+      <div class="key" style="font-size:9.5pt"><span class="t">A safety net that catches healthy behaviour is a bug</span>
+      <p>Our first version counted <b>any</b> bad request and shut down sessions that were working
+      fine. A model that makes one good request and one bad one <em>is still getting somewhere</em>.</p>
+      <p>Now it only counts when <b>everything</b> in that round failed &#8212; and a single good
+      request resets the count.</p></div>
+    </div>
+    <div class="right">
+      <h3 style="margin-bottom:1.5mm">Treat the model like any untrusted input</h3>
+      <ul style="font-size:10.2pt">
+        <li><b>It asks you first</b> before writing, editing, or running anything.</li>
+        <li><b>Workspace confinement</b> on the <em>file</em> tools (read / write / edit / glob / grep /
+        repo_map) &#8212; paths resolving outside the launch directory are refused.</li>
+        <li><b>Your secrets are stripped out</b> &#8212; commands it runs never inherit your API keys or
+        cloud credentials.</li>
+                <li><b>Web fetching can't reach inside your network</b> &#8212; private addresses are refused, and
+        re-checked on <em>every redirect</em>, so it can't be talked into it halfway.</li>
+        <li><b>Undo checkpoints</b> &#8212; files are snapshotted before every edit.</li>
+        <li><b>Small mistakes fix themselves</b> &#8212; a wrong path is corrected and retried, a limited
+        number of times.</li>
+      </ul>
+      <div class="note" style="font-size:9.4pt"><span class="t"><code>--private</code>: an enforced offline lockdown</span>
+      <p>Not a promise &#8212; an actual mechanism. The model address <b>must</b> be your own machine.
+      Web fetching is <b>removed entirely</b>, so the model can't even ask. Commands run with the
+      network blocked, and if that blocking isn't available, they <b>refuse to run at all</b>
+      rather than run unprotected.</p></div>
+      <div class="problem" style="font-size:9.4pt"><span class="t">The most valuable bug we ever fixed</span>
+      <p>Our own docs said the tool couldn't write outside your project folder. For shell commands
+      that was simply <b>not true</b> &#8212; it is a raw shell, with no path check in it at all. What
+      actually protects you there is <b>the confirmation prompt</b>.</p>
+      <p><b>A safety claim that isn't true is worse than no claim</b>, because people relax
+      <em>because</em> of it. Say which mechanism enforces a guarantee &#8212; or don't make it.</p></div>
+    </div>
+  </div>
+  <div class="foot"><span>llmc-code &#183; how it works</span><span>21</span></div>
+</div>
+
+<div data-src="s20" class="slide">
+  <div class="sh"><span class="num">22</span><h2>Custom #14 &#8212; other people's tools, and testing without a GPU</h2>
+    <span class="tag">mcp.py &#183; providers.py</span></div>
+  <div class="body">
+    <div class="left">
+      <h3>Plugging in tools we didn't write</h3>
+      <div class="wwh" style="flex-direction:column;margin-top:0">
+        <div class="why"><span class="lbl">Why</span>
+        <p>Our eleven tools can't cover everything. Other people have already built tools for
+        databases, note vaults, ticket systems. <b>MCP</b> is an agreed way for any AI tool to talk
+        to any of them, so nobody has to write a special connector each time.</p></div>
+        <div class="what"><span class="lbl">What</span>
+        <p><b>741 lines, no new libraries.</b> Each tool program is started as a small background
+        process, and its abilities are added to the model's list next to our own.</p></div>
+        <div class="how"><span class="lbl">How</span>
+        <p>Start it, ask what it can do, add those to the list. One that fails to start is <b>skipped
+        with a warning</b> &#8212; it never takes the whole program down with it.</p></div>
+      </div>
+      <div class="problem" style="margin-top:3mm"><span class="t">Never trust a server's own hints</span>
+      <p>A tool program can declare "this one is harmless, no need to ask". But a <em>bad</em> one
+      could say that about something destructive, to get it run automatically.</p>
+      <p>So that claim is ignored unless <b>you</b> have said you trust that particular program.
+      <b>The decision to trust is always yours, never the tool's.</b></p>
+      <p>Also: names are checked so one program can't impersonate another, duplicates are skipped
+      rather than silently overwriting, and a program that stops responding is <b>shut down</b>
+      &#8212; so a late reply can never be mistaken for the answer to a different question.</p></div>
+    </div>
+    <div class="right">
+      <h3>The single best decision in this project</h3>
+      <p>We never let the code call the model directly. It always goes through a <b>swappable
+      piece</b>. That let us write a second one: a <b>fake model that follows a script</b>.</p>
+      <div class="srcfile">real or fake, both produce exactly these three things</div>
+      <pre class="sm">{<span class="str">"type"</span>:<span class="str">"text"</span>,      <span class="str">"text"</span>: <span class="cmt">&lt;incremental delta&gt;</span>}
+{<span class="str">"type"</span>:<span class="str">"tool_call"</span>, <span class="str">"id"</span>, <span class="str">"name"</span>, <span class="str">"arguments"</span>: <span class="cmt">&lt;dict&gt;</span>}
+{<span class="str">"type"</span>:<span class="str">"done"</span>,      <span class="str">"finish_reason"</span>, <span class="str">"output_tokens"</span>}   <span class="cmt"># exactly one, last</span></pre>
+      <div style="display:flex;gap:4mm;margin:3mm 0">
+        <div class="card stat"><div class="n">1,355</div><div class="l">tests</div></div>
+        <div class="card stat"><div class="n">0</div><div class="l">of them need<br>a GPU or internet</div></div>
+        <div class="card stat"><div class="n">3</div><div class="l">dependencies<br>openai &#183; rich &#183; prompt_toolkit</div></div>
+      </div>
+      <div class="key"><span class="t">Why this matters more than it sounds</span>
+      <p>Nearly every bug here is a <b>loop bug</b>: a request with no matching result, a counter that
+      never resets, messages added in the wrong order.</p>
+      <p>You cannot chase those with a real model &#8212; it gives a different answer every time, and
+      slowly. Against a script they become <b>ordinary tests that run in milliseconds</b>.</p></div>
+      <div class="note"><span class="t">Do this on day one</span>
+      <p>Adding this swappable piece later, once twelve different places all call the model
+      directly, is miserable work. Done at the start, it costs ten minutes.</p></div>
+    </div>
+  </div>
+  <div class="foot"><span>llmc-code &#183; how it works</span><span>22</span></div>
+</div>
+
+<div data-src="s21" class="slide">
+  <div class="sh"><span class="num">23</span><h2>Recap &#8212; and how to build your own</h2>
     <span class="tag">take-aways</span></div>
   <div class="body" style="font-size:96%">
     <div class="left">
-      <h3>What we actually built</h3>
+      <h3>What we built, in one line each</h3>
       <table style="font-size:9pt">
-      <tr><th style="width:30%">Layer</th><th>The idea in one line</th></tr>
-      <tr><td><b>The loop</b></td><td>Let the model request actions; run them; feed the results back; repeat until it answers.</td></tr>
-      <tr><td><b>Tools</b></td><td>Cap every output, never raise, and write error messages <em>for the model</em>.</td></tr>
-      <tr><td><b>Dialect parsing</b></td><td>Accept seven formats; refuse to act when the input is ambiguous.</td></tr>
-      <tr><td><b>Context mgmt</b></td><td>Measure &#8594; budget &#8594; trim &#8594; compact. Send what <em>this</em> message needs.</td></tr>
-      <tr><td><b>CAG</b></td><td>Append-only history keeps the server's KV cache hitting. Free speed.</td></tr>
-      <tr><td><b>RAG</b></td><td>Search a store instead of pasting everything. Cheap test first, expensive method only if needed.</td></tr>
-      <tr><td><b>Vector store</b></td><td>float32 arrays + a packed sidecar + a checksum. No database.</td></tr>
-      <tr><td><b>Sub-agents</b></td><td>When a job doesn't fit in context, partition the job.</td></tr>
-      <tr><td><b>Hardware</b></td><td>Cooldown and output caps &#8212; the machine is part of the system.</td></tr>
-      <tr><td><b>Safety</b></td><td>The model is untrusted input. Gate, confine, scrub, snapshot.</td></tr>
+      <tr><th style="width:30%">The part</th><th>The idea behind it</th></tr>
+      <tr><td><b>The loop</b></td><td>Let the model ask for things. Do them. Show it what happened. Repeat until it just answers.</td></tr>
+      <tr><td><b>Tools</b></td><td>Always cut output short, never crash, and write error messages <em>for the model to read</em>.</td></tr>
+      <tr><td><b>Dialect parsing</b></td><td>Understand seven ways of asking &#8212; but refuse to act when it's unclear.</td></tr>
+      <tr><td><b>Context mgmt</b></td><td>Measure, budget, shorten, summarise. Send what <em>this</em> question needs, nothing more.</td></tr>
+      <tr><td><b>CAG</b></td><td>Only ever add to the end, so the server can skip re-reading. Free speed.</td></tr>
+      <tr><td><b>RAG</b></td><td>Search a store instead of pasting everything in. Cheap check first, expensive one only if needed.</td></tr>
+      <tr><td><b>Vector store</b></td><td>Raw numbers in a second file, plus a fingerprint so a crash can't scramble them.</td></tr>
+      <tr><td><b>Sub-agents</b></td><td>When a job doesn't fit, split the job.</td></tr>
+      <tr><td><b>Hardware</b></td><td>Breaks and shorter replies &#8212; the laptop is part of the system too.</td></tr>
+      <tr><td><b>Safety</b></td><td>Treat the model as untrusted. Ask first, fence it in, strip secrets, keep an undo.</td></tr>
       </table>
       <div class="key"><span class="t">If you remember one thing</span>
-      <p><b>The model is not the program.</b> About 95% of this codebase is the machinery around it
-      &#8212; and that machinery is where the quality comes from.</p></div>
+      <p><b>The model is not the program.</b> Around 95% of this code is the machinery <em>around</em>
+      the model &#8212; and that machinery is where the quality actually comes from.</p></div>
     </div>
     <div class="right">
-      <h3>Start here: a real agent in 20 lines</h3>
+      <h3>Start here: a working assistant in 20 lines</h3>
       <p>Everything here grew out of the loop on slide 4. Type it, run it, then grow it &#8212; each exercise rebuilds one slide:</p>
       <table style="font-size:9pt">
       <tr><th style="width:8%">#</th><th style="width:44%">Exercise</th><th>What you'll discover</th></tr>
-      <tr><td>1</td><td>Add <code>write_file</code> and <code>edit_file</code></td><td>Edits fail on whitespace; you'll invent a tolerant fallback</td></tr>
-      <tr><td>2</td><td>Print a running token count of <code>messages</code></td><td>Watch it explode after 3 reads &#8212; this is why Part 2 exists</td></tr>
-      <tr><td>3</td><td>Summarise old turns past 8k tokens</td><td>Compaction &#8212; and why truncation loses decisions</td></tr>
-      <tr><td>4</td><td>Write a BM25 index + a <code>code_search</code> tool</td><td>Keyword search beats embeddings for code more often than you expect</td></tr>
-      <tr><td>5</td><td>Add embeddings, but only when BM25 scores 0</td><td>The hybrid gate</td></tr>
-      <tr><td>6</td><td>Snapshot files before edits; add <code>/undo</code></td><td>Trust &#8212; users approve far more when undo exists</td></tr>
-      <tr><td>7</td><td>Add <code>spawn_agent</code> with read-only tools</td><td>Context isolation</td></tr>
-      <tr><td>8</td><td>Point it at a model that emits XML tool calls</td><td>Reality. You'll write your second parser, then your third</td></tr>
+      <tr><td>1</td><td>Add writing and editing files</td><td>Edits fail over invisible spacing. You'll invent a forgiving match.</td></tr>
+      <tr><td>2</td><td>Print the conversation size after each turn</td><td>Watch it explode after three file reads. That's the whole problem.</td></tr>
+      <tr><td>3</td><td>Summarise old turns once it gets big</td><td>And why simply deleting them loses your decisions.</td></tr>
+      <tr><td>4</td><td>Build a word search over your code</td><td>It beats meaning-search on code far more often than you'd think.</td></tr>
+      <tr><td>5</td><td>Add meaning-search, but only when the word search finds nothing</td><td>Cheap first, expensive only when needed.</td></tr>
+      <tr><td>6</td><td>Copy files before editing; add an undo</td><td>People approve far more changes once undo exists.</td></tr>
+      <tr><td>7</td><td>Send a read-only helper to do the exploring</td><td>Its reading gets thrown away; yours stays clean.</td></tr>
+      <tr><td>8</td><td>Point it at a model that asks in a different format</td><td>Reality. You'll write your second reader, then your third.</td></tr>
       </table>
       <div class="note"><span class="t">Final advice</span>
-      <p>Build the loop first and make it ugly. Then spend your time on <b>tool quality</b> and
-      <b>context discipline</b> &#8212; that is where nearly all the difference between a
-      frustrating agent and a useful one actually lives.</p></div>
+      <p>Build the loop first, and let it be ugly. Then spend your time on <b>better tools</b> and
+      <b>keeping the conversation small</b>. That is where almost all the difference between a
+      frustrating assistant and a genuinely useful one actually lives.</p></div>
       <p style="margin-top:3mm;font-family:var(--mono);font-size:8.5pt;color:#7a8799">
       pipx install llmc-code &#183; github.com/Adhithya-Karthikeyan/llmc-code</p>
     </div>
   </div>
-  <div class="foot"><span>llmc-code &#183; how it works</span><span>20</span></div>
+  <div class="foot"><span>llmc-code &#183; how it works</span><span>23</span></div>
 </div>
 
 </body></html>
