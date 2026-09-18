@@ -270,246 +270,7 @@ figcaption{ font-size:8.6pt; color:var(--ink-faint); margin-top:2mm; }
 </div>
 
 <div data-src="s03" class="slide">
-  <div class="sh"><span class="num">02</span><h2>The one data structure everything else operates on</h2>
-    <span class="tag">start here</span></div>
-  <div class="body">
-    <div class="left">
-      <p>Before any module makes sense, you need this. The assistant's entire "memory" is <b>one
-      Python list of dictionaries</b>, in a variable called <code>agent.messages</code>.</p>
-      <p>No database, no hidden state, no framework object. Just a list. Every feature in this deck
-      is an <b>operation on that list</b>.</p>
-      <div class="srcfile">agent.messages &#8212; the only five shapes that ever go in it</div>
-      <pre class="sm" style="font-size:7pt">[
- {<span class="str">"role"</span>:<span class="str">"system"</span>,    <span class="str">"content"</span>:<span class="str">"You are a coding agent…"</span>},   <span class="cmt"># [0], never moves</span>
-
- {<span class="str">"role"</span>:<span class="str">"user"</span>,      <span class="str">"content"</span>:<span class="str">"fix the failing test"</span>},
-
- {<span class="str">"role"</span>:<span class="str">"assistant"</span>, <span class="str">"content"</span>:<span class="str">""</span>,                      <span class="cmt"># it wants something</span>
-  <span class="str">"tool_calls"</span>:[{<span class="str">"id"</span>:<span class="str">"call_1"</span>,
-                <span class="str">"function"</span>:{<span class="str">"name"</span>:<span class="str">"run_bash"</span>,
-                             <span class="str">"arguments"</span>:<span class="str">'{"command":"pytest -q"}'</span>}}]},
-
- {<span class="str">"role"</span>:<span class="str">"tool"</span>,      <span class="str">"tool_call_id"</span>:<span class="str">"call_1"</span>,          <span class="cmt"># the result</span>
-  <span class="str">"content"</span>:<span class="str">'{"ok":true,"exit":1,"stdout":"FAILED test_parse.py…"}'</span>},
-
- {<span class="str">"role"</span>:<span class="str">"assistant"</span>, <span class="str">"content"</span>:<span class="str">"The parser crashes on empty input…"</span>}
-]                                                <span class="cmt"># ↑ no tool_calls = done</span></pre>
-      <div class="key"><span class="t">Two invariants you must never break</span>
-      <p>&#8226; <b>Index 0 is always the system message.</b> Every operation starts from index 1.<br>
-      &#8226; <b>Every <code>tool_calls</code> entry needs a matching <code>tool</code> entry with the
-      same <code>id</code>.</b> One without the other and the server rejects the <em>whole</em>
-      request. Most agent bugs are this bug.</p></div>
-    </div>
-    <div class="right">
-      <div class="qa"><div class="q">How fast does it grow?</div>
-      <div class="a">One thing you type produces <b>1 + 2&#215;N</b> entries, where N is how many actions
-      the model took. "Fix the failing test" &#8212; run tests, read two files, edit, re-run &#8212; is
-      <b>11 entries</b>, and those tool results can be thousands of lines.</div></div>
-      <div class="qa"><div class="q">Where does it actually live?</div>
-      <div class="a"><b>In RAM</b>, as an attribute on the <code>Agent</code> object. <b>On disk</b>,
-      rewritten after every completed turn:</div></div>
-      <div class="srcfile">~/.llmcode/sessions/&lt;project-id&gt;.json</div>
-      <pre class="sm">{<span class="str">"cwd"</span>:        <span class="str">"/Users/you/projects/app"</span>,
- <span class="str">"updated_at"</span>: <span class="str">"2026-09-18T09:14:02+00:00"</span>,
- <span class="str">"model"</span>:      <span class="str">"qwen3-coder-30b"</span>,
- <span class="str">"title"</span>:      <span class="str">"fix the failing test"</span>,
- <span class="str">"messages"</span>:   [ <span class="cmt">… the exact list above …</span> ]}</pre>
-      <div class="qa"><div class="q">Four operations, and nothing else</div>
-      <div class="a">Every technique later in this deck is one of these:<br>
-      &#8226; <b>Append</b> to the end &#8212; all the loop ever does<br>
-      &#8226; <b>Shorten</b> one entry's <code>content</code>, in place &#8212; the trim (box 5)<br>
-      &#8226; <b>Replace</b> a run of old entries with one summary &#8212; compaction (box 5)<br>
-      &#8226; <b>Copy</b> the list and add to the copy &#8212; recall and caching (boxes 6, 7)</div></div>
-      <div class="note"><span class="t">Why this slide comes first</span>
-      <p>"Managing context" sounds abstract until you know it means <b>editing strings inside a Python
-      list</b>. That is all it is.</p></div>
-    </div>
-  </div>
-  <div class="foot"><span>llmc-code &#183; how it works</span><span>2</span></div>
-</div>
-
-<div data-src="s04" class="slide">
-  <div class="sh"><span class="num">03</span><h2>Where everything is actually stored</h2>
-    <span class="tag">one folder, seven files</span></div>
-  <div class="body">
-    <div class="left">
-      <p>Every piece of state this program keeps lives under <b>one folder in your home
-      directory</b>. No database, no server, no cache daemon. You can open all of it in a text
-      editor.</p>
-      <div class="srcfile">the whole state of the tool &#8212; chmod 0700, owner only</div>
-      <pre class="sm">~/.llmcode/
-├── config.json                       <span class="cmt"># your settings</span>
-├── mcp.json                          <span class="cmt"># external tool programs</span>
-├── sessions/
-│   ├── app-3f9a1c2b7e04.json         <span class="cmt"># THE CONVERSATION</span>
-│   ├── app-3f9a1c2b7e04.memory.json  <span class="cmt"># past Q&amp;A, for recall</span>
-│   ├── app-3f9a1c2b7e04.memory.json.vec   <span class="cmt"># their vectors (binary)</span>
-│   └── app-3f9a1c2b7e04.code_index.json   <span class="cmt"># your code, chunked</span>
-└── checkpoints/app-3f9a1c2b7e04/sessions/&lt;id&gt;/
-    ├── index.json                    <span class="cmt"># what was backed up, when</span>
-    └── blobs/*.blob                  <span class="cmt"># the file bytes, for undo</span></pre>
-      <div class="qa"><div class="q">What is that <code>app-3f9a1c2b7e04</code> part?</div>
-      <div class="a">A <b>project id</b>, built from the folder you launched in:</div></div>
-      <pre class="sm">project_id = <span class="str">"app"</span> + <span class="str">"-"</span> + sha256(<span class="str">"/Users/you/projects/app"</span>)[:<span class="num">12</span>]
-             <span class="cmt">#  ↑ folder name        ↑ first 12 hex of the FULL path</span></pre>
-      <div class="a">The name makes it readable. The hash of the <em>absolute path</em> makes it
-      unique &#8212; so two different projects both called <code>app</code> never collide, and the same
-      project always maps back to the same files.</div>
-    </div>
-    <div class="right">
-      <div class="qa"><div class="q">Why one file per concern, not one big one?</div></div>
-      <table>
-      <tr><th style="width:36%">File</th><th>Written when</th></tr>
-      <tr><td><code>&lt;proj&gt;.json</code><br><span class="ts">the conversation</span></td>
-          <td>After <b>every completed turn</b>. Whole file rewritten.</td></tr>
-      <tr><td><code>&lt;proj&gt;.memory.json</code><br><span class="ts">past questions + answers</span></td>
-          <td>When a turn finishes, one record is added.</td></tr>
-      <tr><td><code>&#8230;.memory.json.vec</code><br><span class="ts">the numbers</span></td>
-          <td>Only when something new gets embedded.</td></tr>
-      <tr><td><code>&lt;proj&gt;.code_index.json</code><br><span class="ts">your code, in chunks</span></td>
-          <td>When a search runs and a file has changed.</td></tr>
-      <tr><td><code>blobs/*.blob</code><br><span class="ts">undo copies</span></td>
-          <td>Just before each file edit.</td></tr>
-      </table>
-      <div class="a">Splitting them means a big write to one never risks the others, and the
-      <b>numbers stay out of the readable files</b>.</div>
-      <div class="key"><span class="t">Every single write uses the same three steps</span>
-      <p>Write to a <b>temporary file in the same folder</b> &#8594; flush it to the disk &#8594;
-      <b>rename</b> it over the real file.</p>
-      <p>Renaming is one indivisible operation, so a crash leaves you with <b>either the old file or
-      the new one</b> &#8212; never a half-written one. Same three lines in
-      <code>config.py</code>, <code>session.py</code>, <code>memory.py</code> and
-      <code>checkpoint.py</code>.</p></div>
-      <div class="note"><span class="t">What this buys you as a builder</span>
-      <p>When something goes wrong you can <code>cat</code> the file and see exactly what the model was
-      sent. Debugging an agent is mostly <b>reading the conversation you actually sent</b> &#8212; make
-      that easy on day one.</p></div>
-    </div>
-  </div>
-  <div class="foot"><span>llmc-code &#183; how it works</span><span>3</span></div>
-</div>
-
-<div data-src="s04a" class="slide">
-  <div class="sh"><span class="num">04</span><h2>The life of a conversation &#8212; stored, managed, retrieved</h2>
-    <span class="tag">from launch to saved on disk</span></div>
-  <figure style="margin:0 auto 2mm auto;width:98%"><svg viewBox="0 0 1100 546" xmlns="http://www.w3.org/2000/svg">
-  <!-- LEFT: the stages -->
-  <rect class="bx-b" x="8" y="6" width="786" height="80" rx="5"/>
-  <circle cx="34" cy="30" r="12" fill="#1f5fa8"/><text class="tms" x="34" y="34" text-anchor="middle" style="fill:#fff;font-weight:700">1</text>
-  <text class="tb" x="54" y="34">You launch llmc-code inside a project folder</text>
-  <text class="ts" x="20" y="56">project id  =  folder name  +  first 12 hex of sha256(absolute path)</text>
-  <text class="ts" x="20" y="74">so the same folder always maps back to the same files, and two projects named "app" never collide</text>
-  <path class="ln-b" d="M401,86 L401,104"/>
-
-  <rect class="bx" x="8" y="106" width="786" height="66" rx="5"/>
-  <circle cx="34" cy="130" r="12" fill="#5a6c80"/><text class="tms" x="34" y="134" text-anchor="middle" style="fill:#fff;font-weight:700">2</text>
-  <text class="tb" x="54" y="134">The list is created</text>
-  <text class="tms" x="20" y="158">messages = [ {"role":"system", "content": "&#8230;the instructions&#8230;"} ]</text>
-  <text class="ts" x="520" y="158">&#8592; plus the saved history, only if you ask</text>
-  <path class="ln" d="M401,172 L401,190"/>
-
-  <rect class="bx-b" x="8" y="192" width="786" height="58" rx="5"/>
-  <circle cx="34" cy="216" r="12" fill="#1f5fa8"/><text class="tms" x="34" y="220" text-anchor="middle" style="fill:#fff;font-weight:700">3</text>
-  <text class="tb" x="54" y="220">You type something</text>
-  <text class="tms" x="20" y="240">messages.append({"role":"user", "content": "fix the failing test"})</text>
-  <path class="ln" d="M401,250 L401,268"/>
-
-  <rect class="bx-a" x="8" y="270" width="786" height="120" rx="5"/>
-  <circle cx="34" cy="294" r="12" fill="#a8611f"/><text class="tms" x="34" y="298" text-anchor="middle" style="fill:#fff;font-weight:700">4</text>
-  <text class="tb" x="54" y="298">Before anything is sent &#8212; five steps, cheapest first</text>
-  <rect class="bx" x="20" y="310" width="145" height="70" rx="4"/>
-  <text class="tms" x="92" y="330" text-anchor="middle" style="font-weight:700">classify</text>
-  <text class="ts" x="92" y="350" text-anchor="middle">quick question</text>
-  <text class="ts" x="92" y="366" text-anchor="middle">or real work?</text>
-  <rect class="bx" x="173" y="310" width="145" height="70" rx="4"/>
-  <text class="tms" x="245" y="330" text-anchor="middle" style="font-weight:700">budget</text>
-  <text class="ts" x="245" y="350" text-anchor="middle">12,000 &#215; 1&#8211;3</text>
-  <text class="ts" x="245" y="366" text-anchor="middle">for this turn</text>
-  <rect class="bx" x="326" y="310" width="145" height="70" rx="4"/>
-  <text class="tms" x="398" y="330" text-anchor="middle" style="font-weight:700">shorten</text>
-  <text class="ts" x="398" y="350" text-anchor="middle">old tool results</text>
-  <text class="ts" x="398" y="366" text-anchor="middle">&#8594; 500 chars</text>
-  <rect class="bx" x="479" y="310" width="145" height="70" rx="4"/>
-  <text class="tms" x="551" y="330" text-anchor="middle" style="font-weight:700">look up</text>
-  <text class="ts" x="551" y="350" text-anchor="middle">search past</text>
-  <text class="ts" x="551" y="366" text-anchor="middle">answers (RAG)</text>
-  <rect class="bx-g" x="632" y="310" width="150" height="70" rx="4"/>
-  <text class="tms" x="707" y="330" text-anchor="middle" style="font-weight:700">copy + add</text>
-  <text class="ts" x="707" y="350" text-anchor="middle">messages + extras</text>
-  <text class="ts" x="707" y="366" text-anchor="middle">extras go LAST</text>
-  <path class="ln-o" d="M401,390 L401,408"/>
-
-  <rect class="bx-p" x="8" y="410" width="786" height="58" rx="5"/>
-  <circle cx="34" cy="434" r="12" fill="#6a3fa0"/><text class="tms" x="34" y="438" text-anchor="middle" style="fill:#fff;font-weight:700">5</text>
-  <text class="tb" x="54" y="438">Send &#8212; then loop</text>
-  <text class="ts" x="20" y="458">append the reply &#8594; run what it asked for &#8594; append the result &#8594; send again, until it just talks</text>
-  <path class="ln-p" d="M401,468 L401,486"/>
-
-  <rect class="bx-g" x="8" y="488" width="786" height="52" rx="5"/>
-  <circle cx="34" cy="512" r="12" fill="#1d7a53"/><text class="tms" x="34" y="516" text-anchor="middle" style="fill:#fff;font-weight:700">6</text>
-  <text class="tb" x="54" y="512">Turn ends &#8212; save</text>
-  <text class="ts" x="20" y="532">write the whole list to disk (temp file, then rename) &#183; store one memory record of this Q&amp;A</text>
-
-  <!-- RIGHT: the disk -->
-  <rect class="bx-d" x="814" y="6" width="278" height="534" rx="5" stroke-dasharray="5 4"/>
-  <text class="tt" x="828" y="28">ON YOUR DISK</text>
-  <text class="tm" x="828" y="52">~/.llmcode/sessions/</text>
-
-  <rect class="bx" x="828" y="66" width="250" height="56" rx="4"/>
-  <text class="tms" x="838" y="86">&lt;project-id&gt;.json</text>
-  <text class="ts" x="838" y="104">the conversation itself</text>
-  <text class="ts" x="838" y="118">read at step 1, written at step 6</text>
-
-  <rect class="bx" x="828" y="132" width="250" height="56" rx="4"/>
-  <text class="tms" x="838" y="152">&lt;project-id&gt;.memory.json</text>
-  <text class="ts" x="838" y="170">past questions and answers</text>
-  <text class="ts" x="838" y="184">read at step 4, written at step 6</text>
-
-  <rect class="bx" x="828" y="198" width="250" height="40" rx="4"/>
-  <text class="tms" x="838" y="218">&#8230;.memory.json.vec</text>
-  <text class="ts" x="838" y="232">their numbers, as raw bytes</text>
-
-  <rect class="bx" x="828" y="248" width="250" height="40" rx="4"/>
-  <text class="tms" x="838" y="268">&lt;project-id&gt;.code_index.json</text>
-  <text class="ts" x="838" y="282">your code, split by function</text>
-
-  <rect class="bx" x="828" y="298" width="250" height="40" rx="4"/>
-  <text class="tms" x="838" y="318">checkpoints/&#8230;/blobs/</text>
-  <text class="ts" x="838" y="332">file copies, so /undo works</text>
-
-  <rect class="bx-r" x="828" y="356" width="250" height="90" rx="4"/>
-  <text class="tt" x="838" y="376" fill="#a8324a">NOTHING LEAVES THIS FOLDER</text>
-  <text class="ts" x="838" y="396">The saved chat can contain the</text>
-  <text class="ts" x="838" y="410">contents of files the model read.</text>
-  <text class="ts" x="838" y="424">It is never uploaded anywhere,</text>
-  <text class="ts" x="838" y="438">and the folder is owner-only.</text>
-
-  <text class="ts" x="828" y="472">Every write is: temp file &#8594;</text>
-  <text class="ts" x="828" y="488">rename over the real one.</text>
-  <text class="ts" x="828" y="504">A crash leaves you the old file</text>
-  <text class="ts" x="828" y="520">or the new one &#8212; never half.</text>
-
-  <path class="ln" d="M794,46 L824,46"/>
-  <path class="ln" d="M794,514 L824,514"/>
-  <path class="ln" d="M794,345 L824,160"/>
-</svg>
-</figure>
-  <div class="wwh">
-    <div class="why"><span class="lbl">Stored</span>
-    <p>In <b>RAM</b> as one Python list while you work, and mirrored to <b>one JSON file per project
-    folder</b> after every turn. Nothing else holds it.</p></div>
-    <div class="what"><span class="lbl">Managed</span>
-    <p>Only ever <b>added to at the end</b>. The five steps at stage 4 decide how much of it goes out
-    this turn &#8212; they shorten and select, they never delete.</p></div>
-    <div class="how"><span class="lbl">Retrieved</span>
-    <p>A fresh launch starts <b>empty</b> on purpose. The saved chat comes back only when you pass
-    <code>-c</code> or type <code>/resume</code> &#8212; so yesterday's context is never a surprise.</p></div>
-  </div>
-  <div class="foot"><span>llmc-code &#183; how it works</span><span>4</span></div>
-</div>
-
-<div data-src="s05" class="slide">
-  <div class="sh"><span class="num">05</span><h2>The complete architecture</h2>
+  <div class="sh"><span class="num">02</span><h2>The complete architecture</h2>
     <span class="tag">the map &#183; box numbers below</span></div>
   <figure style="margin:0 auto 2mm auto;width:84%"><svg viewBox="0 0 1100 474" xmlns="http://www.w3.org/2000/svg">
   <!-- USER -->
@@ -662,11 +423,131 @@ figcaption{ font-size:8.6pt; color:var(--ink-faint); margin-top:2mm; }
     <p>Follow the arrows <b>top to bottom</b> for one question. <b>Each of the six numbered boxes
     gets its own slide next</b> &#8212; what it holds, how it works, and why it is built that way.</p></div>
   </div>
-  <div class="foot"><span>llmc-code &#183; how it works</span><span>5</span></div>
+  <div class="foot"><span>llmc-code &#183; how it works</span><span>2</span></div>
+</div>
+
+<div data-src="s04" class="slide">
+  <div class="sh"><span class="num">03</span><h2>The one data structure everything else operates on</h2>
+    <span class="tag">start here</span></div>
+  <div class="body">
+    <div class="left">
+      <p>Before any module makes sense, you need this. The assistant's entire "memory" is <b>one
+      Python list of dictionaries</b>, in a variable called <code>agent.messages</code>.</p>
+      <p>No database, no hidden state, no framework object. Just a list. Every feature in this deck
+      is an <b>operation on that list</b>.</p>
+      <div class="srcfile">agent.messages &#8212; the only five shapes that ever go in it</div>
+      <pre class="sm" style="font-size:7pt">[
+ {<span class="str">"role"</span>:<span class="str">"system"</span>,    <span class="str">"content"</span>:<span class="str">"You are a coding agent…"</span>},   <span class="cmt"># [0], never moves</span>
+
+ {<span class="str">"role"</span>:<span class="str">"user"</span>,      <span class="str">"content"</span>:<span class="str">"fix the failing test"</span>},
+
+ {<span class="str">"role"</span>:<span class="str">"assistant"</span>, <span class="str">"content"</span>:<span class="str">""</span>,                      <span class="cmt"># it wants something</span>
+  <span class="str">"tool_calls"</span>:[{<span class="str">"id"</span>:<span class="str">"call_1"</span>,
+                <span class="str">"function"</span>:{<span class="str">"name"</span>:<span class="str">"run_bash"</span>,
+                             <span class="str">"arguments"</span>:<span class="str">'{"command":"pytest -q"}'</span>}}]},
+
+ {<span class="str">"role"</span>:<span class="str">"tool"</span>,      <span class="str">"tool_call_id"</span>:<span class="str">"call_1"</span>,          <span class="cmt"># the result</span>
+  <span class="str">"content"</span>:<span class="str">'{"ok":true,"exit":1,"stdout":"FAILED test_parse.py…"}'</span>},
+
+ {<span class="str">"role"</span>:<span class="str">"assistant"</span>, <span class="str">"content"</span>:<span class="str">"The parser crashes on empty input…"</span>}
+]                                                <span class="cmt"># ↑ no tool_calls = done</span></pre>
+      <div class="key"><span class="t">Two invariants you must never break</span>
+      <p>&#8226; <b>Index 0 is always the system message.</b> Every operation starts from index 1.<br>
+      &#8226; <b>Every <code>tool_calls</code> entry needs a matching <code>tool</code> entry with the
+      same <code>id</code>.</b> One without the other and the server rejects the <em>whole</em>
+      request. Most agent bugs are this bug.</p></div>
+    </div>
+    <div class="right">
+      <div class="qa"><div class="q">How fast does it grow?</div>
+      <div class="a">One thing you type produces <b>1 + 2&#215;N</b> entries, where N is how many actions
+      the model took. "Fix the failing test" &#8212; run tests, read two files, edit, re-run &#8212; is
+      <b>11 entries</b>, and those tool results can be thousands of lines.</div></div>
+      <div class="qa"><div class="q">Where does it actually live?</div>
+      <div class="a"><b>In RAM</b>, as an attribute on the <code>Agent</code> object. <b>On disk</b>,
+      rewritten after every completed turn:</div></div>
+      <div class="srcfile">~/.llmcode/sessions/&lt;project-id&gt;.json</div>
+      <pre class="sm">{<span class="str">"cwd"</span>:        <span class="str">"/Users/you/projects/app"</span>,
+ <span class="str">"updated_at"</span>: <span class="str">"2026-09-18T09:14:02+00:00"</span>,
+ <span class="str">"model"</span>:      <span class="str">"qwen3-coder-30b"</span>,
+ <span class="str">"title"</span>:      <span class="str">"fix the failing test"</span>,
+ <span class="str">"messages"</span>:   [ <span class="cmt">… the exact list above …</span> ]}</pre>
+      <div class="qa"><div class="q">Four operations, and nothing else</div>
+      <div class="a">Every technique later in this deck is one of these:<br>
+      &#8226; <b>Append</b> to the end &#8212; all the loop ever does<br>
+      &#8226; <b>Shorten</b> one entry's <code>content</code>, in place &#8212; the trim (box 5)<br>
+      &#8226; <b>Replace</b> a run of old entries with one summary &#8212; compaction (box 5)<br>
+      &#8226; <b>Copy</b> the list and add to the copy &#8212; recall and caching (boxes 6, 7)</div></div>
+      <div class="note"><span class="t">Why this slide comes first</span>
+      <p>"Managing context" sounds abstract until you know it means <b>editing strings inside a Python
+      list</b>. That is all it is.</p></div>
+    </div>
+  </div>
+  <div class="foot"><span>llmc-code &#183; how it works</span><span>3</span></div>
+</div>
+
+<div data-src="s05" class="slide">
+  <div class="sh"><span class="num">04</span><h2>Where everything is actually stored</h2>
+    <span class="tag">one folder, seven files</span></div>
+  <div class="body">
+    <div class="left">
+      <p>Every piece of state this program keeps lives under <b>one folder in your home
+      directory</b>. No database, no server, no cache daemon. You can open all of it in a text
+      editor.</p>
+      <div class="srcfile">the whole state of the tool &#8212; chmod 0700, owner only</div>
+      <pre class="sm">~/.llmcode/
+├── config.json                       <span class="cmt"># your settings</span>
+├── mcp.json                          <span class="cmt"># external tool programs</span>
+├── sessions/
+│   ├── app-3f9a1c2b7e04.json         <span class="cmt"># THE CONVERSATION</span>
+│   ├── app-3f9a1c2b7e04.memory.json  <span class="cmt"># past Q&amp;A, for recall</span>
+│   ├── app-3f9a1c2b7e04.memory.json.vec   <span class="cmt"># their vectors (binary)</span>
+│   └── app-3f9a1c2b7e04.code_index.json   <span class="cmt"># your code, chunked</span>
+└── checkpoints/app-3f9a1c2b7e04/sessions/&lt;id&gt;/
+    ├── index.json                    <span class="cmt"># what was backed up, when</span>
+    └── blobs/*.blob                  <span class="cmt"># the file bytes, for undo</span></pre>
+      <div class="qa"><div class="q">What is that <code>app-3f9a1c2b7e04</code> part?</div>
+      <div class="a">A <b>project id</b>, built from the folder you launched in:</div></div>
+      <pre class="sm">project_id = <span class="str">"app"</span> + <span class="str">"-"</span> + sha256(<span class="str">"/Users/you/projects/app"</span>)[:<span class="num">12</span>]
+             <span class="cmt">#  ↑ folder name        ↑ first 12 hex of the FULL path</span></pre>
+      <div class="a">The name makes it readable. The hash of the <em>absolute path</em> makes it
+      unique &#8212; so two different projects both called <code>app</code> never collide, and the same
+      project always maps back to the same files.</div>
+    </div>
+    <div class="right">
+      <div class="qa"><div class="q">Why one file per concern, not one big one?</div></div>
+      <table>
+      <tr><th style="width:36%">File</th><th>Written when</th></tr>
+      <tr><td><code>&lt;proj&gt;.json</code><br><span class="ts">the conversation</span></td>
+          <td>After <b>every completed turn</b>. Whole file rewritten.</td></tr>
+      <tr><td><code>&lt;proj&gt;.memory.json</code><br><span class="ts">past questions + answers</span></td>
+          <td>When a turn finishes, one record is added.</td></tr>
+      <tr><td><code>&#8230;.memory.json.vec</code><br><span class="ts">the numbers</span></td>
+          <td>Only when something new gets embedded.</td></tr>
+      <tr><td><code>&lt;proj&gt;.code_index.json</code><br><span class="ts">your code, in chunks</span></td>
+          <td>When a search runs and a file has changed.</td></tr>
+      <tr><td><code>blobs/*.blob</code><br><span class="ts">undo copies</span></td>
+          <td>Just before each file edit.</td></tr>
+      </table>
+      <div class="a">Splitting them means a big write to one never risks the others, and the
+      <b>numbers stay out of the readable files</b>.</div>
+      <div class="key"><span class="t">Every single write uses the same three steps</span>
+      <p>Write to a <b>temporary file in the same folder</b> &#8594; flush it to the disk &#8594;
+      <b>rename</b> it over the real file.</p>
+      <p>Renaming is one indivisible operation, so a crash leaves you with <b>either the old file or
+      the new one</b> &#8212; never a half-written one. Same three lines in
+      <code>config.py</code>, <code>session.py</code>, <code>memory.py</code> and
+      <code>checkpoint.py</code>.</p></div>
+      <div class="note"><span class="t">What this buys you as a builder</span>
+      <p>When something goes wrong you can <code>cat</code> the file and see exactly what the model was
+      sent. Debugging an agent is mostly <b>reading the conversation you actually sent</b> &#8212; make
+      that easy on day one.</p></div>
+    </div>
+  </div>
+  <div class="foot"><span>llmc-code &#183; how it works</span><span>4</span></div>
 </div>
 
 <div data-src="s06" class="slide">
-  <div class="sh"><span class="num">06</span><h2>What happens when you press Enter</h2><span class="tag">one request, end to end</span></div>
+  <div class="sh"><span class="num">05</span><h2>What happens when you press Enter</h2><span class="tag">one request, end to end</span></div>
   <div class="body col">
     <figure style="margin:0 auto 2mm auto;width:100%"><svg viewBox="0 0 760 322" xmlns="http://www.w3.org/2000/svg">
   <!-- row 1 -->
@@ -745,11 +626,11 @@ figcaption{ font-size:8.6pt; color:var(--ink-faint); margin-top:2mm; }
       writes a file or runs a command <b>asks you first</b>. Just reading? It goes ahead.</p></div>
     </div>
   </div>
-  <div class="foot"><span>llmc-code &#183; how it works</span><span>6</span></div>
+  <div class="foot"><span>llmc-code &#183; how it works</span><span>5</span></div>
 </div>
 
 <div data-src="s07" class="slide">
-  <div class="sh"><span class="num">07</span><h2>The whole agent, in 20 lines</h2><span class="tag">the loop, in real code</span></div>
+  <div class="sh"><span class="num">06</span><h2>The whole agent, in 20 lines</h2><span class="tag">the loop, in real code</span></div>
   <div class="body">
     <div class="left">
       <p>Take away 3,000 lines of safety checks and polish, and this is the whole thing. It is not
@@ -800,17 +681,17 @@ figcaption{ font-size:8.6pt; color:var(--ink-faint); margin-top:2mm; }
       <b>Your error messages are now instructions to the model.</b> Write them for the model to read, not for a log file nobody opens.</p></div>
     </div>
   </div>
-  <div class="foot"><span>llmc-code &#183; how it works</span><span>7</span></div>
+  <div class="foot"><span>llmc-code &#183; how it works</span><span>6</span></div>
 </div>
 
 <div data-src="s08" class="slide">
-  <div class="sh"><span class="num">08</span><h2>Box 2 &#8212; the brain: what the Agent object holds</h2>
+  <div class="sh"><span class="num">07</span><h2>Box 2 &#8212; the brain: what the Agent object holds</h2>
     <span class="tag">box 2 &#183; agent.py</span></div>
   <div class="body">
     <div class="left">
       <div class="qa"><div class="q">The whole "brain" is one object with these fields</div></div>
       <div class="srcfile">llmcode/agent.py &#8212; the state that matters</div>
-      <pre class="sm">self.messages      <span class="cmt"># the list from slide 2 — the ONLY real state</span>
+      <pre class="sm">self.messages      <span class="cmt"># the list from slide 3 — the ONLY real state</span>
 self.provider      <span class="cmt"># who to send it to (real model, or the fake one)</span>
 self.registry      <span class="cmt"># {name: Tool} — what it is allowed to do</span>
 self.tool_names    <span class="cmt"># which of those to offer THIS agent</span>
@@ -857,12 +738,12 @@ truncation_retried        <span class="cmt"># once per pass (reply got cut off)<
       <p>Our first version counted <em>any</em> failure, and killed sessions that were working fine.</p></div>
     </div>
   </div>
-  <div class="foot"><span>llmc-code &#183; how it works</span><span>8</span></div>
+  <div class="foot"><span>llmc-code &#183; how it works</span><span>7</span></div>
 </div>
 
 <style>#s-tools td{padding:1.3mm 2.5mm}#s-tools th{padding:1.3mm 2.5mm}</style>
 <div data-src="s09" id="s-tools" class="slide">
-  <div class="sh"><span class="num">09</span><h2>Box 5 &#8212; the hands: what a tool actually is</h2>
+  <div class="sh"><span class="num">08</span><h2>Box 5 &#8212; the hands: what a tool actually is</h2>
     <span class="tag">box 5 &#183; tools.py</span></div>
   <div class="body">
     <div class="left">
@@ -918,11 +799,11 @@ REGISTRY: dict[str, Tool] = {}          <span class="cmt"># name → Tool</span>
       truncates head-only &#8212; because a test failure summary is at the <em>bottom</em>.</p></div>
     </div>
   </div>
-  <div class="foot"><span>llmc-code &#183; how it works</span><span>9</span></div>
+  <div class="foot"><span>llmc-code &#183; how it works</span><span>8</span></div>
 </div>
 
-<div data-src="s09a" class="slide">
-  <div class="sh"><span class="num">10</span><h2>One tool call, from request to result</h2>
+<div data-src="s10" class="slide">
+  <div class="sh"><span class="num">09</span><h2>One tool call, from request to result</h2>
     <span class="tag">what happens between the model asking and the model seeing</span></div>
   <figure style="margin:0 auto 3mm auto;width:100%"><svg viewBox="0 0 1100 330" xmlns="http://www.w3.org/2000/svg">
   <rect class="bx-p" x="8" y="20" width="164" height="70" rx="4"/>
@@ -997,11 +878,11 @@ REGISTRY: dict[str, Tool] = {}          <span class="cmt"># name → Tool</span>
     <p>A failure is appended as an ordinary result. The next pass round the loop, the model reads the
     error and tries something else &#8212; <b>no crash, no lost turn</b>.</p></div>
   </div>
-  <div class="foot"><span>llmc-code &#183; how it works</span><span>10</span></div>
+  <div class="foot"><span>llmc-code &#183; how it works</span><span>9</span></div>
 </div>
 
-<div data-src="s10" class="slide">
-  <div class="sh"><span class="num">11</span><h2>Box 6 &#8212; the mouth: turning any model into one shape</h2>
+<div data-src="s11" class="slide">
+  <div class="sh"><span class="num">10</span><h2>Box 6 &#8212; the mouth: turning any model into one shape</h2>
     <span class="tag">box 6 &#183; providers.py</span></div>
   <div class="body">
     <div class="left">
@@ -1059,11 +940,11 @@ args = json.loads(<span class="str">""</span>.join(slot[<span class="str">"args"
       model <em>explaining</em> <code>rm -rf</code> would run it.</p></div>
     </div>
   </div>
-  <div class="foot"><span>llmc-code &#183; how it works</span><span>11</span></div>
+  <div class="foot"><span>llmc-code &#183; how it works</span><span>10</span></div>
 </div>
 
-<div data-src="s11" class="slide">
-  <div class="sh"><span class="num">12</span><h2>Seven dialects in, one shape out</h2>
+<div data-src="s12" class="slide">
+  <div class="sh"><span class="num">11</span><h2>Seven dialects in, one shape out</h2>
     <span class="tag">providers.py &#8594; tools.py</span></div>
   <div class="body">
     <div class="left center"><figure style="margin:0 auto 2mm auto;width:96%"><svg viewBox="0 0 760 428" xmlns="http://www.w3.org/2000/svg">
@@ -1158,17 +1039,662 @@ args = json.loads(<span class="str">""</span>.join(slot[<span class="str">"args"
       the user's files.</p></div>
     </div>
   </div>
+  <div class="foot"><span>llmc-code &#183; how it works</span><span>11</span></div>
+</div>
+
+<div data-src="s13" class="slide">
+  <div class="sh"><span class="num">12</span><h2>CAG &#8212; re-using the work the server already did</h2>
+    <span class="tag">CAG &#183; 1 of 2</span></div>
+  <figure style="margin:0 auto 3mm auto;width:98%"><svg viewBox="0 0 1100 480" xmlns="http://www.w3.org/2000/svg">
+  <text class="tt" x="8" y="16">WHAT THE SERVER KEEPS</text>
+  <rect class="bx-d" x="8" y="26" width="1084" height="46" rx="5"/>
+  <text class="ts" x="24" y="46">As it reads your message it builds up working state for every word. It <tspan style="font-weight:650">keeps that state</tspan> after answering.</text>
+  <text class="ts" x="24" y="64">Next time, it compares the start of your new message with what it kept &#8212; and reuses however much still matches, <tspan style="font-weight:650">exactly</tspan>.</text>
+
+  <!-- turn 1 -->
+  <text class="tm" x="8" y="108">turn 1</text>
+  <rect x="86" y="88" width="700" height="34" rx="4" class="bx-b"/>
+  <text class="tms" x="102" y="110">system  +  you  +  its reply</text>
+  <text class="ts" x="806" y="110" fill="#1f5fa8">reads all of it &#8212; nothing kept yet</text>
+
+  <!-- turn 2 -->
+  <text class="tm" x="8" y="156">turn 2</text>
+  <rect x="86" y="136" width="700" height="34" rx="4" class="bx-g"/>
+  <text class="tms" x="102" y="158">everything from turn 1 &#8212; unchanged</text>
+  <rect x="790" y="136" width="170" height="34" rx="4" class="bx-b"/>
+  <text class="tms" x="806" y="158">your new bit</text>
+  <text class="ts" x="972" y="158" fill="#1d7a53">skips the green</text>
+
+  <!-- turn 3 -->
+  <text class="tm" x="8" y="204">turn 3</text>
+  <rect x="86" y="184" width="874" height="34" rx="4" class="bx-g"/>
+  <text class="tms" x="102" y="206">everything from turns 1 and 2 &#8212; still unchanged</text>
+  <rect x="964" y="184" width="128" height="34" rx="4" class="bx-b"/>
+  <text class="tms" x="978" y="206">new bit</text>
+
+  <text class="ts" x="86" y="240" fill="#1d7a53">The green part grows every turn, and every turn it is free. This is the whole trick.</text>
+
+  <!-- the break -->
+  <text class="tt" x="8" y="284" fill="#a8324a">AND HOW YOU THROW IT ALL AWAY</text>
+  <text class="tm" x="8" y="322">turn 3</text>
+  <rect x="86" y="302" width="240" height="34" rx="4" class="bx-g"/>
+  <text class="tms" x="102" y="324">matches so far</text>
+  <rect x="330" y="302" width="180" height="34" rx="4" class="bx-r"/>
+  <text class="tms" x="346" y="324">something inserted</text>
+  <rect x="514" y="302" width="446" height="34" rx="4" class="bx-r"/>
+  <text class="tms" x="530" y="324">the same words as before &#8212; but now in a different place</text>
+  <rect x="964" y="302" width="128" height="34" rx="4" class="bx-b"/>
+  <text class="tms" x="978" y="324">new bit</text>
+  <text class="ts" x="86" y="358" fill="#a8324a">From the insert onwards nothing lines up any more, so all of it is read again &#8212; even though not one word changed.</text>
+
+  <!-- the rule -->
+  <rect class="bx-g" x="8" y="382" width="534" height="90" rx="5"/>
+  <text class="tt" x="24" y="404" fill="#1d7a53">SO THE RULE IS: ONLY EVER ADD TO THE END</text>
+  <text class="ts" x="24" y="426">Never insert. Never reorder. Never edit an earlier entry.</text>
+  <text class="ts" x="24" y="446">Text-only messages stay plain strings; tool descriptions are built once</text>
+  <text class="ts" x="24" y="464">and reused; a summary that saved too little is rolled back.</text>
+
+  <rect class="bx-b" x="558" y="382" width="534" height="90" rx="5"/>
+  <text class="tt" x="574" y="404" fill="#1f5fa8">BUT WE STILL NEED TO ADD THINGS</text>
+  <text class="ts" x="574" y="426">Recalled memories and per-turn hints go on a <tspan style="font-weight:650">copy</tspan> of the list, at the</text>
+  <text class="ts" x="574" y="446">very end, on the first pass only.</text>
+  <text class="tms" x="574" y="466">req_messages = self.messages + extras</text>
+</svg>
+</figure>
+  <div class="wwh">
+    <div class="why"><span class="lbl">Why it matters here</span>
+    <p>Most of your waiting is the model <b>reading</b> the message, not writing the reply. On a
+    laptop that reading is the expensive part &#8212; and the server will skip it for free if you let it.</p></div>
+    <div class="what"><span class="lbl">What it is</span>
+    <p><b>Cache-augmented generation.</b> RAG makes the message <em>smarter</em>; CAG makes it
+    <em>cheaper</em>. It costs no extra code &#8212; only the discipline to never disturb the start of
+    the list.</p></div>
+    <div class="how"><span class="lbl">How we keep it</span>
+    <p>The stored list is <b>append-only</b>. Anything we want to add for one turn goes on a copy, at
+    the very end. The list on disk and the list in memory are never edited in the middle.</p></div>
+  </div>
   <div class="foot"><span>llmc-code &#183; how it works</span><span>12</span></div>
 </div>
 
-<div data-src="s12" class="slide">
-  <div class="sh"><span class="num">13</span><h2>Box 3 &#8212; keeping the chat small: the setup</h2>
-    <span class="tag">box 3 &#183; where context lives</span></div>
+<div data-src="s14" class="slide">
+  <div class="sh"><span class="num">13</span><h2>CAG in the code &#8212; the four lines that protect it</h2>
+    <span class="tag">CAG &#183; 2 of 2</span></div>
+  <div class="body col">
+    <div class="body" style="gap:5mm;flex:0 0 auto;margin-bottom:3mm">
+      <div class="left">
+        <div class="qa"><div class="q">What the server remembers</div>
+        <div class="a">When it reads your list, it keeps the work it did. If your <b>next</b> request starts
+        with <em>exactly the same entries, in the same order</em>, it reuses that work and starts
+        where the new text begins. Most of your waiting is that re-reading &#8212; skipping it is free.</div></div>
+        <div class="qa"><div class="q">So what breaks it?</div>
+        <div class="a"><b>Changing anything that isn't at the end.</b> Insert one entry in the
+        middle and everything after it has shifted position &#8212; so all of it must be read again,
+        even though not one word of it changed.</div></div>
+      </div>
+      <div class="right">
+        <div class="qa"><div class="q">Which is a problem, because we <em>do</em> need to add things</div>
+        <div class="a">Every turn we attach recalled memories (box 7) and sometimes a hint. The obvious
+        place is near the question &#8212; in the middle. That would cost the cache every turn.</div></div>
+        <div class="srcfile">llmcode/agent.py &#8212; the whole solution, four lines</div>
+        <pre class="sm"><span class="kw">if</span> _iter == <span class="num">0</span>:                          <span class="cmt"># first pass of this turn only</span>
+    extras = [b <span class="kw">for</span> b <span class="kw">in</span> (mem_block, hint_block) <span class="kw">if</span> b]
+    req_messages = self.messages + extras <span class="cmt"># ← a COPY, extras LAST</span>
+<span class="kw">else</span>:
+    req_messages = self.messages          <span class="cmt"># later passes: unchanged</span></pre>
+      </div>
+    </div>
+    <figure style="margin:0 auto 2mm auto;width:56%"><svg viewBox="0 0 760 268" xmlns="http://www.w3.org/2000/svg">
+  <text class="tt" x="20" y="16">&#10003; add it to the END &#8212; what we do</text>
+  <rect x="20" y="26" width="420" height="30" rx="3" fill="#ecf8f2" stroke="#1d7a53" stroke-width="1.4"/>
+  <text class="tms" x="30" y="46">everything so far, exactly as it was</text>
+  <rect x="442" y="26" width="120" height="30" rx="3" fill="#eef4fc" stroke="#1f5fa8" stroke-width="1.4"/>
+  <text class="tms" x="452" y="46">new user msg</text>
+  <rect x="564" y="26" width="130" height="30" rx="3" fill="#f4eefc" stroke="#6a3fa0" stroke-width="1.4" stroke-dasharray="4 3"/>
+  <text class="tms" x="574" y="46">recall note</text>
+  <text class="tt" x="230" y="72" text-anchor="middle" fill="#1d7a53">the server SKIPS re-reading all of this</text>
+  <text class="tt" x="568" y="72" text-anchor="middle" fill="#1f5fa8">only this is new</text>
+  <path class="ln-g" d="M20,80 L438,80"/>
+  <path class="ln-b" d="M442,80 L692,80"/>
+
+  <text class="tt" x="20" y="130" fill="#a8324a">&#10007; squeeze it into the MIDDLE &#8212; the tempting mistake</text>
+  <rect x="20" y="140" width="150" height="30" rx="3" fill="#ecf8f2" stroke="#1d7a53" stroke-width="1.4"/>
+  <text class="tms" x="30" y="160">the first few messages</text>
+  <rect x="172" y="140" width="130" height="30" rx="3" fill="#fdeef1" stroke="#a8324a" stroke-width="1.4"/>
+  <text class="tms" x="182" y="160">recall note</text>
+  <rect x="304" y="140" width="258" height="30" rx="3" fill="#fdeef1" stroke="#a8324a" stroke-width="1.4"/>
+  <text class="tms" x="314" y="160">the same messages, now in a different place</text>
+  <rect x="564" y="140" width="130" height="30" rx="3" fill="#eef4fc" stroke="#1f5fa8" stroke-width="1.4"/>
+  <text class="tms" x="574" y="160">new user msg</text>
+  <text class="tt" x="95" y="186" text-anchor="middle" fill="#1d7a53">cached</text>
+  <text class="tt" x="430" y="186" text-anchor="middle" fill="#a8324a">everything from here must be read again from scratch</text>
+  <path class="ln-g" d="M20,194 L168,194"/>
+  <path class="ln-r" d="M172,194 L692,194"/>
+
+  <text class="ts" x="380" y="226" text-anchor="middle">One message added near the front throws away the saved work for everything after it &#8212;</text>
+  <text class="ts" x="380" y="242" text-anchor="middle">even though not one of those words changed. Where it sits matters, not just what it says.</text>
+</svg></figure>
+    <div class="two">
+      <div class="key"><span class="t">Three wins from that one <code>+</code></span>
+      <p>&#8226; <code>self.messages</code> is <b>never modified</b>, so its prefix stays byte-stable and
+      the cache keeps paying.<br>
+      &#8226; The extras are <b>never saved to disk</b>, because they were never in the stored list.<br>
+      &#8226; Summarising can never mangle them, because they aren't there to be summarised.</p></div>
+      <div class="note"><span class="t">The same rule, three more places</span>
+      <p>&#8226; A message with no image keeps <code>content</code> as a plain <b>string</b>; attaching
+      an image makes it a list, which is a different prefix.<br>
+      &#8226; The tool descriptions are built once and reused, so their key order can't drift.<br>
+      &#8226; A summary that didn't save enough is <b>rolled back</b> (previous slide) &#8212; the code
+      would rather carry extra words than disturb the front of the list.</p></div>
+    </div>
+  </div>
+  <div class="foot"><span>llmc-code &#183; how it works</span><span>13</span></div>
+</div>
+
+<div data-src="s15" class="slide">
+  <div class="sh"><span class="num">14</span><h2>Looking things up, end to end</h2>
+    <span class="tag">RAG &#183; 1 of 5</span></div>
+  <figure style="margin:0 auto 2mm auto;width:98%"><svg viewBox="0 0 1100 500" xmlns="http://www.w3.org/2000/svg">
+  <text class="tt" x="8" y="16" fill="#1d7a53">WRITING &#8212; ONCE, AT THE END OF EVERY TURN</text>
+  <rect class="bx-g" x="8" y="26" width="1084" height="164" rx="5"/>
+
+  <rect class="bx" x="24" y="46" width="176" height="62" rx="4"/>
+  <text class="tb" x="112" y="70" text-anchor="middle">The turn ends</text>
+  <text class="ts" x="112" y="92" text-anchor="middle">you got your answer</text>
+  <path class="ln-g" d="M200,77 L230,77"/>
+
+  <rect class="bx" x="232" y="46" width="226" height="62" rx="4"/>
+  <text class="tb" x="345" y="68" text-anchor="middle">Build one record</text>
+  <text class="tms" x="345" y="88" text-anchor="middle">"Q: &#8230;your question&#8230;</text>
+  <text class="tms" x="345" y="102" text-anchor="middle">A: &#8230;the answer&#8230;"</text>
+  <path class="ln-g" d="M458,77 L488,77"/>
+
+  <rect class="bx" x="490" y="46" width="206" height="62" rx="4"/>
+  <text class="tb" x="593" y="68" text-anchor="middle">Fingerprint it</text>
+  <text class="tms" x="593" y="88" text-anchor="middle">sha256(text)[:16]</text>
+  <text class="ts" x="593" y="102" text-anchor="middle">seen before? skip it</text>
+  <path class="ln-g" d="M696,77 L726,77"/>
+
+  <rect class="bx-d" x="728" y="46" width="200" height="62" rx="4"/>
+  <text class="tms" x="828" y="72" text-anchor="middle">.memory.json</text>
+  <text class="ts" x="828" y="94" text-anchor="middle">the record is appended</text>
+
+  <path class="ln-p" d="M593,108 L593,130"/>
+  <rect class="bx-p" x="380" y="132" width="424" height="44" rx="4"/>
+  <text class="ts" x="396" y="152">Turn it into 768 numbers &#8212; but only when something</text>
+  <text class="ts" x="396" y="168">actually needs them, not on every turn</text>
+  <path class="ln-p" d="M804,154 L834,154"/>
+  <rect class="bx-d" x="836" y="132" width="180" height="44" rx="4"/>
+  <text class="tms" x="926" y="159" text-anchor="middle">.memory.json.vec</text>
+
+  <text class="tt" x="8" y="226" fill="#1f5fa8">READING &#8212; ONCE PER TURN, BEFORE THE LOOP STARTS</text>
+  <rect class="bx-b" x="8" y="236" width="1084" height="256" rx="5"/>
+
+  <rect class="bx" x="24" y="258" width="180" height="62" rx="4"/>
+  <text class="tb" x="114" y="282" text-anchor="middle">Your question</text>
+  <text class="ts" x="114" y="304" text-anchor="middle">"where do settings live?"</text>
+  <path class="ln-b" d="M204,289 L232,289"/>
+
+  <rect class="bx" x="234" y="258" width="196" height="62" rx="4"/>
+  <text class="tb" x="332" y="282" text-anchor="middle">Split into words</text>
+  <text class="ts" x="332" y="304" text-anchor="middle">drop "the", "is", "where"</text>
+  <path class="ln-b" d="M430,289 L458,289"/>
+
+  <rect class="bx-a" x="460" y="258" width="210" height="62" rx="4"/>
+  <text class="tb" x="565" y="282" text-anchor="middle">Score every record</text>
+  <text class="ts" x="565" y="304" text-anchor="middle">rare words count for more</text>
+
+  <path class="ln-g" d="M670,276 L744,262"/>
+  <text class="tt" x="707" y="252" text-anchor="middle" fill="#1d7a53">FOUND</text>
+  <path class="ln-o" d="M670,302 L744,350"/>
+  <text class="tt" x="690" y="332" text-anchor="middle" fill="#a8611f">NONE</text>
+
+  <rect class="bx-g" x="746" y="240" width="204" height="52" rx="4"/>
+  <text class="tb" x="848" y="262" text-anchor="middle">Take the best few</text>
+  <text class="ts" x="848" y="282" text-anchor="middle">instant &#183; the usual case</text>
+
+  <rect class="bx-p" x="746" y="330" width="204" height="66" rx="4"/>
+  <text class="tb" x="848" y="352" text-anchor="middle">Compare meanings</text>
+  <text class="ts" x="848" y="372" text-anchor="middle">embed the question, then</text>
+  <text class="ts" x="848" y="388" text-anchor="middle">cosine against each vector</text>
+
+  <path class="ln" d="M950,266 L984,294"/>
+  <path class="ln" d="M950,358 L984,326"/>
+  <rect class="bx" x="986" y="288" width="90" height="44" rx="4"/>
+  <text class="tb" x="1031" y="308" text-anchor="middle">Top 3</text>
+  <text class="ts" x="1031" y="324" text-anchor="middle">merged</text>
+
+  <path class="ln-b" d="M1031,332 L1031,420 L566,420 L566,432"/>
+  <rect class="bx-g" x="24" y="434" width="1052" height="48" rx="4"/>
+  <text class="tb" x="40" y="454">Attached to the END of a COPY of the list &#8212; never stored, never saved to disk</text>
+  <text class="ts" x="40" y="474">so the start of the message is byte-identical to last time, and the server can still skip re-reading it</text>
+</svg>
+</figure>
+  <div class="wwh">
+    <div class="why"><span class="lbl">Two paths, different costs</span>
+    <p>Writing happens <b>once per turn</b> and is nearly free. Reading happens <b>once per turn</b>
+    too &#8212; never inside the loop, because searching on every pass would undo the speed it buys.</p></div>
+    <div class="what"><span class="lbl">The gate in the middle</span>
+    <p>The slow half only runs when the fast half scored <b>exactly zero</b>. That is why filler words
+    are stripped: it makes zero mean <em>nothing in common</em>.</p></div>
+    <div class="how"><span class="lbl">Where it ends up</span>
+    <p>On a <b>copy</b> of the list, at the very end. Never written to the session file &#8212; so
+    recalled text can never come back as if you had said it.</p></div>
+  </div>
+  <div class="foot"><span>llmc-code &#183; how it works</span><span>14</span></div>
+</div>
+
+<div data-src="s16" class="slide">
+  <div class="sh"><span class="num">15</span><h2>Box 4 &#8212; the recall store: what is saved, and when</h2>
+    <span class="tag">RAG &#183; 2 of 5 &#183; memory.py</span></div>
+  <div class="body">
+    <div class="left">
+      <div class="qa"><div class="q">What gets stored, and when</div>
+      <div class="a">At the end of every successful turn, <b>one record</b> is added &#8212; the question
+      and the answer, glued together:</div></div>
+      <div class="srcfile">llmcode/agent.py &#8212; right before the turn returns</div>
+      <pre class="sm">self.memory.add(
+    text    = f<span class="str">"Q: {user_text}\nA: {final_text}"</span>,
+    summary = self._cheap_summary(final_text),
+)</pre>
+      <div class="qa"><div class="q">What one record looks like</div></div>
+      <div class="srcfile">llmcode/memory.py &#8212; MemoryRecord</div>
+      <pre class="sm">{<span class="str">"id"</span>:           <span class="str">"r17"</span>,             <span class="cmt"># position when added</span>
+ <span class="str">"text"</span>:         <span class="str">"Q: where is config stored?\nA: ~/.llmcode/…"</span>,
+ <span class="str">"summary"</span>:      <span class="str">"config lives in ~/.llmcode"</span>,
+ <span class="str">"content_hash"</span>: <span class="str">"a7f3c91b2e4d8006"</span>,  <span class="cmt"># sha256(text)[:16]</span>
+ <span class="str">"ts"</span>:           <span class="str">"2026-09-18T09:14:02Z"</span>}</pre>
+      <div class="a">The whole file is a JSON list of those, at
+      <code>~/.llmcode/sessions/&lt;proj&gt;.memory.json</code>.</div>
+      <div class="key"><span class="t">Why <code>content_hash</code> earns its place</span>
+      <p>It does three jobs at once: it <b>stops duplicates</b> being added, it is the <b>key</b>
+      under which that record's vector is stored, and it means the same text is
+      <b>never embedded twice</b> &#8212; even across restarts. Name things by a fingerprint of their
+      content and caching becomes almost free.</p></div>
+    </div>
+    <div class="right">
+      <div class="qa"><div class="q">How a record gets back into the conversation</div>
+      <div class="a">Once per turn, <b>before</b> the loop starts &#8212; never inside it, because
+      searching costs time and doing it every pass would undo the speed it buys:</div></div>
+      <div class="srcfile">llmcode/agent.py &#8212; run(), before the loop</div>
+      <pre class="sm"><span class="kw">if</span> self._memory_active() <span class="kw">and</span> self.memory.records \
+        <span class="kw">and</span> turn_intent != <span class="str">"trivial"</span>:       <span class="cmt"># "thanks" skips it</span>
+    <span class="kw">try</span>:
+        records = self.memory.retrieve(user_text, provider, …)
+    <span class="kw">except</span> Exception:
+        records = []                    <span class="cmt"># never break a turn</span>
+    mem_block = {<span class="str">"role"</span>:<span class="str">"user"</span>, <span class="str">"content"</span>: render(records),
+                 <span class="str">"_memory"</span>: <span class="kw">True</span>}      <span class="cmt"># ← tagged, not stored</span></pre>
+      <div class="a">That block is appended to a <b>copy</b> of the list (box 6), so it is sent but
+      never kept. The <code>_memory</code> tag also means <code>session.py</code> strips it before
+      saving &#8212; recalled text never gets re-saved as if it were new conversation.</div>
+      <div class="qa"><div class="q">Three design choices worth copying</div>
+      <div class="a">
+      &#8226; <b>Role is <code>"user"</code>, not <code>"system"</code>.</b> A system entry arriving
+      <em>after</em> tool results is rejected by some strict chat templates. A user entry is accepted
+      anywhere.<br>
+      &#8226; <b>Only on the first pass.</b> Re-sending it on every tool round wastes words and breaks
+      the cacheable tail.<br>
+      &#8226; <b>Failure is swallowed.</b> Recall is a bonus; losing it must never cost the answer.</div></div>
+    </div>
+  </div>
+  <div class="foot"><span>llmc-code &#183; how it works</span><span>15</span></div>
+</div>
+
+<div data-src="s17" class="slide">
+  <div class="sh"><span class="num">16</span><h2>Box 4 &#8212; the word search: the index we build</h2>
+    <span class="tag">RAG &#183; 3 of 5 &#183; the word index</span></div>
+  <div class="body">
+    <div class="left">
+      <div class="qa"><div class="q">First, every record is turned into a bag of words</div></div>
+      <pre class="sm">_tokenize(<span class="str">"Where is the config stored?"</span>)
+  &#8594; lowercase &#8594; split on [a-z0-9]+ &#8594; drop filler words
+  &#8594; [<span class="str">"config"</span>, <span class="str">"stored"</span>]        <span class="cmt"># "where","is","the" dropped</span></pre>
+      <div class="a">The <b>same</b> function runs on records and on your question &#8212; that symmetry
+      is the only reason they ever match.</div>
+      <div class="qa"><div class="q">Then one index is built for the whole store</div></div>
+      <div class="srcfile">llmcode/memory.py &#8212; _BM25Index, built once, reused for every search</div>
+      <pre class="sm">tfs     : list[dict[str,int]]  <span class="cmt"># per record: word → how many times</span>
+lengths : list[int]            <span class="cmt"># per record: how many words</span>
+avgdl   : float                <span class="cmt"># average record length</span>
+df_map  : dict[str,int]        <span class="cmt"># word → how many records have it</span>
+n       : int                  <span class="cmt"># how many records</span></pre>
+      <div class="a">Built in one pass over all records. It is thrown away and rebuilt only when the
+      store changes &#8212; otherwise every search would re-count every word in every record, which is
+      the difference between instant and a visible pause on a few thousand items.</div>
+      <div class="key"><span class="t">Dropping filler words is load-bearing</span>
+      <p>It looks like tidying. It is not. If a question and a record share <em>only</em> the word
+      "the", the score comes out <b>above zero</b> &#8212; and the next slide only reaches for the slow
+      meaning-search when the score is <b>exactly zero</b>.</p>
+      <p>Our list deliberately <b>keeps</b> <code>on</code>, <code>off</code>, <code>no</code>,
+      <code>not</code>: in a command-line tool those are values, not filler.</p></div>
+    </div>
+    <div class="right">
+      <div class="qa"><div class="q">The scoring loop, in full</div></div>
+      <div class="srcfile">llmcode/memory.py &#8212; k1 = 1.5, b = 0.75</div>
+      <pre class="sm"><span class="kw">for</span> term <span class="kw">in</span> q_terms:                <span class="cmt"># a repeated query word counts once</span>
+    f   = tf.get(term, <span class="num">0</span>)        <span class="cmt"># times it's in THIS record</span>
+    <span class="kw">if</span> f == <span class="num">0</span>: <span class="kw">continue</span>
+    n_q = df_map[term]            <span class="cmt"># how many records have it at all</span>
+
+    idf   = log(<span class="num">1</span> + (n - n_q + <span class="num">.5</span>) / (n_q + <span class="num">.5</span>))   <span class="cmt"># ① rare = valuable</span>
+    denom = f + k1 * (<span class="num">1</span> - b + b * (dl / avgdl))    <span class="cmt"># ③ long = penalised</span>
+    s    += idf * (f * (k1 + <span class="num">1</span>)) / denom            <span class="cmt"># ② repeats saturate</span></pre>
+      <figure style="margin:0 auto 2mm auto;width:100%"><svg viewBox="0 0 760 196" xmlns="http://www.w3.org/2000/svg">
+  <!-- panel 1: IDF -->
+  <text class="tt" x="20" y="14">1 &#183; rare words count for more</text>
+  <rect class="bx-d" x="14" y="22" width="216" height="150" rx="4"/>
+  <text class="ts" x="26" y="44">"the"</text>
+  <rect x="80" y="34" width="8" height="12" fill="#c3cedb"/>
+  <text class="tms" x="96" y="44">appears in everything &#8594; worthless</text>
+  <text class="ts" x="26" y="76">"config"</text>
+  <rect x="80" y="66" width="52" height="12" fill="#7ea9d4"/>
+  <text class="tms" x="140" y="76">appears in a few &#8594; useful</text>
+  <text class="ts" x="26" y="108">"_maybe_auto"</text>
+  <rect x="80" y="98" width="110" height="12" fill="#1f5fa8"/>
+  <text class="tms" x="80" y="126">appears in exactly one &#8594; gold</text>
+  <text class="ts" x="26" y="152">A word that is in everything</text>
+  <text class="ts" x="26" y="165">tells you nothing.</text>
+
+  <!-- panel 2: saturation -->
+  <text class="tt" x="272" y="14">2 &#183; repeats count less and less</text>
+  <rect class="bx-d" x="266" y="22" width="216" height="150" rx="4"/>
+  <line x1="288" y1="150" x2="464" y2="150" stroke="#9fb0c2" stroke-width="1"/>
+  <line x1="288" y1="150" x2="288" y2="44" stroke="#9fb0c2" stroke-width="1"/>
+  <path d="M288,150 C310,86 340,68 380,62 C420,58 444,56 462,55" fill="none" stroke="#1d7a53" stroke-width="2"/>
+  <path d="M288,150 L462,46" fill="none" stroke="#c3cedb" stroke-width="1.4" stroke-dasharray="4 3"/>
+  <text class="tms" x="392" y="90" style="fill:#1d7a53">BM25</text>
+  <text class="tms" x="360" y="42" style="fill:#9fb0c2">naive counting</text>
+  <text class="tms" x="292" y="164">times the word appears &#8594;</text>
+  <text class="ts" x="276" y="185" transform="rotate(-90 276 185)">score</text>
+
+  <!-- panel 3: length -->
+  <text class="tt" x="524" y="14">3 &#183; long documents get a penalty</text>
+  <rect class="bx-d" x="518" y="22" width="228" height="150" rx="4"/>
+  <rect x="532" y="40" width="60" height="26" rx="2" class="bx-g"/>
+  <text class="tms" x="600" y="57">short note, 1 match</text>
+  <text class="tms" x="600" y="70" style="fill:#1d7a53">strong signal</text>
+  <rect x="532" y="86" width="200" height="40" rx="2" class="bx-a"/>
+  <text class="tms" x="540" y="102">huge file, 1 match</text>
+  <text class="tms" x="540" y="118" style="fill:#a8611f">probably coincidence</text>
+  <text class="ts" x="532" y="150">Finding a word in 20 lines means</text>
+  <text class="ts" x="532" y="163">more than finding it in 2,000.</text>
+</svg></figure>
+      <div class="note"><span class="t">Why not just count matching words?</span>
+      <p>Because every record contains "the", long records would win by sheer size, and the tenth
+      occurrence of a word would count as much as the second. Those three corrections
+      <b>are</b> the formula &#8212; and it still beats fancier methods on code, where an exact function
+      name matters more than general similarity.</p></div>
+    </div>
+  </div>
+  <div class="foot"><span>llmc-code &#183; how it works</span><span>16</span></div>
+</div>
+
+<div data-src="s18" class="slide">
+  <div class="sh"><span class="num">17</span><h2>Box 4 &#8212; the meaning search, and the gate that usually skips it</h2>
+    <span class="tag">RAG &#183; 4 of 5 &#183; meaning search</span></div>
+  <div class="body">
+    <div class="left">
+      <div class="qa"><div class="q">What a vector actually is here</div>
+      <div class="a">A record's text is sent to a second, small model (<code>nomic-embed-text</code>,
+      served by the same LM Studio) which returns <b>768 floating-point numbers</b>. Texts about the
+      same topic come back with similar numbers.</div></div>
+      <div class="qa"><div class="q">Comparing two of them &#8212; the whole function</div></div>
+      <div class="srcfile">llmcode/memory.py &#8212; cosine()</div>
+      <pre class="sm"><span class="kw">if not</span> a <span class="kw">or not</span> b <span class="kw">or</span> len(a) != len(b): <span class="kw">return</span> <span class="num">0.0</span>
+dot = na = nb = <span class="num">0.0</span>
+<span class="kw">for</span> x, y <span class="kw">in</span> zip(a, b):
+    dot += x * y      <span class="cmt"># how much they point the same way</span>
+    na  += x * x      <span class="cmt"># length of a, squared</span>
+    nb  += y * y      <span class="cmt"># length of b, squared</span>
+<span class="kw">if</span> na &lt;= <span class="num">0.0</span> <span class="kw">or</span> nb &lt;= <span class="num">0.0</span>: <span class="kw">return</span> <span class="num">0.0</span>
+<span class="kw">return</span> dot / sqrt(na * nb)     <span class="cmt"># 1.0 = same direction = same topic</span></pre>
+      <div class="a">We compare <b>direction</b>, not distance &#8212; length mostly reflects how wordy the
+      text was. Note it <b>never raises</b>: garbage in returns <code>0.0</code>, which correctly
+      means "no match", so one corrupt record can't take down a turn.</div>
+      <div class="note"><span class="t">Searching is a loop, not a database</span>
+      <p><code>for each record: cosine(query_vec, record_vec)</code>, keep the top few. Over a few
+      thousand records that is <b>milliseconds</b>. No index structure, no server.</p></div>
+    </div>
+    <div class="right">
+      <div class="qa"><div class="q">The decision that made this fast</div>
+      <div class="a">Embedding the question means <b>another round trip</b> to a different model &#8212;
+      and on one GPU that can force your main model to be swapped out and back. Doing that on every
+      turn would cost more than the search saves. So:</div></div>
+      <div class="srcfile">llmcode/memory.py &#8212; retrieve(), the entire policy</div>
+      <pre class="sm">bm25_full = _bm25_score_index(query, self._bm25_index)
+best_bm25 = bm25_full[<span class="num">0</span>][<span class="num">1</span>] <span class="kw">if</span> bm25_full <span class="kw">else</span> <span class="num">0.0</span>
+
+embed_idx = []
+<span class="kw">if</span> provider <span class="kw">and</span> (mode == <span class="str">"embed"</span>
+                 <span class="kw">or</span> (mode == <span class="str">"auto"</span> <span class="kw">and</span> best_bm25 &lt;= <span class="num">0.0</span>)):
+    embed_idx = self._embed_rank(query, provider, pool_k)
+
+ordered = bm25_idx <span class="kw">if not</span> embed_idx \
+          <span class="kw">else</span> self._fuse(bm25_idx, embed_idx, pool_k)</pre>
+      <table>
+      <tr><th style="width:34%">Your question</th><th>What runs</th><th style="width:22%">Cost</th></tr>
+      <tr><td>"where is config.json?"<br><span class="ts">shares real words</span></td>
+          <td>word search only</td><td>instant &#8212; the usual case</td></tr>
+      <tr><td>"where do settings live?"<br><span class="ts">a paraphrase</span></td>
+          <td>word search scores <b>0</b> &#8594; meaning search &#8594; results merged</td>
+          <td>one round trip, only when needed</td></tr>
+      <tr><td>"thanks"</td><td>nothing at all</td><td>zero</td></tr>
+      </table>
+      <div class="key"><span class="t">The shape, which recurs four times in this codebase</span>
+      <p><b>Run the cheap check. Only pay for the expensive one when the cheap one found
+      nothing.</b> Here; in code search; in the optional re-ranking pass; and in the retry that
+      lifts the reply-length cap.</p></div>
+    </div>
+  </div>
+  <div class="foot"><span>llmc-code &#183; how it works</span><span>17</span></div>
+</div>
+
+<div data-src="s19" class="slide">
+  <div class="sh"><span class="num">18</span><h2>Box 4 &#8212; where the vectors are stored</h2>
+    <span class="tag">RAG &#183; 5 of 5 &#183; the vector files</span></div>
+  <div class="body col">
+    <figure style="margin:0 auto 2mm auto;width:62%"><svg viewBox="0 0 700 250" xmlns="http://www.w3.org/2000/svg">
+  <text class="tt" x="10" y="14">in RAM</text>
+  <rect class="bx-p" x="10" y="22" width="320" height="56" rx="4"/>
+  <text class="tms" x="22" y="42">{"a7f3…": array('f', [0.13, -0.88, 0.04, …]),</text>
+  <text class="tms" x="22" y="58"> "b0c1…": array('f', [0.52,  0.19, -0.7, …])}</text>
+  <text class="tms" x="22" y="72" style="fill:#6a3fa0">4 bytes per number &#8212; not Python's bulky floats</text>
+
+  <path class="ln-p" d="M170,78 L170,100"/>
+  <text class="tt" x="180" y="94">save</text>
+
+  <text class="tt" x="10" y="116">on disk &#8212; two files</text>
+  <rect class="bx" x="10" y="124" width="320" height="52" rx="4"/>
+  <text class="tms" x="22" y="142" style="font-weight:700">.memory.json</text>
+  <text class="tms" x="22" y="157">the text, plus a fingerprint of the numbers</text>
+  <text class="tms" x="22" y="171" style="fill:#7a8799">readable, and small</text>
+
+  <rect class="bx-p" x="10" y="186" width="320" height="52" rx="4"/>
+  <text class="tms" x="22" y="204" style="font-weight:700">.memory.json.vec</text>
+  <text class="tms" x="22" y="219">just the raw numbers, back to back</text>
+  <text class="tms" x="22" y="233" style="fill:#7a8799">all the same size &#8212; no labels, no punctuation</text>
+
+  <!-- right: byte layout -->
+  <text class="tt" x="360" y="14">the .vec byte layout</text>
+  <rect x="360" y="24" width="96" height="30" rx="2" class="bx-p"/><text class="tmz" x="366" y="43">vector 0 &#183; 3072 B</text>
+  <rect x="458" y="24" width="96" height="30" rx="2" class="bx-p"/><text class="tmz" x="464" y="43">vector 1 &#183; 3072 B</text>
+  <rect x="556" y="24" width="96" height="30" rx="2" class="bx-p"/><text class="tmz" x="562" y="43">vector 2 &#183; 3072 B</text>
+  <text class="tms" x="654" y="43">…</text>
+  <text class="ts" x="360" y="70">same order as the list in the other file, so number 5 is easy to find</text>
+
+  <rect class="bx-r" x="360" y="86" width="330" height="152" rx="4"/>
+  <text class="tt" x="372" y="104" fill="#a8324a">what if the power cuts halfway?</text>
+  <text class="ts" x="372" y="124">Two files can disagree. If we save one and not the other,</text>
+  <text class="ts" x="372" y="140">one says 200 items and the other holds 140 &#8212;</text>
+  <text class="ts" x="372" y="156">and every item quietly matches the WRONG numbers.</text>
+  <text class="ts" x="372" y="180" style="font-weight:600">Fix: save a fingerprint of the numbers file</text>
+  <text class="ts" x="372" y="196" style="font-weight:600">inside the other file. Check it on load.</text>
+  <text class="ts" x="372" y="216">If it doesn't match &#8594; throw the numbers away</text>
+  <text class="ts" x="372" y="230">and rebuild them. Slow once, never wrong.</text>
+</svg></figure>
+    <div class="body" style="gap:5mm">
+      <div class="left">
+        <div class="qa"><div class="q">Why not just put them in the JSON?</div>
+        <div class="a">768 numbers per record, written as decimal text, is roughly <b>9 KB of digits
+        per record</b> &#8212; and it has to be parsed back one number at a time on every launch. A few
+        thousand records makes the file unopenable and startup slow.</div></div>
+        <div class="qa"><div class="q">So: numbers in their own file, as raw bytes</div>
+        <div class="a">In memory each vector is an <code>array('f')</code> &#8212; <b>4 bytes per
+        number</b>, packed, instead of the ~32 bytes an ordinary Python float costs. Saving is then
+        just writing those bytes straight out, end to end, with <b>no separators and no labels</b>.
+        <br>Finding vector number 5 is arithmetic, not parsing:</div></div>
+        <pre class="sm">stride = dim * <span class="num">4</span>                  <span class="cmt"># 768 × 4 = 3072 bytes each</span>
+offset = i * stride                <span class="cmt"># vector i starts exactly here</span></pre>
+      </div>
+      <div class="right">
+        <div class="qa"><div class="q">The real engineering problem: two files can disagree</div>
+        <div class="a">The records live in the <code>.json</code>; their numbers live in the
+        <code>.vec</code>. If the process dies between writing one and the other, the JSON might
+        claim 200 records while the <code>.vec</code> holds 140 &#8212; and then <b>every record quietly
+        pairs with the wrong numbers</b>. No error. Just wrong answers, forever.</div></div>
+        <div class="key"><span class="t">The fix: make one file prove it matches the other</span>
+        <p>When saving, we fingerprint the exact bytes of the <code>.vec</code> and store that
+        fingerprint <b>inside the JSON</b> as <code>vector_sig</code>.</p>
+        <p>On load we re-fingerprint the file and compare. If it doesn't match &#8212; or the file is
+        short, or missing &#8212; we <b>treat the vectors as empty and re-embed</b>. Slow once; never
+        silently wrong.</p></div>
+        <div class="note"><span class="t">When this simple approach is the right one</span>
+        <p>Thousands of items, one machine, one user &#8212; a loop over 4,000 comparisons is
+        milliseconds. You need a real vector database at <em>millions</em> of items, or when several
+        programs share one index. <b>Not before that.</b></p></div>
+      </div>
+    </div>
+  </div>
+  <div class="foot"><span>llmc-code &#183; how it works</span><span>18</span></div>
+</div>
+
+<div data-src="s20" class="slide">
+  <div class="sh"><span class="num">19</span><h2>The life of a conversation &#8212; stored, managed, retrieved</h2>
+    <span class="tag">CONTEXT &#183; 1 of 4 &#183; the whole lifecycle</span></div>
+  <figure style="margin:0 auto 2mm auto;width:98%"><svg viewBox="0 0 1100 546" xmlns="http://www.w3.org/2000/svg">
+  <!-- LEFT: the stages -->
+  <rect class="bx-b" x="8" y="6" width="786" height="80" rx="5"/>
+  <circle cx="34" cy="30" r="12" fill="#1f5fa8"/><text class="tms" x="34" y="34" text-anchor="middle" style="fill:#fff;font-weight:700">1</text>
+  <text class="tb" x="54" y="34">You launch llmc-code inside a project folder</text>
+  <text class="ts" x="20" y="56">project id  =  folder name  +  first 12 hex of sha256(absolute path)</text>
+  <text class="ts" x="20" y="74">so the same folder always maps back to the same files, and two projects named "app" never collide</text>
+  <path class="ln-b" d="M401,86 L401,104"/>
+
+  <rect class="bx" x="8" y="106" width="786" height="66" rx="5"/>
+  <circle cx="34" cy="130" r="12" fill="#5a6c80"/><text class="tms" x="34" y="134" text-anchor="middle" style="fill:#fff;font-weight:700">2</text>
+  <text class="tb" x="54" y="134">The list is created</text>
+  <text class="tms" x="20" y="158">messages = [ {"role":"system", "content": "&#8230;the instructions&#8230;"} ]</text>
+  <text class="ts" x="520" y="158">&#8592; plus the saved history, only if you ask</text>
+  <path class="ln" d="M401,172 L401,190"/>
+
+  <rect class="bx-b" x="8" y="192" width="786" height="58" rx="5"/>
+  <circle cx="34" cy="216" r="12" fill="#1f5fa8"/><text class="tms" x="34" y="220" text-anchor="middle" style="fill:#fff;font-weight:700">3</text>
+  <text class="tb" x="54" y="220">You type something</text>
+  <text class="tms" x="20" y="240">messages.append({"role":"user", "content": "fix the failing test"})</text>
+  <path class="ln" d="M401,250 L401,268"/>
+
+  <rect class="bx-a" x="8" y="270" width="786" height="120" rx="5"/>
+  <circle cx="34" cy="294" r="12" fill="#a8611f"/><text class="tms" x="34" y="298" text-anchor="middle" style="fill:#fff;font-weight:700">4</text>
+  <text class="tb" x="54" y="298">Before anything is sent &#8212; five steps, cheapest first</text>
+  <rect class="bx" x="20" y="310" width="145" height="70" rx="4"/>
+  <text class="tms" x="92" y="330" text-anchor="middle" style="font-weight:700">classify</text>
+  <text class="ts" x="92" y="350" text-anchor="middle">quick question</text>
+  <text class="ts" x="92" y="366" text-anchor="middle">or real work?</text>
+  <rect class="bx" x="173" y="310" width="145" height="70" rx="4"/>
+  <text class="tms" x="245" y="330" text-anchor="middle" style="font-weight:700">budget</text>
+  <text class="ts" x="245" y="350" text-anchor="middle">12,000 &#215; 1&#8211;3</text>
+  <text class="ts" x="245" y="366" text-anchor="middle">for this turn</text>
+  <rect class="bx" x="326" y="310" width="145" height="70" rx="4"/>
+  <text class="tms" x="398" y="330" text-anchor="middle" style="font-weight:700">shorten</text>
+  <text class="ts" x="398" y="350" text-anchor="middle">old tool results</text>
+  <text class="ts" x="398" y="366" text-anchor="middle">&#8594; 500 chars</text>
+  <rect class="bx" x="479" y="310" width="145" height="70" rx="4"/>
+  <text class="tms" x="551" y="330" text-anchor="middle" style="font-weight:700">look up</text>
+  <text class="ts" x="551" y="350" text-anchor="middle">search past</text>
+  <text class="ts" x="551" y="366" text-anchor="middle">answers (RAG)</text>
+  <rect class="bx-g" x="632" y="310" width="150" height="70" rx="4"/>
+  <text class="tms" x="707" y="330" text-anchor="middle" style="font-weight:700">copy + add</text>
+  <text class="ts" x="707" y="350" text-anchor="middle">messages + extras</text>
+  <text class="ts" x="707" y="366" text-anchor="middle">extras go LAST</text>
+  <path class="ln-o" d="M401,390 L401,408"/>
+
+  <rect class="bx-p" x="8" y="410" width="786" height="58" rx="5"/>
+  <circle cx="34" cy="434" r="12" fill="#6a3fa0"/><text class="tms" x="34" y="438" text-anchor="middle" style="fill:#fff;font-weight:700">5</text>
+  <text class="tb" x="54" y="438">Send &#8212; then loop</text>
+  <text class="ts" x="20" y="458">append the reply &#8594; run what it asked for &#8594; append the result &#8594; send again, until it just talks</text>
+  <path class="ln-p" d="M401,468 L401,486"/>
+
+  <rect class="bx-g" x="8" y="488" width="786" height="52" rx="5"/>
+  <circle cx="34" cy="512" r="12" fill="#1d7a53"/><text class="tms" x="34" y="516" text-anchor="middle" style="fill:#fff;font-weight:700">6</text>
+  <text class="tb" x="54" y="512">Turn ends &#8212; save</text>
+  <text class="ts" x="20" y="532">write the whole list to disk (temp file, then rename) &#183; store one memory record of this Q&amp;A</text>
+
+  <!-- RIGHT: the disk -->
+  <rect class="bx-d" x="814" y="6" width="278" height="534" rx="5" stroke-dasharray="5 4"/>
+  <text class="tt" x="828" y="28">ON YOUR DISK</text>
+  <text class="tm" x="828" y="52">~/.llmcode/sessions/</text>
+
+  <rect class="bx" x="828" y="66" width="250" height="56" rx="4"/>
+  <text class="tms" x="838" y="86">&lt;project-id&gt;.json</text>
+  <text class="ts" x="838" y="104">the conversation itself</text>
+  <text class="ts" x="838" y="118">read at step 1, written at step 6</text>
+
+  <rect class="bx" x="828" y="132" width="250" height="56" rx="4"/>
+  <text class="tms" x="838" y="152">&lt;project-id&gt;.memory.json</text>
+  <text class="ts" x="838" y="170">past questions and answers</text>
+  <text class="ts" x="838" y="184">read at step 4, written at step 6</text>
+
+  <rect class="bx" x="828" y="198" width="250" height="40" rx="4"/>
+  <text class="tms" x="838" y="218">&#8230;.memory.json.vec</text>
+  <text class="ts" x="838" y="232">their numbers, as raw bytes</text>
+
+  <rect class="bx" x="828" y="248" width="250" height="40" rx="4"/>
+  <text class="tms" x="838" y="268">&lt;project-id&gt;.code_index.json</text>
+  <text class="ts" x="838" y="282">your code, split by function</text>
+
+  <rect class="bx" x="828" y="298" width="250" height="40" rx="4"/>
+  <text class="tms" x="838" y="318">checkpoints/&#8230;/blobs/</text>
+  <text class="ts" x="838" y="332">file copies, so /undo works</text>
+
+  <rect class="bx-r" x="828" y="356" width="250" height="90" rx="4"/>
+  <text class="tt" x="838" y="376" fill="#a8324a">NOTHING LEAVES THIS FOLDER</text>
+  <text class="ts" x="838" y="396">The saved chat can contain the</text>
+  <text class="ts" x="838" y="410">contents of files the model read.</text>
+  <text class="ts" x="838" y="424">It is never uploaded anywhere,</text>
+  <text class="ts" x="838" y="438">and the folder is owner-only.</text>
+
+  <text class="ts" x="828" y="472">Every write is: temp file &#8594;</text>
+  <text class="ts" x="828" y="488">rename over the real one.</text>
+  <text class="ts" x="828" y="504">A crash leaves you the old file</text>
+  <text class="ts" x="828" y="520">or the new one &#8212; never half.</text>
+
+  <path class="ln" d="M794,46 L824,46"/>
+  <path class="ln" d="M794,514 L824,514"/>
+  <path class="ln" d="M794,345 L824,160"/>
+</svg>
+</figure>
+  <div class="wwh">
+    <div class="why"><span class="lbl">Stored</span>
+    <p>In <b>RAM</b> as one Python list while you work, and mirrored to <b>one JSON file per project
+    folder</b> after every turn. Nothing else holds it.</p></div>
+    <div class="what"><span class="lbl">Managed</span>
+    <p>Only ever <b>added to at the end</b>. The five steps at stage 4 decide how much of it goes out
+    this turn &#8212; they shorten and select, they never delete.</p></div>
+    <div class="how"><span class="lbl">Retrieved</span>
+    <p>A fresh launch starts <b>empty</b> on purpose. The saved chat comes back only when you pass
+    <code>-c</code> or type <code>/resume</code> &#8212; so yesterday's context is never a surprise.</p></div>
+  </div>
+  <div class="foot"><span>llmc-code &#183; how it works</span><span>19</span></div>
+</div>
+
+<div data-src="s21" class="slide">
+  <div class="sh"><span class="num">20</span><h2>Box 3 &#8212; keeping the chat small: the setup</h2>
+    <span class="tag">CONTEXT &#183; 2 of 4 &#183; where it lives</span></div>
   <div class="body">
     <div class="left">
       <div class="qa"><div class="q">Where is "the context" stored?</div>
       <div class="a">It is <b>not</b> a separate thing. The context <em>is</em> <code>agent.messages</code>
-      &#8212; the list from slide 2, in RAM, mirrored to
+      &#8212; the list from slide 3, in RAM, mirrored to
       <code>~/.llmcode/sessions/&lt;proj&gt;.json</code> after each turn.
       <br>"Managing context" means <b>rewriting strings inside that list</b> before we send it.</div></div>
       <div class="qa"><div class="q">Why not just send the whole list every time?</div>
@@ -1213,12 +1739,12 @@ budget = max(<span class="num">4_000</span>, base)            <span class="cmt">
       and summarising &#8212; try to get the list <em>under</em>.</p></div>
     </div>
   </div>
-  <div class="foot"><span>llmc-code &#183; how it works</span><span>13</span></div>
+  <div class="foot"><span>llmc-code &#183; how it works</span><span>20</span></div>
 </div>
 
-<div data-src="s13" class="slide">
-  <div class="sh"><span class="num">14</span><h2>Box 3 &#8212; how a part of the context is taken out</h2>
-    <span class="tag">box 3 &#183; the trim, line by line</span></div>
+<div data-src="s22" class="slide">
+  <div class="sh"><span class="num">21</span><h2>Box 3 &#8212; how a part of the context is taken out</h2>
+    <span class="tag">CONTEXT &#183; 3 of 4 &#183; the trim, line by line</span></div>
   <div class="body">
     <div class="left">
       <div class="qa"><div class="q">The idea in one sentence</div>
@@ -1254,7 +1780,7 @@ boundary = user_idxs[-<span class="num">1</span>]
           "and the other file?" needs that in full. Only finished turns are touched.</td></tr>
       <tr><td><b>Only <code>content</code> changes</b><br><span class="ts">never the list itself</span></td>
           <td>No entry is removed, none reordered, no <code>tool_call_id</code> touched. So the
-          pairing rule from slide 2 <b>cannot</b> break. The list is the same length before and
+          pairing rule from slide 3 <b>cannot</b> break. The list is the same length before and
           after.</td></tr>
       <tr><td><b>The marker check</b><br><code>⟪ctx-trimmed⟫ not in c</code></td>
           <td>This runs on <b>every turn</b> over the same entries. Without the check it would cut
@@ -1273,14 +1799,14 @@ boundary = user_idxs[-<span class="num">1</span>]
       A cache invalidated by a lossy signal eventually lies to you.</p></div>
     </div>
   </div>
-  <div class="foot"><span>llmc-code &#183; how it works</span><span>14</span></div>
+  <div class="foot"><span>llmc-code &#183; how it works</span><span>21</span></div>
 </div>
 
-<div data-src="s14" class="slide">
-  <div class="sh"><span class="num">15</span><h2>Box 3 &#8212; and when shortening isn't enough: summarising</h2>
-    <span class="tag">box 3 &#183; summarising</span></div>
+<div data-src="s23" class="slide">
+  <div class="sh"><span class="num">22</span><h2>Box 3 &#8212; and when shortening isn't enough: summarising</h2>
+    <span class="tag">CONTEXT &#183; 4 of 4 &#183; summarising</span></div>
   <div class="body col">
-    <figure style="margin:0 auto 2mm auto;width:56%"><svg viewBox="0 0 760 316" xmlns="http://www.w3.org/2000/svg">
+    <figure style="margin:0 auto 2mm auto;width:48%"><svg viewBox="0 0 760 316" xmlns="http://www.w3.org/2000/svg">
   <!-- col 1 -->
   <text class="tt" x="118" y="16" text-anchor="middle">the raw chat</text>
   <text class="ts" x="118" y="32" text-anchor="middle" style="font-weight:600">~55,000 words</text>
@@ -1373,463 +1899,11 @@ before, after = self.compact(keep_turns=<span class="num">1</span>)     <span cl
       </div>
     </div>
   </div>
-  <div class="foot"><span>llmc-code &#183; how it works</span><span>15</span></div>
+  <div class="foot"><span>llmc-code &#183; how it works</span><span>22</span></div>
 </div>
 
-<div data-src="s15" class="slide">
-  <div class="sh"><span class="num">16</span><h2>Box 3 &#8212; never make the server re-read</h2>
-    <span class="tag">box 3 &#183; re-using the server&#8217;s work</span></div>
-  <div class="body col">
-    <div class="body" style="gap:5mm;flex:0 0 auto;margin-bottom:3mm">
-      <div class="left">
-        <div class="qa"><div class="q">What the server remembers</div>
-        <div class="a">When it reads your list, it keeps the work it did. If your <b>next</b> request starts
-        with <em>exactly the same entries, in the same order</em>, it reuses that work and starts
-        where the new text begins. Most of your waiting is that re-reading &#8212; skipping it is free.</div></div>
-        <div class="qa"><div class="q">So what breaks it?</div>
-        <div class="a"><b>Changing anything that isn't at the end.</b> Insert one entry in the
-        middle and everything after it has shifted position &#8212; so all of it must be read again,
-        even though not one word of it changed.</div></div>
-      </div>
-      <div class="right">
-        <div class="qa"><div class="q">Which is a problem, because we <em>do</em> need to add things</div>
-        <div class="a">Every turn we attach recalled memories (box 7) and sometimes a hint. The obvious
-        place is near the question &#8212; in the middle. That would cost the cache every turn.</div></div>
-        <div class="srcfile">llmcode/agent.py &#8212; the whole solution, four lines</div>
-        <pre class="sm"><span class="kw">if</span> _iter == <span class="num">0</span>:                          <span class="cmt"># first pass of this turn only</span>
-    extras = [b <span class="kw">for</span> b <span class="kw">in</span> (mem_block, hint_block) <span class="kw">if</span> b]
-    req_messages = self.messages + extras <span class="cmt"># ← a COPY, extras LAST</span>
-<span class="kw">else</span>:
-    req_messages = self.messages          <span class="cmt"># later passes: unchanged</span></pre>
-      </div>
-    </div>
-    <figure style="margin:0 auto 2mm auto;width:56%"><svg viewBox="0 0 760 268" xmlns="http://www.w3.org/2000/svg">
-  <text class="tt" x="20" y="16">&#10003; add it to the END &#8212; what we do</text>
-  <rect x="20" y="26" width="420" height="30" rx="3" fill="#ecf8f2" stroke="#1d7a53" stroke-width="1.4"/>
-  <text class="tms" x="30" y="46">everything so far, exactly as it was</text>
-  <rect x="442" y="26" width="120" height="30" rx="3" fill="#eef4fc" stroke="#1f5fa8" stroke-width="1.4"/>
-  <text class="tms" x="452" y="46">new user msg</text>
-  <rect x="564" y="26" width="130" height="30" rx="3" fill="#f4eefc" stroke="#6a3fa0" stroke-width="1.4" stroke-dasharray="4 3"/>
-  <text class="tms" x="574" y="46">recall note</text>
-  <text class="tt" x="230" y="72" text-anchor="middle" fill="#1d7a53">the server SKIPS re-reading all of this</text>
-  <text class="tt" x="568" y="72" text-anchor="middle" fill="#1f5fa8">only this is new</text>
-  <path class="ln-g" d="M20,80 L438,80"/>
-  <path class="ln-b" d="M442,80 L692,80"/>
-
-  <text class="tt" x="20" y="130" fill="#a8324a">&#10007; squeeze it into the MIDDLE &#8212; the tempting mistake</text>
-  <rect x="20" y="140" width="150" height="30" rx="3" fill="#ecf8f2" stroke="#1d7a53" stroke-width="1.4"/>
-  <text class="tms" x="30" y="160">the first few messages</text>
-  <rect x="172" y="140" width="130" height="30" rx="3" fill="#fdeef1" stroke="#a8324a" stroke-width="1.4"/>
-  <text class="tms" x="182" y="160">recall note</text>
-  <rect x="304" y="140" width="258" height="30" rx="3" fill="#fdeef1" stroke="#a8324a" stroke-width="1.4"/>
-  <text class="tms" x="314" y="160">the same messages, now in a different place</text>
-  <rect x="564" y="140" width="130" height="30" rx="3" fill="#eef4fc" stroke="#1f5fa8" stroke-width="1.4"/>
-  <text class="tms" x="574" y="160">new user msg</text>
-  <text class="tt" x="95" y="186" text-anchor="middle" fill="#1d7a53">cached</text>
-  <text class="tt" x="430" y="186" text-anchor="middle" fill="#a8324a">everything from here must be read again from scratch</text>
-  <path class="ln-g" d="M20,194 L168,194"/>
-  <path class="ln-r" d="M172,194 L692,194"/>
-
-  <text class="ts" x="380" y="226" text-anchor="middle">One message added near the front throws away the saved work for everything after it &#8212;</text>
-  <text class="ts" x="380" y="242" text-anchor="middle">even though not one of those words changed. Where it sits matters, not just what it says.</text>
-</svg></figure>
-    <div class="two">
-      <div class="key"><span class="t">Three wins from that one <code>+</code></span>
-      <p>&#8226; <code>self.messages</code> is <b>never modified</b>, so its prefix stays byte-stable and
-      the cache keeps paying.<br>
-      &#8226; The extras are <b>never saved to disk</b>, because they were never in the stored list.<br>
-      &#8226; Summarising can never mangle them, because they aren't there to be summarised.</p></div>
-      <div class="note"><span class="t">The same rule, three more places</span>
-      <p>&#8226; A message with no image keeps <code>content</code> as a plain <b>string</b>; attaching
-      an image makes it a list, which is a different prefix.<br>
-      &#8226; The tool descriptions are built once and reused, so their key order can't drift.<br>
-      &#8226; A summary that didn't save enough is <b>rolled back</b> (previous slide) &#8212; the code
-      would rather carry extra words than disturb the front of the list.</p></div>
-    </div>
-  </div>
-  <div class="foot"><span>llmc-code &#183; how it works</span><span>16</span></div>
-</div>
-
-<div data-src="s15a" class="slide">
-  <div class="sh"><span class="num">17</span><h2>Looking things up, end to end</h2>
-    <span class="tag">the write path and the read path</span></div>
-  <figure style="margin:0 auto 2mm auto;width:98%"><svg viewBox="0 0 1100 500" xmlns="http://www.w3.org/2000/svg">
-  <text class="tt" x="8" y="16" fill="#1d7a53">WRITING &#8212; ONCE, AT THE END OF EVERY TURN</text>
-  <rect class="bx-g" x="8" y="26" width="1084" height="164" rx="5"/>
-
-  <rect class="bx" x="24" y="46" width="176" height="62" rx="4"/>
-  <text class="tb" x="112" y="70" text-anchor="middle">The turn ends</text>
-  <text class="ts" x="112" y="92" text-anchor="middle">you got your answer</text>
-  <path class="ln-g" d="M200,77 L230,77"/>
-
-  <rect class="bx" x="232" y="46" width="226" height="62" rx="4"/>
-  <text class="tb" x="345" y="68" text-anchor="middle">Build one record</text>
-  <text class="tms" x="345" y="88" text-anchor="middle">"Q: &#8230;your question&#8230;</text>
-  <text class="tms" x="345" y="102" text-anchor="middle">A: &#8230;the answer&#8230;"</text>
-  <path class="ln-g" d="M458,77 L488,77"/>
-
-  <rect class="bx" x="490" y="46" width="206" height="62" rx="4"/>
-  <text class="tb" x="593" y="68" text-anchor="middle">Fingerprint it</text>
-  <text class="tms" x="593" y="88" text-anchor="middle">sha256(text)[:16]</text>
-  <text class="ts" x="593" y="102" text-anchor="middle">seen before? skip it</text>
-  <path class="ln-g" d="M696,77 L726,77"/>
-
-  <rect class="bx-d" x="728" y="46" width="200" height="62" rx="4"/>
-  <text class="tms" x="828" y="72" text-anchor="middle">.memory.json</text>
-  <text class="ts" x="828" y="94" text-anchor="middle">the record is appended</text>
-
-  <path class="ln-p" d="M593,108 L593,130"/>
-  <rect class="bx-p" x="380" y="132" width="424" height="44" rx="4"/>
-  <text class="ts" x="396" y="152">Turn it into 768 numbers &#8212; but only when something</text>
-  <text class="ts" x="396" y="168">actually needs them, not on every turn</text>
-  <path class="ln-p" d="M804,154 L834,154"/>
-  <rect class="bx-d" x="836" y="132" width="180" height="44" rx="4"/>
-  <text class="tms" x="926" y="159" text-anchor="middle">.memory.json.vec</text>
-
-  <text class="tt" x="8" y="226" fill="#1f5fa8">READING &#8212; ONCE PER TURN, BEFORE THE LOOP STARTS</text>
-  <rect class="bx-b" x="8" y="236" width="1084" height="256" rx="5"/>
-
-  <rect class="bx" x="24" y="258" width="180" height="62" rx="4"/>
-  <text class="tb" x="114" y="282" text-anchor="middle">Your question</text>
-  <text class="ts" x="114" y="304" text-anchor="middle">"where do settings live?"</text>
-  <path class="ln-b" d="M204,289 L232,289"/>
-
-  <rect class="bx" x="234" y="258" width="196" height="62" rx="4"/>
-  <text class="tb" x="332" y="282" text-anchor="middle">Split into words</text>
-  <text class="ts" x="332" y="304" text-anchor="middle">drop "the", "is", "where"</text>
-  <path class="ln-b" d="M430,289 L458,289"/>
-
-  <rect class="bx-a" x="460" y="258" width="210" height="62" rx="4"/>
-  <text class="tb" x="565" y="282" text-anchor="middle">Score every record</text>
-  <text class="ts" x="565" y="304" text-anchor="middle">rare words count for more</text>
-
-  <path class="ln-g" d="M670,276 L744,262"/>
-  <text class="tt" x="707" y="252" text-anchor="middle" fill="#1d7a53">FOUND</text>
-  <path class="ln-o" d="M670,302 L744,350"/>
-  <text class="tt" x="690" y="332" text-anchor="middle" fill="#a8611f">NONE</text>
-
-  <rect class="bx-g" x="746" y="240" width="204" height="52" rx="4"/>
-  <text class="tb" x="848" y="262" text-anchor="middle">Take the best few</text>
-  <text class="ts" x="848" y="282" text-anchor="middle">instant &#183; the usual case</text>
-
-  <rect class="bx-p" x="746" y="330" width="204" height="66" rx="4"/>
-  <text class="tb" x="848" y="352" text-anchor="middle">Compare meanings</text>
-  <text class="ts" x="848" y="372" text-anchor="middle">embed the question, then</text>
-  <text class="ts" x="848" y="388" text-anchor="middle">cosine against each vector</text>
-
-  <path class="ln" d="M950,266 L984,294"/>
-  <path class="ln" d="M950,358 L984,326"/>
-  <rect class="bx" x="986" y="288" width="90" height="44" rx="4"/>
-  <text class="tb" x="1031" y="308" text-anchor="middle">Top 3</text>
-  <text class="ts" x="1031" y="324" text-anchor="middle">merged</text>
-
-  <path class="ln-b" d="M1031,332 L1031,420 L566,420 L566,432"/>
-  <rect class="bx-g" x="24" y="434" width="1052" height="48" rx="4"/>
-  <text class="tb" x="40" y="454">Attached to the END of a COPY of the list &#8212; never stored, never saved to disk</text>
-  <text class="ts" x="40" y="474">so the start of the message is byte-identical to last time, and the server can still skip re-reading it</text>
-</svg>
-</figure>
-  <div class="wwh">
-    <div class="why"><span class="lbl">Two paths, different costs</span>
-    <p>Writing happens <b>once per turn</b> and is nearly free. Reading happens <b>once per turn</b>
-    too &#8212; never inside the loop, because searching on every pass would undo the speed it buys.</p></div>
-    <div class="what"><span class="lbl">The gate in the middle</span>
-    <p>The slow half only runs when the fast half scored <b>exactly zero</b>. That is why filler words
-    are stripped: it makes zero mean <em>nothing in common</em>.</p></div>
-    <div class="how"><span class="lbl">Where it ends up</span>
-    <p>On a <b>copy</b> of the list, at the very end. Never written to the session file &#8212; so
-    recalled text can never come back as if you had said it.</p></div>
-  </div>
-  <div class="foot"><span>llmc-code &#183; how it works</span><span>17</span></div>
-</div>
-
-<div data-src="s16" class="slide">
-  <div class="sh"><span class="num">18</span><h2>Box 4 &#8212; the recall store: what is saved, and when</h2>
-    <span class="tag">box 4 &#183; memory.py</span></div>
-  <div class="body">
-    <div class="left">
-      <div class="qa"><div class="q">What gets stored, and when</div>
-      <div class="a">At the end of every successful turn, <b>one record</b> is added &#8212; the question
-      and the answer, glued together:</div></div>
-      <div class="srcfile">llmcode/agent.py &#8212; right before the turn returns</div>
-      <pre class="sm">self.memory.add(
-    text    = f<span class="str">"Q: {user_text}\nA: {final_text}"</span>,
-    summary = self._cheap_summary(final_text),
-)</pre>
-      <div class="qa"><div class="q">What one record looks like</div></div>
-      <div class="srcfile">llmcode/memory.py &#8212; MemoryRecord</div>
-      <pre class="sm">{<span class="str">"id"</span>:           <span class="str">"r17"</span>,             <span class="cmt"># position when added</span>
- <span class="str">"text"</span>:         <span class="str">"Q: where is config stored?\nA: ~/.llmcode/…"</span>,
- <span class="str">"summary"</span>:      <span class="str">"config lives in ~/.llmcode"</span>,
- <span class="str">"content_hash"</span>: <span class="str">"a7f3c91b2e4d8006"</span>,  <span class="cmt"># sha256(text)[:16]</span>
- <span class="str">"ts"</span>:           <span class="str">"2026-09-18T09:14:02Z"</span>}</pre>
-      <div class="a">The whole file is a JSON list of those, at
-      <code>~/.llmcode/sessions/&lt;proj&gt;.memory.json</code>.</div>
-      <div class="key"><span class="t">Why <code>content_hash</code> earns its place</span>
-      <p>It does three jobs at once: it <b>stops duplicates</b> being added, it is the <b>key</b>
-      under which that record's vector is stored, and it means the same text is
-      <b>never embedded twice</b> &#8212; even across restarts. Name things by a fingerprint of their
-      content and caching becomes almost free.</p></div>
-    </div>
-    <div class="right">
-      <div class="qa"><div class="q">How a record gets back into the conversation</div>
-      <div class="a">Once per turn, <b>before</b> the loop starts &#8212; never inside it, because
-      searching costs time and doing it every pass would undo the speed it buys:</div></div>
-      <div class="srcfile">llmcode/agent.py &#8212; run(), before the loop</div>
-      <pre class="sm"><span class="kw">if</span> self._memory_active() <span class="kw">and</span> self.memory.records \
-        <span class="kw">and</span> turn_intent != <span class="str">"trivial"</span>:       <span class="cmt"># "thanks" skips it</span>
-    <span class="kw">try</span>:
-        records = self.memory.retrieve(user_text, provider, …)
-    <span class="kw">except</span> Exception:
-        records = []                    <span class="cmt"># never break a turn</span>
-    mem_block = {<span class="str">"role"</span>:<span class="str">"user"</span>, <span class="str">"content"</span>: render(records),
-                 <span class="str">"_memory"</span>: <span class="kw">True</span>}      <span class="cmt"># ← tagged, not stored</span></pre>
-      <div class="a">That block is appended to a <b>copy</b> of the list (box 6), so it is sent but
-      never kept. The <code>_memory</code> tag also means <code>session.py</code> strips it before
-      saving &#8212; recalled text never gets re-saved as if it were new conversation.</div>
-      <div class="qa"><div class="q">Three design choices worth copying</div>
-      <div class="a">
-      &#8226; <b>Role is <code>"user"</code>, not <code>"system"</code>.</b> A system entry arriving
-      <em>after</em> tool results is rejected by some strict chat templates. A user entry is accepted
-      anywhere.<br>
-      &#8226; <b>Only on the first pass.</b> Re-sending it on every tool round wastes words and breaks
-      the cacheable tail.<br>
-      &#8226; <b>Failure is swallowed.</b> Recall is a bonus; losing it must never cost the answer.</div></div>
-    </div>
-  </div>
-  <div class="foot"><span>llmc-code &#183; how it works</span><span>18</span></div>
-</div>
-
-<div data-src="s17" class="slide">
-  <div class="sh"><span class="num">19</span><h2>Box 4 &#8212; the word search: the index we build</h2>
-    <span class="tag">box 4 &#183; the word index</span></div>
-  <div class="body">
-    <div class="left">
-      <div class="qa"><div class="q">First, every record is turned into a bag of words</div></div>
-      <pre class="sm">_tokenize(<span class="str">"Where is the config stored?"</span>)
-  &#8594; lowercase &#8594; split on [a-z0-9]+ &#8594; drop filler words
-  &#8594; [<span class="str">"config"</span>, <span class="str">"stored"</span>]        <span class="cmt"># "where","is","the" dropped</span></pre>
-      <div class="a">The <b>same</b> function runs on records and on your question &#8212; that symmetry
-      is the only reason they ever match.</div>
-      <div class="qa"><div class="q">Then one index is built for the whole store</div></div>
-      <div class="srcfile">llmcode/memory.py &#8212; _BM25Index, built once, reused for every search</div>
-      <pre class="sm">tfs     : list[dict[str,int]]  <span class="cmt"># per record: word → how many times</span>
-lengths : list[int]            <span class="cmt"># per record: how many words</span>
-avgdl   : float                <span class="cmt"># average record length</span>
-df_map  : dict[str,int]        <span class="cmt"># word → how many records have it</span>
-n       : int                  <span class="cmt"># how many records</span></pre>
-      <div class="a">Built in one pass over all records. It is thrown away and rebuilt only when the
-      store changes &#8212; otherwise every search would re-count every word in every record, which is
-      the difference between instant and a visible pause on a few thousand items.</div>
-      <div class="key"><span class="t">Dropping filler words is load-bearing</span>
-      <p>It looks like tidying. It is not. If a question and a record share <em>only</em> the word
-      "the", the score comes out <b>above zero</b> &#8212; and the next slide only reaches for the slow
-      meaning-search when the score is <b>exactly zero</b>.</p>
-      <p>Our list deliberately <b>keeps</b> <code>on</code>, <code>off</code>, <code>no</code>,
-      <code>not</code>: in a command-line tool those are values, not filler.</p></div>
-    </div>
-    <div class="right">
-      <div class="qa"><div class="q">The scoring loop, in full</div></div>
-      <div class="srcfile">llmcode/memory.py &#8212; k1 = 1.5, b = 0.75</div>
-      <pre class="sm"><span class="kw">for</span> term <span class="kw">in</span> q_terms:                <span class="cmt"># a repeated query word counts once</span>
-    f   = tf.get(term, <span class="num">0</span>)        <span class="cmt"># times it's in THIS record</span>
-    <span class="kw">if</span> f == <span class="num">0</span>: <span class="kw">continue</span>
-    n_q = df_map[term]            <span class="cmt"># how many records have it at all</span>
-
-    idf   = log(<span class="num">1</span> + (n - n_q + <span class="num">.5</span>) / (n_q + <span class="num">.5</span>))   <span class="cmt"># ① rare = valuable</span>
-    denom = f + k1 * (<span class="num">1</span> - b + b * (dl / avgdl))    <span class="cmt"># ③ long = penalised</span>
-    s    += idf * (f * (k1 + <span class="num">1</span>)) / denom            <span class="cmt"># ② repeats saturate</span></pre>
-      <figure style="margin:0 auto 2mm auto;width:100%"><svg viewBox="0 0 760 196" xmlns="http://www.w3.org/2000/svg">
-  <!-- panel 1: IDF -->
-  <text class="tt" x="20" y="14">1 &#183; rare words count for more</text>
-  <rect class="bx-d" x="14" y="22" width="216" height="150" rx="4"/>
-  <text class="ts" x="26" y="44">"the"</text>
-  <rect x="80" y="34" width="8" height="12" fill="#c3cedb"/>
-  <text class="tms" x="96" y="44">appears in everything &#8594; worthless</text>
-  <text class="ts" x="26" y="76">"config"</text>
-  <rect x="80" y="66" width="52" height="12" fill="#7ea9d4"/>
-  <text class="tms" x="140" y="76">appears in a few &#8594; useful</text>
-  <text class="ts" x="26" y="108">"_maybe_auto"</text>
-  <rect x="80" y="98" width="110" height="12" fill="#1f5fa8"/>
-  <text class="tms" x="80" y="126">appears in exactly one &#8594; gold</text>
-  <text class="ts" x="26" y="152">A word that is in everything</text>
-  <text class="ts" x="26" y="165">tells you nothing.</text>
-
-  <!-- panel 2: saturation -->
-  <text class="tt" x="272" y="14">2 &#183; repeats count less and less</text>
-  <rect class="bx-d" x="266" y="22" width="216" height="150" rx="4"/>
-  <line x1="288" y1="150" x2="464" y2="150" stroke="#9fb0c2" stroke-width="1"/>
-  <line x1="288" y1="150" x2="288" y2="44" stroke="#9fb0c2" stroke-width="1"/>
-  <path d="M288,150 C310,86 340,68 380,62 C420,58 444,56 462,55" fill="none" stroke="#1d7a53" stroke-width="2"/>
-  <path d="M288,150 L462,46" fill="none" stroke="#c3cedb" stroke-width="1.4" stroke-dasharray="4 3"/>
-  <text class="tms" x="392" y="90" style="fill:#1d7a53">BM25</text>
-  <text class="tms" x="360" y="42" style="fill:#9fb0c2">naive counting</text>
-  <text class="tms" x="292" y="164">times the word appears &#8594;</text>
-  <text class="ts" x="276" y="185" transform="rotate(-90 276 185)">score</text>
-
-  <!-- panel 3: length -->
-  <text class="tt" x="524" y="14">3 &#183; long documents get a penalty</text>
-  <rect class="bx-d" x="518" y="22" width="228" height="150" rx="4"/>
-  <rect x="532" y="40" width="60" height="26" rx="2" class="bx-g"/>
-  <text class="tms" x="600" y="57">short note, 1 match</text>
-  <text class="tms" x="600" y="70" style="fill:#1d7a53">strong signal</text>
-  <rect x="532" y="86" width="200" height="40" rx="2" class="bx-a"/>
-  <text class="tms" x="540" y="102">huge file, 1 match</text>
-  <text class="tms" x="540" y="118" style="fill:#a8611f">probably coincidence</text>
-  <text class="ts" x="532" y="150">Finding a word in 20 lines means</text>
-  <text class="ts" x="532" y="163">more than finding it in 2,000.</text>
-</svg></figure>
-      <div class="note"><span class="t">Why not just count matching words?</span>
-      <p>Because every record contains "the", long records would win by sheer size, and the tenth
-      occurrence of a word would count as much as the second. Those three corrections
-      <b>are</b> the formula &#8212; and it still beats fancier methods on code, where an exact function
-      name matters more than general similarity.</p></div>
-    </div>
-  </div>
-  <div class="foot"><span>llmc-code &#183; how it works</span><span>19</span></div>
-</div>
-
-<div data-src="s18" class="slide">
-  <div class="sh"><span class="num">20</span><h2>Box 4 &#8212; the meaning search, and the gate that usually skips it</h2>
-    <span class="tag">box 4 &#183; meaning search</span></div>
-  <div class="body">
-    <div class="left">
-      <div class="qa"><div class="q">What a vector actually is here</div>
-      <div class="a">A record's text is sent to a second, small model (<code>nomic-embed-text</code>,
-      served by the same LM Studio) which returns <b>768 floating-point numbers</b>. Texts about the
-      same topic come back with similar numbers.</div></div>
-      <div class="qa"><div class="q">Comparing two of them &#8212; the whole function</div></div>
-      <div class="srcfile">llmcode/memory.py &#8212; cosine()</div>
-      <pre class="sm"><span class="kw">if not</span> a <span class="kw">or not</span> b <span class="kw">or</span> len(a) != len(b): <span class="kw">return</span> <span class="num">0.0</span>
-dot = na = nb = <span class="num">0.0</span>
-<span class="kw">for</span> x, y <span class="kw">in</span> zip(a, b):
-    dot += x * y      <span class="cmt"># how much they point the same way</span>
-    na  += x * x      <span class="cmt"># length of a, squared</span>
-    nb  += y * y      <span class="cmt"># length of b, squared</span>
-<span class="kw">if</span> na &lt;= <span class="num">0.0</span> <span class="kw">or</span> nb &lt;= <span class="num">0.0</span>: <span class="kw">return</span> <span class="num">0.0</span>
-<span class="kw">return</span> dot / sqrt(na * nb)     <span class="cmt"># 1.0 = same direction = same topic</span></pre>
-      <div class="a">We compare <b>direction</b>, not distance &#8212; length mostly reflects how wordy the
-      text was. Note it <b>never raises</b>: garbage in returns <code>0.0</code>, which correctly
-      means "no match", so one corrupt record can't take down a turn.</div>
-      <div class="note"><span class="t">Searching is a loop, not a database</span>
-      <p><code>for each record: cosine(query_vec, record_vec)</code>, keep the top few. Over a few
-      thousand records that is <b>milliseconds</b>. No index structure, no server.</p></div>
-    </div>
-    <div class="right">
-      <div class="qa"><div class="q">The decision that made this fast</div>
-      <div class="a">Embedding the question means <b>another round trip</b> to a different model &#8212;
-      and on one GPU that can force your main model to be swapped out and back. Doing that on every
-      turn would cost more than the search saves. So:</div></div>
-      <div class="srcfile">llmcode/memory.py &#8212; retrieve(), the entire policy</div>
-      <pre class="sm">bm25_full = _bm25_score_index(query, self._bm25_index)
-best_bm25 = bm25_full[<span class="num">0</span>][<span class="num">1</span>] <span class="kw">if</span> bm25_full <span class="kw">else</span> <span class="num">0.0</span>
-
-embed_idx = []
-<span class="kw">if</span> provider <span class="kw">and</span> (mode == <span class="str">"embed"</span>
-                 <span class="kw">or</span> (mode == <span class="str">"auto"</span> <span class="kw">and</span> best_bm25 &lt;= <span class="num">0.0</span>)):
-    embed_idx = self._embed_rank(query, provider, pool_k)
-
-ordered = bm25_idx <span class="kw">if not</span> embed_idx \
-          <span class="kw">else</span> self._fuse(bm25_idx, embed_idx, pool_k)</pre>
-      <table>
-      <tr><th style="width:34%">Your question</th><th>What runs</th><th style="width:22%">Cost</th></tr>
-      <tr><td>"where is config.json?"<br><span class="ts">shares real words</span></td>
-          <td>word search only</td><td>instant &#8212; the usual case</td></tr>
-      <tr><td>"where do settings live?"<br><span class="ts">a paraphrase</span></td>
-          <td>word search scores <b>0</b> &#8594; meaning search &#8594; results merged</td>
-          <td>one round trip, only when needed</td></tr>
-      <tr><td>"thanks"</td><td>nothing at all</td><td>zero</td></tr>
-      </table>
-      <div class="key"><span class="t">The shape, which recurs four times in this codebase</span>
-      <p><b>Run the cheap check. Only pay for the expensive one when the cheap one found
-      nothing.</b> Here; in code search; in the optional re-ranking pass; and in the retry that
-      lifts the reply-length cap.</p></div>
-    </div>
-  </div>
-  <div class="foot"><span>llmc-code &#183; how it works</span><span>20</span></div>
-</div>
-
-<div data-src="s19" class="slide">
-  <div class="sh"><span class="num">21</span><h2>Box 4 &#8212; where the vectors are stored</h2>
-    <span class="tag">box 4 &#183; the vector files</span></div>
-  <div class="body col">
-    <figure style="margin:0 auto 2mm auto;width:62%"><svg viewBox="0 0 700 250" xmlns="http://www.w3.org/2000/svg">
-  <text class="tt" x="10" y="14">in RAM</text>
-  <rect class="bx-p" x="10" y="22" width="320" height="56" rx="4"/>
-  <text class="tms" x="22" y="42">{"a7f3…": array('f', [0.13, -0.88, 0.04, …]),</text>
-  <text class="tms" x="22" y="58"> "b0c1…": array('f', [0.52,  0.19, -0.7, …])}</text>
-  <text class="tms" x="22" y="72" style="fill:#6a3fa0">4 bytes per number &#8212; not Python's bulky floats</text>
-
-  <path class="ln-p" d="M170,78 L170,100"/>
-  <text class="tt" x="180" y="94">save</text>
-
-  <text class="tt" x="10" y="116">on disk &#8212; two files</text>
-  <rect class="bx" x="10" y="124" width="320" height="52" rx="4"/>
-  <text class="tms" x="22" y="142" style="font-weight:700">.memory.json</text>
-  <text class="tms" x="22" y="157">the text, plus a fingerprint of the numbers</text>
-  <text class="tms" x="22" y="171" style="fill:#7a8799">readable, and small</text>
-
-  <rect class="bx-p" x="10" y="186" width="320" height="52" rx="4"/>
-  <text class="tms" x="22" y="204" style="font-weight:700">.memory.json.vec</text>
-  <text class="tms" x="22" y="219">just the raw numbers, back to back</text>
-  <text class="tms" x="22" y="233" style="fill:#7a8799">all the same size &#8212; no labels, no punctuation</text>
-
-  <!-- right: byte layout -->
-  <text class="tt" x="360" y="14">the .vec byte layout</text>
-  <rect x="360" y="24" width="96" height="30" rx="2" class="bx-p"/><text class="tmz" x="366" y="43">vector 0 &#183; 3072 B</text>
-  <rect x="458" y="24" width="96" height="30" rx="2" class="bx-p"/><text class="tmz" x="464" y="43">vector 1 &#183; 3072 B</text>
-  <rect x="556" y="24" width="96" height="30" rx="2" class="bx-p"/><text class="tmz" x="562" y="43">vector 2 &#183; 3072 B</text>
-  <text class="tms" x="654" y="43">…</text>
-  <text class="ts" x="360" y="70">same order as the list in the other file, so number 5 is easy to find</text>
-
-  <rect class="bx-r" x="360" y="86" width="330" height="152" rx="4"/>
-  <text class="tt" x="372" y="104" fill="#a8324a">what if the power cuts halfway?</text>
-  <text class="ts" x="372" y="124">Two files can disagree. If we save one and not the other,</text>
-  <text class="ts" x="372" y="140">one says 200 items and the other holds 140 &#8212;</text>
-  <text class="ts" x="372" y="156">and every item quietly matches the WRONG numbers.</text>
-  <text class="ts" x="372" y="180" style="font-weight:600">Fix: save a fingerprint of the numbers file</text>
-  <text class="ts" x="372" y="196" style="font-weight:600">inside the other file. Check it on load.</text>
-  <text class="ts" x="372" y="216">If it doesn't match &#8594; throw the numbers away</text>
-  <text class="ts" x="372" y="230">and rebuild them. Slow once, never wrong.</text>
-</svg></figure>
-    <div class="body" style="gap:5mm">
-      <div class="left">
-        <div class="qa"><div class="q">Why not just put them in the JSON?</div>
-        <div class="a">768 numbers per record, written as decimal text, is roughly <b>9 KB of digits
-        per record</b> &#8212; and it has to be parsed back one number at a time on every launch. A few
-        thousand records makes the file unopenable and startup slow.</div></div>
-        <div class="qa"><div class="q">So: numbers in their own file, as raw bytes</div>
-        <div class="a">In memory each vector is an <code>array('f')</code> &#8212; <b>4 bytes per
-        number</b>, packed, instead of the ~32 bytes an ordinary Python float costs. Saving is then
-        just writing those bytes straight out, end to end, with <b>no separators and no labels</b>.
-        <br>Finding vector number 5 is arithmetic, not parsing:</div></div>
-        <pre class="sm">stride = dim * <span class="num">4</span>                  <span class="cmt"># 768 × 4 = 3072 bytes each</span>
-offset = i * stride                <span class="cmt"># vector i starts exactly here</span></pre>
-      </div>
-      <div class="right">
-        <div class="qa"><div class="q">The real engineering problem: two files can disagree</div>
-        <div class="a">The records live in the <code>.json</code>; their numbers live in the
-        <code>.vec</code>. If the process dies between writing one and the other, the JSON might
-        claim 200 records while the <code>.vec</code> holds 140 &#8212; and then <b>every record quietly
-        pairs with the wrong numbers</b>. No error. Just wrong answers, forever.</div></div>
-        <div class="key"><span class="t">The fix: make one file prove it matches the other</span>
-        <p>When saving, we fingerprint the exact bytes of the <code>.vec</code> and store that
-        fingerprint <b>inside the JSON</b> as <code>vector_sig</code>.</p>
-        <p>On load we re-fingerprint the file and compare. If it doesn't match &#8212; or the file is
-        short, or missing &#8212; we <b>treat the vectors as empty and re-embed</b>. Slow once; never
-        silently wrong.</p></div>
-        <div class="note"><span class="t">When this simple approach is the right one</span>
-        <p>Thousands of items, one machine, one user &#8212; a loop over 4,000 comparisons is
-        milliseconds. You need a real vector database at <em>millions</em> of items, or when several
-        programs share one index. <b>Not before that.</b></p></div>
-      </div>
-    </div>
-  </div>
-  <div class="foot"><span>llmc-code &#183; how it works</span><span>21</span></div>
-</div>
-
-<div data-src="s20" class="slide">
-  <div class="sh"><span class="num">22</span><h2>Searching your code, and mapping the project</h2>
+<div data-src="s24" class="slide">
+  <div class="sh"><span class="num">23</span><h2>Searching your code, and mapping the project</h2>
     <span class="tag">code_index.py &#183; repo_graph.py</span></div>
   <div class="body">
     <div class="left">
@@ -1878,11 +1952,11 @@ offset = i * stride                <span class="cmt"># vector i starts exactly h
       A good search tool beats a bigger memory, and costs far less.</p></div>
     </div>
   </div>
-  <div class="foot"><span>llmc-code &#183; how it works</span><span>22</span></div>
+  <div class="foot"><span>llmc-code &#183; how it works</span><span>23</span></div>
 </div>
 
-<div data-src="s21" class="slide">
-  <div class="sh"><span class="num">23</span><h2>Sub-agents &#8212; how the context stays small</h2>
+<div data-src="s25" class="slide">
+  <div class="sh"><span class="num">24</span><h2>Sub-agents &#8212; how the context stays small</h2>
     <span class="tag">orchestration.py &#183; audit.py</span></div>
   <div class="body">
     <div class="left">
@@ -1930,12 +2004,12 @@ answer = sub.run(task)                   <span class="cmt"># runs its own full l
       "clean" &#8212; a silent partial review is worse than no review.</div>
     </div>
   </div>
-  <div class="foot"><span>llmc-code &#183; how it works</span><span>23</span></div>
+  <div class="foot"><span>llmc-code &#183; how it works</span><span>24</span></div>
 </div>
 
 <style>#s-safety li{font-size:9.7pt;margin-bottom:1.1mm}#s-safety td{padding:1.2mm 2.5mm}#s-safety th{padding:1.2mm 2.5mm}#s-safety h3{margin:0 0 1.5mm 0}</style>
-<div data-src="s22" class="slide" id="s-safety" style="padding-bottom:7mm">
-  <div class="sh"><span class="num">24</span><h2>Never trusting the model</h2>
+<div data-src="s26" class="slide" id="s-safety" style="padding-bottom:7mm">
+  <div class="sh"><span class="num">25</span><h2>Never trusting the model</h2>
     <span class="tag">guards &#183; safety &#183; privacy</span></div>
   <div class="body">
     <div class="left">
@@ -1984,11 +2058,11 @@ answer = sub.run(task)                   <span class="cmt"># runs its own full l
       <em>because</em> of it. Say which mechanism enforces a guarantee &#8212; or don't make it.</p></div>
     </div>
   </div>
-  <div class="foot"><span>llmc-code &#183; how it works</span><span>24</span></div>
+  <div class="foot"><span>llmc-code &#183; how it works</span><span>25</span></div>
 </div>
 
-<div data-src="s23" id="s-heat" class="slide">
-  <div class="sh"><span class="num">25</span><h2>Keeping the laptop cool</h2>
+<div data-src="s27" id="s-heat" class="slide">
+  <div class="sh"><span class="num">26</span><h2>Keeping the laptop cool</h2>
     <span class="tag">cooldown.py &#183; gentle mode</span></div>
   <div class="body">
     <div class="left">
@@ -2034,12 +2108,12 @@ answer = sub.run(task)                   <span class="cmt"># runs its own full l
       waited."</b> That is the number to improve.</p></div>
     </div>
   </div>
-  <div class="foot"><span>llmc-code &#183; how it works</span><span>25</span></div>
+  <div class="foot"><span>llmc-code &#183; how it works</span><span>26</span></div>
 </div>
 
-<div data-src="s23a" class="slide">
-  <div class="sh"><span class="num">26</span><h2>MCP &#8212; plugging in tools we didn't write</h2>
-    <span class="tag">start, call, and what happens when it goes wrong</span></div>
+<div data-src="s28" class="slide">
+  <div class="sh"><span class="num">27</span><h2>MCP &#8212; plugging in tools we didn't write</h2>
+    <span class="tag">MCP &#183; 1 of 2 &#183; start, call, fail</span></div>
   <figure style="margin:0 auto 3mm auto;width:96%"><svg viewBox="0 0 1100 400" xmlns="http://www.w3.org/2000/svg">
   <text class="tt" x="8" y="16">1 &#183; WHEN LLMC-CODE STARTS</text>
   <rect class="bx-b" x="8" y="26" width="1084" height="116" rx="5"/>
@@ -2111,12 +2185,12 @@ answer = sub.run(task)                   <span class="cmt"># runs its own full l
     <p>A program can claim its tool is harmless. That claim is <b>ignored</b> unless you personally
     trusted that program. Names are checked so one can't impersonate another.</p></div>
   </div>
-  <div class="foot"><span>llmc-code &#183; how it works</span><span>26</span></div>
+  <div class="foot"><span>llmc-code &#183; how it works</span><span>27</span></div>
 </div>
 
-<div data-src="s24" class="slide">
-  <div class="sh"><span class="num">27</span><h2>Other people's tools, and testing with a fake model</h2>
-    <span class="tag">mcp.py &#183; providers.py</span></div>
+<div data-src="s29" class="slide">
+  <div class="sh"><span class="num">28</span><h2>Other people's tools, and testing with a fake model</h2>
+    <span class="tag">MCP &#183; 2 of 2 &#183; and testing with a fake model</span></div>
   <div class="body">
     <div class="left">
       <h3>Plugging in tools we didn't write</h3>
@@ -2164,11 +2238,11 @@ answer = sub.run(task)                   <span class="cmt"># runs its own full l
       directly, is miserable work. Done at the start, it costs ten minutes.</p></div>
     </div>
   </div>
-  <div class="foot"><span>llmc-code &#183; how it works</span><span>27</span></div>
+  <div class="foot"><span>llmc-code &#183; how it works</span><span>28</span></div>
 </div>
 
-<div data-src="s25" class="slide">
-  <div class="sh"><span class="num">28</span><h2>Recap &#8212; and how to build your own</h2>
+<div data-src="s30" class="slide">
+  <div class="sh"><span class="num">29</span><h2>Recap &#8212; and how to build your own</h2>
     <span class="tag">take-aways</span></div>
   <div class="body" style="font-size:96%">
     <div class="left">
@@ -2212,7 +2286,7 @@ answer = sub.run(task)                   <span class="cmt"># runs its own full l
       pipx install llmc-code &#183; github.com/Adhithya-Karthikeyan/llmc-code</p>
     </div>
   </div>
-  <div class="foot"><span>llmc-code &#183; how it works</span><span>28</span></div>
+  <div class="foot"><span>llmc-code &#183; how it works</span><span>29</span></div>
 </div>
 
 </body></html>
