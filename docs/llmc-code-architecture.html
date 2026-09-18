@@ -392,111 +392,166 @@ figcaption{ font-size:8.6pt; color:var(--ink-faint); margin-top:2mm; }
 <div data-src="s05" class="slide">
   <div class="sh"><span class="num">04</span><h2>The complete architecture</h2>
     <span class="tag">the map &#183; box numbers below</span></div>
-  <figure style="margin:0 auto 2mm auto;width:84%"><svg viewBox="0 0 1000 545" xmlns="http://www.w3.org/2000/svg">
- <defs>
-  <marker id="a2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
-    <path d="M0,1 L9,5 L0,9 z" fill="#7d8b99"/></marker>
- </defs>
- <style>
-  .r{ fill:#fff; stroke:#c8d2dc; stroke-width:2; }
-  .rb{ fill:#eef5fd; stroke:#2563a8; stroke-width:2; }
-  .rg{ fill:#ecf8f2; stroke:#1d7a53; stroke-width:2; }
-  .ra{ fill:#fdf4ea; stroke:#b06a1d; stroke-width:2; }
-  .rp{ fill:#f5efFd; stroke:#6a3fa0; stroke-width:2; }
-  .rd{ fill:#f3f6f9; stroke:#aab6c2; stroke-width:2; }
-  .ln{ stroke:#7d8b99; stroke-width:2.2; fill:none; marker-end:url(#a2); }
-  .h{ font:600 20px Inter,Helvetica,Arial,sans-serif; fill:#101c27; }
-  .s{ font:15px Inter,Helvetica,Arial,sans-serif; fill:#5b6b7c; }
-  .m{ font:600 16px "SF Mono",Menlo,monospace; fill:#2c3d4e; }
-  .n{ font:700 17px "SF Mono",Menlo,monospace; fill:#fff; }
- </style>
+  <figure style="margin-bottom:2mm"><svg viewBox="0 0 1100 474" xmlns="http://www.w3.org/2000/svg">
+  <!-- USER -->
+  <rect class="bx-d" x="440" y="4" width="220" height="34" rx="5"/>
+  <text class="tb" x="550" y="26" text-anchor="middle">You, in a terminal</text>
+  <path class="ln" d="M550,38 L550,56"/>
 
- <!-- you -->
- <rect class="rd" x="390" y="6" width="220" height="46" rx="8"/>
- <text class="h" x="500" y="36" text-anchor="middle">You, typing</text>
- <path class="ln" d="M500,52 L500,78"/>
+  <!-- INTERFACE -->
+  <rect class="bx-b" x="230" y="56" width="640" height="52" rx="6"/>
+  <text class="tt" x="242" y="72" fill="#1f5fa8">what you see and type</text>
+  <text class="tm" x="300" y="95" style="font-weight:700">repl.py</text>
+  <text class="ts" x="352" y="95">input &#183; 35 slash commands &#183; themes &#183; spinner &#183; buffered render</text>
+  <text class="tm" x="718" y="95" style="font-weight:700">__main__.py</text>
+  <text class="ts" x="800" y="95">CLI flags</text>
+  <path class="ln-b" d="M550,108 L550,126"/>
 
- <!-- 1 face -->
- <rect class="rb" x="230" y="80" width="540" height="62" rx="8"/>
- <circle cx="262" cy="111" r="15" fill="#2563a8"/><text class="n" x="262" y="117" text-anchor="middle">1</text>
- <text class="h" x="292" y="105">The face</text>
- <text class="s" x="292" y="127">the prompt, the commands, the colours</text>
- <text class="m" x="752" y="105" text-anchor="end">repl.py</text>
- <path class="ln" d="M500,142 L500,168"/>
+  <!-- BRAIN -->
+  <rect class="bx-g" x="230" y="126" width="640" height="86" rx="6"/>
+  <text class="tt" x="242" y="142" fill="#1d7a53">the brain &#8212; decides what to do next</text>
+  <rect class="bx" x="244" y="150" width="196" height="52" rx="4"/>
+  <text class="tm" x="342" y="169" text-anchor="middle" style="font-weight:700">agent.py</text>
+  <text class="ts" x="342" y="186" text-anchor="middle">try, see what happened, repeat</text>
+  <text class="tms" x="342" y="198" text-anchor="middle">+ 9 ways it knows to stop</text>
+  <rect class="bx" x="452" y="150" width="196" height="52" rx="4"/>
+  <text class="tm" x="550" y="169" text-anchor="middle" style="font-weight:700">orchestration.py</text>
+  <text class="ts" x="550" y="186" text-anchor="middle">sends a helper off to do a job</text>
+  <text class="tms" x="550" y="198" text-anchor="middle">explorer &#183; coder &#183; reviewer</text>
+  <rect class="bx" x="660" y="150" width="196" height="52" rx="4"/>
+  <text class="tm" x="758" y="169" text-anchor="middle" style="font-weight:700">prompts.py</text>
+  <text class="ts" x="758" y="186" text-anchor="middle">the instructions we give the model</text>
+  <text class="tms" x="758" y="198" text-anchor="middle">explore &#8594; plan &#8594; act &#8594; validate</text>
 
- <!-- 2 brain -->
- <rect class="rg" x="230" y="170" width="540" height="90" rx="8"/>
- <circle cx="262" cy="207" r="15" fill="#1d7a53"/><text class="n" x="262" y="213" text-anchor="middle">2</text>
- <text class="h" x="292" y="199">The brain</text>
- <text class="s" x="292" y="221">runs the loop &#183; decides what to do next</text>
- <text class="s" x="292" y="241">knows when to stop</text>
- <text class="m" x="752" y="199" text-anchor="end">agent.py</text>
+  <!-- CONTEXT ENGINE (left) -->
+  <rect class="bx-a" x="6" y="126" width="214" height="118" rx="6"/>
+  <text class="tt" x="18" y="142" fill="#a8611f">keeping the chat small</text>
+  <text class="tms" x="18" y="160">&#9642; how much history does this</text>
+  <text class="tms" x="30" y="172" style="fill:#7a8799">question actually deserve?</text>
+  <text class="tms" x="18" y="188">&#9642; shorten results from</text>
+  <text class="tms" x="30" y="200" style="fill:#7a8799">earlier, finished steps</text>
+  <text class="tms" x="18" y="216">&#9642; summarise old turns</text>
+  <text class="tms" x="30" y="228" style="fill:#7a8799">into one short note</text>
+  <text class="tms" x="18" y="240" style="fill:#a8611f">size = characters / 4</text>
+  <path class="ln-o" d="M220,168 L242,168"/>
 
- <!-- 3 context (left) -->
- <rect class="ra" x="10" y="170" width="196" height="90" rx="8"/>
- <circle cx="42" cy="197" r="15" fill="#b06a1d"/><text class="n" x="42" y="203" text-anchor="middle">3</text>
- <text class="h" x="70" y="203">Context</text>
- <text class="s" x="24" y="232">shrinks the chat</text>
- <text class="s" x="24" y="250">before we send it</text>
- <path class="ln" d="M206,215 L226,215"/>
+  <!-- CAG (left lower) -->
+  <rect class="bx-p" x="6" y="256" width="214" height="72" rx="6"/>
+  <text class="tt" x="18" y="272" fill="#6a3fa0">re-using the server's work</text>
+  <text class="tms" x="18" y="290">only ever ADD to the end,</text>
+  <text class="tms" x="18" y="304">never change what came before</text>
+  <text class="tms" x="18" y="318">&#8594; the server skips re-reading it</text>
+  <path class="ln-p" d="M113,256 L113,246"/>
 
- <!-- 4 memory (right) -->
- <rect class="rb" x="794" y="170" width="196" height="90" rx="8"/>
- <circle cx="826" cy="197" r="15" fill="#2563a8"/><text class="n" x="826" y="203" text-anchor="middle">4</text>
- <text class="h" x="854" y="203">Memory</text>
- <text class="s" x="808" y="232">finds only the bits</text>
- <text class="s" x="808" y="250">this question needs</text>
- <path class="ln" d="M790,215 L774,215"/>
+  <!-- GOVERNOR (left bottom) -->
+  <rect class="bx-r" x="6" y="340" width="214" height="80" rx="6"/>
+  <text class="tt" x="18" y="356" fill="#a8324a">keeping the laptop cool</text>
+  <text class="tms" x="18" y="374">cooldown.py &#8212; a 1 minute break</text>
+  <text class="tms" x="30" y="386" style="fill:#7a8799">after every 10 minutes of work</text>
+  <text class="tms" x="18" y="402">gentle mode &#8212; shorter replies</text>
+  <text class="tms" x="30" y="414" style="fill:#7a8799">and small pauses between turns</text>
 
- <!-- split -->
- <path class="ln" d="M370,260 L370,286"/>
- <path class="ln" d="M630,260 L630,286"/>
+  <!-- RETRIEVAL (right) -->
+  <rect class="bx-b" x="880" y="126" width="214" height="118" rx="6"/>
+  <text class="tt" x="892" y="142" fill="#1f5fa8">looking things up (RAG)</text>
+  <text class="tms" x="892" y="160">memory.py &#8212; past conversations</text>
+  <text class="tms" x="904" y="172" style="fill:#7a8799">words first, then meaning</text>
+  <text class="tms" x="892" y="190">code_index.py &#8212; your own code</text>
+  <text class="tms" x="904" y="202" style="fill:#7a8799">split up function by function</text>
+  <text class="tms" x="892" y="220">repo_graph.py &#8212; the key files</text>
+  <text class="tms" x="892" y="238">rerank.py &#8212; a closer look</text>
+  <path class="ln-b" d="M878,168 L858,168"/>
 
- <!-- 5 hands -->
- <rect class="ra" x="130" y="288" width="480" height="70" rx="8"/>
- <circle cx="162" cy="323" r="15" fill="#b06a1d"/><text class="n" x="162" y="329" text-anchor="middle">5</text>
- <text class="h" x="192" y="316">The hands</text>
- <text class="s" x="192" y="338">read, write and run things on your machine</text>
- <text class="m" x="592" y="316" text-anchor="end">tools.py</text>
+  <!-- VECTOR STORE (right) -->
+  <rect class="bx-p" x="880" y="256" width="214" height="72" rx="6"/>
+  <text class="tt" x="892" y="272" fill="#6a3fa0">where meanings are stored</text>
+  <text class="tms" x="892" y="290">each number takes 4 bytes</text>
+  <text class="tms" x="892" y="304">saved as raw bytes (.vec)</text>
+  <text class="tms" x="892" y="318">+ a checksum to catch a crash</text>
+  <path class="ln-p" d="M987,256 L987,246"/>
 
- <!-- 6 mouth -->
- <rect class="rp" x="630" y="288" width="360" height="70" rx="8"/>
- <circle cx="662" cy="323" r="15" fill="#6a3fa0"/><text class="n" x="662" y="329" text-anchor="middle">6</text>
- <text class="h" x="692" y="316">The mouth</text>
- <text class="s" x="692" y="338">sends and receives the reply</text>
- <text class="m" x="972" y="316" text-anchor="end">providers.py</text>
+  <!-- STATE (right bottom) -->
+  <rect class="bx-d" x="880" y="340" width="214" height="80" rx="6"/>
+  <text class="tt" x="892" y="356">saved on your disk</text>
+  <text class="tms" x="892" y="374">config.py &#8212; your settings</text>
+  <text class="tms" x="892" y="392">session.py &#8212; past sessions</text>
+  <text class="tms" x="892" y="410">checkpoint.py &#8212; undo</text>
 
- <path class="ln" d="M370,358 L370,400"/>
- <path class="ln" d="M810,358 L810,400"/>
+  <!-- ACTIONS -->
+  <path class="ln-g" d="M550,212 L550,230"/>
+  <rect class="bx-a" x="230" y="230" width="640" height="76" rx="6"/>
+  <text class="tt" x="242" y="246" fill="#a8611f">the hands &#8212; does things on your machine</text>
+  <rect class="bx" x="244" y="254" width="300" height="44" rx="4"/>
+  <text class="tm" x="394" y="272" text-anchor="middle" style="font-weight:700">tools.py</text>
+  <text class="tmz" x="394" y="286" text-anchor="middle">read_file &#183; write_file &#183; edit_file &#183; run_bash &#183; glob</text>
+  <text class="tmz" x="394" y="297" text-anchor="middle">grep &#183; repo_map &#183; web_fetch &#183; code_search &#183; todo_write</text>
+  <rect class="bx" x="556" y="254" width="146" height="44" rx="4"/>
+  <text class="tm" x="629" y="272" text-anchor="middle" style="font-weight:700">mcp.py</text>
+  <text class="tms" x="629" y="288" text-anchor="middle">other people's tools</text>
+  <rect class="bx" x="714" y="254" width="142" height="44" rx="4"/>
+  <text class="tm" x="785" y="272" text-anchor="middle" style="font-weight:700">remediation.py</text>
+  <text class="tms" x="785" y="288" text-anchor="middle">retries a failed call</text>
 
- <!-- bottom -->
- <rect class="rd" x="130" y="402" width="480" height="58" rx="8"/>
- <text class="h" x="370" y="428" text-anchor="middle">Your files and shell</text>
- <text class="s" x="370" y="449" text-anchor="middle">the part that can actually break</text>
+  <!-- PROVIDER -->
+  <path class="ln" d="M394,306 L394,324"/>
+  <path class="ln" d="M550,306 L550,324"/>
+  <rect class="bx-p" x="230" y="324" width="640" height="76" rx="6"/>
+  <text class="tt" x="242" y="340" fill="#6a3fa0">the mouth &#8212; talks to the model</text>
+  <text class="tms" x="244" y="360">&#9642; sends the chat, gets the reply back bit by bit</text>
+  <text class="tms" x="244" y="376">&#9642; understands 7 ways models ask for things</text>
+  <text class="tms" x="244" y="392">&#9642; makes every model look the same to our code</text>
+  <text class="tms" x="556" y="360">&#9642; turns text into numbers, for searching</text>
+  <text class="tms" x="556" y="376">&#9642; a fake model for tests &#8212; no GPU needed</text>
+  <text class="tms" x="556" y="392">&#9642; private mode &#8212; locked to this machine</text>
 
- <rect class="rd" x="630" y="402" width="360" height="58" rx="8"/>
- <text class="h" x="810" y="428" text-anchor="middle">LM Studio</text>
- <text class="s" x="810" y="449" text-anchor="middle">your model, on your GPU</text>
+  <!-- EXTERNALS -->
+  <path class="ln-o" d="M244,292 L226,292 L226,414 L252,414 L252,424"/>
+  <path class="ln-p" d="M550,400 L550,428"/>
+  <path class="ln" d="M629,298 L629,314 L875,314 L875,420 L960,420 L960,424"/>
+  <rect class="bx-d" x="150" y="428" width="205" height="42" rx="5"/>
+  <text class="t" x="252" y="447" text-anchor="middle" style="font-weight:600">Your files &amp; shell</text>
+  <text class="tms" x="252" y="462" text-anchor="middle">the part that can actually break</text>
+  <rect class="bx-d" x="430" y="428" width="240" height="42" rx="5"/>
+  <text class="t" x="550" y="447" text-anchor="middle" style="font-weight:600">LM Studio &#183; localhost:1234</text>
+  <text class="tms" x="550" y="462" text-anchor="middle">your model, running on your GPU</text>
+  <rect class="bx-d" x="855" y="428" width="210" height="42" rx="5"/>
+  <text class="t" x="960" y="447" text-anchor="middle" style="font-weight:600">MCP servers</text>
+  <text class="tms" x="960" y="462" text-anchor="middle">small helper programs</text>
 
- <!-- storage strip -->
- <rect class="r" x="10" y="486" width="980" height="50" rx="8" stroke-dasharray="6 4"/>
- <text class="m" x="30" y="517">~/.llmcode/</text>
- <text class="s" x="140" y="517">settings &#183; saved chats &#183; remembered answers &#183; code index &#183; undo copies</text>
- <text class="s" x="970" y="517" text-anchor="end">all of it, plain files on your disk</text>
+  <!-- box numbers -->
+  <circle cx="858" cy="70" r="9" fill="#1f5fa8"/><text x="858" y="73.5" text-anchor="middle" style="font-family:'SF Mono',Menlo,monospace;font-size:9px;font-weight:700;fill:#fff">1</text>
+  <circle cx="858" cy="140" r="9" fill="#1d7a53"/><text x="858" y="143.5" text-anchor="middle" style="font-family:'SF Mono',Menlo,monospace;font-size:9px;font-weight:700;fill:#fff">2</text>
+  <circle cx="858" cy="244" r="9" fill="#a8611f"/><text x="858" y="247.5" text-anchor="middle" style="font-family:'SF Mono',Menlo,monospace;font-size:9px;font-weight:700;fill:#fff">3</text>
+  <circle cx="858" cy="338" r="9" fill="#6a3fa0"/><text x="858" y="341.5" text-anchor="middle" style="font-family:'SF Mono',Menlo,monospace;font-size:9px;font-weight:700;fill:#fff">4</text>
+  <circle cx="208" cy="140" r="9" fill="#a8611f"/><text x="208" y="143.5" text-anchor="middle" style="font-family:'SF Mono',Menlo,monospace;font-size:9px;font-weight:700;fill:#fff">5</text>
+  <circle cx="208" cy="270" r="9" fill="#6a3fa0"/><text x="208" y="273.5" text-anchor="middle" style="font-family:'SF Mono',Menlo,monospace;font-size:9px;font-weight:700;fill:#fff">6</text>
+  <circle cx="1082" cy="140" r="9" fill="#1f5fa8"/><text x="1082" y="143.5" text-anchor="middle" style="font-family:'SF Mono',Menlo,monospace;font-size:9px;font-weight:700;fill:#fff">7</text>
+  <circle cx="1082" cy="270" r="9" fill="#6a3fa0"/><text x="1082" y="273.5" text-anchor="middle" style="font-family:'SF Mono',Menlo,monospace;font-size:9px;font-weight:700;fill:#fff">8</text>
+  <circle cx="1082" cy="354" r="9" fill="#5a6c80"/><text x="1082" y="357.5" text-anchor="middle" style="font-family:'SF Mono',Menlo,monospace;font-size:9px;font-weight:700;fill:#fff">9</text>
+  <circle cx="208" cy="354" r="9" fill="#a8324a"/><text x="208" y="357.5" text-anchor="middle" style="font-family:'SF Mono',Menlo,monospace;font-size:8px;font-weight:700;fill:#fff">10</text>
 </svg>
 </figure>
-    <div class="wwh">
+  <div style="display:flex;gap:3mm;align-items:center;margin:0 0 3mm 0;font-size:9.2pt;color:#4a5769;white-space:nowrap">
+    <span class="pill" style="background:#eef4fc;border-color:#1f5fa8;color:#1f5fa8">interface &amp; retrieval</span>
+    <span class="pill" style="background:#ecf8f2;border-color:#1d7a53;color:#1d7a53">the loop</span>
+    <span class="pill" style="background:#fdf3e8;border-color:#a8611f;color:#a8611f">actions &amp; context</span>
+    <span class="pill" style="background:#f4eefc;border-color:#6a3fa0;color:#6a3fa0">model I/O &amp; caching</span>
+    <span class="pill" style="background:#fdeef1;border-color:#a8324a;color:#a8324a">hardware limits</span>
+    <span style="margin-left:auto;white-space:nowrap"><b>Boxes 2&#8211;10 each get their own slide.</b></span>
+  </div>
+  <div class="wwh">
     <div class="why"><span class="lbl">Why it is built in layers</span>
     <p>The brain <b>never touches your files or the network itself</b>. It can only ask the hands
     and the mouth to do it. That one rule is what lets us swap the real model for a fake one and
     test the whole thing without a GPU.</p></div>
-    <div class="what"><span class="lbl">What the side boxes do</span>
-    <p><b>Box 3</b> shrinks the chat before sending it. <b>Box 4</b> finds only the bits this
-    question needs. A cloud tool needs neither &#8212; both exist purely because this runs on your
-    own machine.</p></div>
+    <div class="what"><span class="lbl">What the side panels do</span>
+    <p><b>Left:</b> keep it fast and keep the laptop cool. <b>Right:</b> help it remember and look
+    things up. A cloud tool needs neither &#8212; both exist purely because this runs on your own
+    machine.</p></div>
     <div class="how"><span class="lbl">How to read it</span>
-    <p>Follow the arrows <b>top to bottom</b> for one question. <b>Each of the six numbered boxes
-    gets its own slide next</b> &#8212; what it holds, how it works, and why it is built that way.</p></div>
+    <p>Go <b>top to bottom</b> for one question. The panels on either side are helpers the brain
+    calls <em>before</em> and <em>around</em> each trip to the model. Only the bottom row is not
+    our code.</p></div>
   </div>
   <div class="foot"><span>llmc-code &#183; how it works</span><span>4</span></div>
 </div>
@@ -504,69 +559,70 @@ figcaption{ font-size:8.6pt; color:var(--ink-faint); margin-top:2mm; }
 <div data-src="s06" class="slide">
   <div class="sh"><span class="num">05</span><h2>What happens when you press Enter</h2><span class="tag">one request, end to end</span></div>
   <div class="body col">
-    <figure style="margin:0 auto 2mm auto;width:100%"><svg viewBox="0 0 1000 340" xmlns="http://www.w3.org/2000/svg">
- <defs>
-  <marker id="AR" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
-    <path d="M0,1 L9,5 L0,9 z" fill="#7d8b99"/></marker>
-  <marker id="ARr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
-    <path d="M0,1 L9,5 L0,9 z" fill="#b03a52"/></marker>
- </defs>
- <style>
-  .r{ fill:#fff; stroke:#c8d2dc; stroke-width:2; }
-  .rb{ fill:#eef5fd; stroke:#2563a8; stroke-width:2; }
-  .rg{ fill:#ecf8f2; stroke:#1d7a53; stroke-width:2; }
-  .ra{ fill:#fdf4ea; stroke:#b06a1d; stroke-width:2; }
-  .rp{ fill:#f5efFd; stroke:#6a3fa0; stroke-width:2; }
-  .rr{ fill:#fdeef1; stroke:#b03a52; stroke-width:2; }
-  .rd{ fill:#f3f6f9; stroke:#aab6c2; stroke-width:2; }
-  .ln{ stroke:#7d8b99; stroke-width:2.2; fill:none; marker-end:url(#AR); }
-  .lr{ stroke:#b03a52; stroke-width:2.2; fill:none; marker-end:url(#ARr); stroke-dasharray:7 5; }
-  .h{ font:600 20px Inter,Helvetica,Arial,sans-serif; fill:#101c27; }
-  .s{ font:15px Inter,Helvetica,Arial,sans-serif; fill:#5b6b7c; }
-  .m{ font:600 16px "SF Mono",Menlo,monospace; fill:#2c3d4e; }
-  .mm{ font:14px "SF Mono",Menlo,monospace; fill:#5b6b7c; }
-  .n{ font:700 17px "SF Mono",Menlo,monospace; fill:#fff; }
-  .lbl{ font:600 14px "SF Mono",Menlo,monospace; fill:#7d8b99; letter-spacing:.1em; }
- </style>
+    <figure style="flex:1"><svg viewBox="0 0 760 322" xmlns="http://www.w3.org/2000/svg">
+  <!-- row 1 -->
+  <rect class="bx-b" x="40" y="26" width="210" height="60" rx="5"/>
+  <circle cx="58" cy="42" r="10" fill="#1f5fa8"/><text class="tms" x="58" y="46" text-anchor="middle" style="fill:#fff;font-size:11px;font-weight:700">1</text>
+  <text class="tb" x="76" y="46">You type</text>
+  <text class="ts" x="52" y="66">we judge: quick question,</text>
+  <text class="ts" x="52" y="79">or real work?</text>
 
- <rect class="rb" x="10" y="40" width="210" height="86" rx="8"/>
- <circle cx="42" cy="70" r="15" fill="#2563a8"/><text class="n" x="42" y="76" text-anchor="middle">1</text>
- <text class="h" x="68" y="77">You ask</text>
- <text class="s" x="24" y="104">"fix the failing test"</text>
- <path class="ln" d="M220,83 L256,83"/>
+  <rect class="bx-b" x="275" y="26" width="210" height="60" rx="5"/>
+  <circle cx="293" cy="42" r="10" fill="#1f5fa8"/><text class="tms" x="293" y="46" text-anchor="middle" style="fill:#fff;font-size:11px;font-weight:700">2</text>
+  <text class="tb" x="311" y="46">We build the message</text>
+  <text class="ts" x="287" y="66">instructions + trimmed history +</text>
+  <text class="ts" x="287" y="79">anything we looked up + the tool list</text>
 
- <rect class="rb" x="258" y="40" width="244" height="86" rx="8"/>
- <circle cx="290" cy="70" r="15" fill="#2563a8"/><text class="n" x="290" y="76" text-anchor="middle">2</text>
- <text class="h" x="316" y="77">Build the message</text>
- <text class="s" x="272" y="104">history + what we looked up</text>
- <path class="ln" d="M502,83 L524,83"/>
+  <rect class="bx-p" x="510" y="26" width="210" height="60" rx="5"/>
+  <circle cx="528" cy="42" r="10" fill="#6a3fa0"/><text class="tms" x="528" y="46" text-anchor="middle" style="fill:#fff;font-size:11px;font-weight:700">3</text>
+  <text class="tb" x="546" y="46">Sent to the model</text>
+  <text class="ts" x="522" y="66">it replies bit by bit; a spinner</text>
+  <text class="ts" x="522" y="79">runs while we wait</text>
 
- <rect class="rp" x="526" y="40" width="204" height="86" rx="8"/>
- <circle cx="556" cy="70" r="15" fill="#6a3fa0"/><text class="n" x="556" y="76" text-anchor="middle">3</text>
- <text class="h" x="582" y="77">Model replies</text>
- <text class="s" x="540" y="104">streamed back in pieces</text>
- <path class="ln" d="M730,83 L762,83"/>
+  <path class="ln-b" d="M250,56 L275,56"/>
+  <path class="ln-b" d="M485,56 L510,56"/>
+  <path class="ln-p" d="M615,86 L615,110"/>
 
- <rect class="rg" x="764" y="40" width="226" height="86" rx="8"/>
- <circle cx="796" cy="70" r="15" fill="#1d7a53"/><text class="n" x="796" y="76" text-anchor="middle">4</text>
- <text class="h" x="822" y="77">Read the reply</text>
- <text class="s" x="778" y="104">did it ask for something?</text>
+  <!-- row 2 -->
+  <rect class="bx-g" x="510" y="110" width="210" height="60" rx="5"/>
+  <circle cx="528" cy="126" r="10" fill="#1d7a53"/><text class="tms" x="528" y="130" text-anchor="middle" style="fill:#fff;font-size:11px;font-weight:700">4</text>
+  <text class="tb" x="546" y="130">We read the reply</text>
+  <text class="ts" x="522" y="150">just words? → that's the answer.</text>
+  <text class="ts" x="522" y="163">a request? → there's work to do.</text>
 
- <path class="ln" d="M877,126 L877,166"/>
- <text class="lbl" x="890" y="152">YES</text>
- <rect class="ra" x="560" y="168" width="430" height="80" rx="8"/>
- <circle cx="592" cy="196" r="15" fill="#b06a1d"/><text class="n" x="592" y="202" text-anchor="middle">5</text>
- <text class="h" x="618" y="203">Run it, add the result</text>
- <text class="s" x="574" y="230">ask you first if it writes or runs anything</text>
+  <rect class="bx-a" x="275" y="110" width="210" height="60" rx="5"/>
+  <circle cx="293" cy="126" r="10" fill="#a8611f"/><text class="tms" x="293" y="130" text-anchor="middle" style="fill:#fff;font-size:11px;font-weight:700">5</text>
+  <text class="tb" x="311" y="130">Permission check</text>
+  <text class="ts" x="287" y="150">writes &amp; shell commands ask you</text>
+  <text class="ts" x="287" y="163">first; reads just run</text>
 
- <path class="lr" d="M556,208 L368,208 L368,130"/>
- <text class="lbl" x="462" y="232" text-anchor="middle" fill="#b03a52">GO ROUND AGAIN</text>
+  <rect class="bx-a" x="40" y="110" width="210" height="60" rx="5"/>
+  <circle cx="58" cy="126" r="10" fill="#a8611f"/><text class="tms" x="58" y="130" text-anchor="middle" style="fill:#fff;font-size:11px;font-weight:700">6</text>
+  <text class="tb" x="76" y="130">The tool runs</text>
+  <text class="ts" x="52" y="150">real Python, your real files;</text>
+  <text class="ts" x="52" y="163">the result is cut short and added on</text>
 
- <path class="ln" d="M877,126 L877,166"/>
+  <path class="ln-g" d="M510,140 L485,140"/>
+  <path class="ln-o" d="M275,140 L250,140"/>
 
- <rect class="r" x="10" y="270" width="980" height="56" rx="8"/>
- <text class="h" x="40" y="298">No? Then it is just talking &#8212; and that is your answer.</text>
- <text class="s" x="40" y="318">The loop stops. The answer is printed, and the chat is saved to disk.</text>
+  <!-- loop -->
+  <path class="ln-r dash" d="M145,170 L145,200 L640,200 L640,178" />
+  <text class="tt" x="392" y="216" text-anchor="middle" fill="#a8324a">repeat — the model now sees what happened, and decides the next move</text>
+
+  <!-- row 3 -->
+  <rect class="bx" x="40" y="232" width="330" height="60" rx="5"/>
+  <circle cx="58" cy="248" r="10" fill="#5a6c80"/><text class="tms" x="58" y="252" text-anchor="middle" style="fill:#fff;font-size:11px;font-weight:700">7</text>
+  <text class="tb" x="76" y="252">Model answers in plain words</text>
+  <text class="ts" x="52" y="272">No tool call means the job is done.</text>
+  <text class="ts" x="52" y="285">The loop exits.</text>
+
+  <rect class="bx" x="390" y="232" width="330" height="60" rx="5"/>
+  <circle cx="408" cy="248" r="10" fill="#5a6c80"/><text class="tms" x="408" y="252" text-anchor="middle" style="fill:#fff;font-size:11px;font-weight:700">8</text>
+  <text class="tb" x="426" y="252">Shown and saved</text>
+  <text class="ts" x="402" y="272">the answer is formatted, the speed shown,</text>
+  <text class="ts" x="402" y="285">the chat saved to disk and trimmed.</text>
+
+  <path class="ln" d="M370,262 L390,262"/>
 </svg></figure>
     <div class="wwh">
       <div class="why"><span class="lbl">Why it loops</span>
@@ -640,7 +696,7 @@ figcaption{ font-size:8.6pt; color:var(--ink-faint); margin-top:2mm; }
 
 <div data-src="s08" class="slide">
   <div class="sh"><span class="num">07</span><h2>Box 2 &#8212; the brain: what the Agent object holds</h2>
-    <span class="tag">box 2 &#183; agent.py</span></div>
+    <span class="tag">agent.py &#183; orchestration.py &#183; prompts.py</span></div>
   <div class="body">
     <div class="left">
       <div class="qa"><div class="q">The whole "brain" is one object with these fields</div></div>
@@ -697,8 +753,8 @@ truncation_retried        <span class="cmt"># once per pass (reply got cut off)<
 
 <style>#s-tools td{padding:1.3mm 2.5mm}#s-tools th{padding:1.3mm 2.5mm}</style>
 <div data-src="s09" id="s-tools" class="slide">
-  <div class="sh"><span class="num">08</span><h2>Box 5 &#8212; the hands: what a tool actually is</h2>
-    <span class="tag">box 5 &#183; tools.py</span></div>
+  <div class="sh"><span class="num">08</span><h2>Box 3 &#8212; the hands: what a tool actually is</h2>
+    <span class="tag">tools.py &#183; mcp.py &#183; remediation.py</span></div>
   <div class="body">
     <div class="left">
       <div class="qa"><div class="q">A tool is a five-field dataclass. That's the whole abstraction.</div></div>
@@ -757,8 +813,8 @@ REGISTRY: dict[str, Tool] = {}          <span class="cmt"># name → Tool</span>
 </div>
 
 <div data-src="s10" class="slide">
-  <div class="sh"><span class="num">09</span><h2>Box 6 &#8212; the mouth: turning any model into one shape</h2>
-    <span class="tag">box 6 &#183; providers.py</span></div>
+  <div class="sh"><span class="num">09</span><h2>Box 4 &#8212; the mouth: turning any model into one shape</h2>
+    <span class="tag">providers.py</span></div>
   <div class="body">
     <div class="left">
       <div class="qa"><div class="q">The contract: three event types, nothing else</div>
@@ -822,66 +878,68 @@ args = json.loads(<span class="str">""</span>.join(slot[<span class="str">"args"
   <div class="sh"><span class="num">10</span><h2>Seven dialects in, one shape out</h2>
     <span class="tag">providers.py &#8594; tools.py</span></div>
   <div class="body">
-    <div class="left center"><figure style="margin:0 auto 2mm auto;width:96%"><svg viewBox="0 0 1000 330" xmlns="http://www.w3.org/2000/svg">
- <defs>
-  <marker id="AR" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
-    <path d="M0,1 L9,5 L0,9 z" fill="#7d8b99"/></marker>
-  <marker id="ARr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
-    <path d="M0,1 L9,5 L0,9 z" fill="#b03a52"/></marker>
- </defs>
- <style>
-  .r{ fill:#fff; stroke:#c8d2dc; stroke-width:2; }
-  .rb{ fill:#eef5fd; stroke:#2563a8; stroke-width:2; }
-  .rg{ fill:#ecf8f2; stroke:#1d7a53; stroke-width:2; }
-  .ra{ fill:#fdf4ea; stroke:#b06a1d; stroke-width:2; }
-  .rp{ fill:#f5efFd; stroke:#6a3fa0; stroke-width:2; }
-  .rr{ fill:#fdeef1; stroke:#b03a52; stroke-width:2; }
-  .rd{ fill:#f3f6f9; stroke:#aab6c2; stroke-width:2; }
-  .ln{ stroke:#7d8b99; stroke-width:2.2; fill:none; marker-end:url(#AR); }
-  .lr{ stroke:#b03a52; stroke-width:2.2; fill:none; marker-end:url(#ARr); stroke-dasharray:7 5; }
-  .h{ font:600 20px Inter,Helvetica,Arial,sans-serif; fill:#101c27; }
-  .s{ font:15px Inter,Helvetica,Arial,sans-serif; fill:#5b6b7c; }
-  .m{ font:600 16px "SF Mono",Menlo,monospace; fill:#2c3d4e; }
-  .mm{ font:14px "SF Mono",Menlo,monospace; fill:#5b6b7c; }
-  .n{ font:700 17px "SF Mono",Menlo,monospace; fill:#fff; }
-  .lbl{ font:600 14px "SF Mono",Menlo,monospace; fill:#7d8b99; letter-spacing:.1em; }
- </style>
+    <div class="left center"><figure style="width:96%"><svg viewBox="0 0 760 428" xmlns="http://www.w3.org/2000/svg">
+  <rect class="bx-d" x="4" y="6" width="352" height="44" rx="4"/>
+  <text class="tt" x="14" y="22">1 &#183; native &#8212; the happy path</text>
+  <text class="tmz" x="14" y="40">tool_calls:[{function:{name:"read_file","arguments":"{…}"}}]</text>
 
- <text class="lbl" x="10" y="20">WHAT DIFFERENT MODELS SEND</text>
- <rect class="r" x="10" y="32" width="420" height="52" rx="6"/>
- <text class="m" x="28" y="55">proper channel</text>
- <text class="mm" x="28" y="75">tool_calls: [{ name: "read_file", ... }]</text>
+  <rect class="bx-d" x="4" y="56" width="352" height="52" rx="4"/>
+  <text class="tt" x="14" y="72">2 &#183; deepseek</text>
+  <text class="tmz" x="14" y="88">&lt;&#65372;tool&#9601;call&#9601;begin&#65372;&gt;function&lt;&#65372;tool&#9601;sep&#65372;&gt;read_file</text>
+  <text class="tmz" x="14" y="101">```json {"path":"main.py"} ```</text>
 
- <rect class="r" x="10" y="92" width="420" height="52" rx="6"/>
- <text class="m" x="28" y="115">Qwen &#183; Hermes</text>
- <text class="mm" x="28" y="135">&lt;tool_call&gt;{"name":"read_file", ...}&lt;/tool_call&gt;</text>
+  <rect class="bx-d" x="4" y="114" width="352" height="52" rx="4"/>
+  <text class="tt" x="14" y="130">3 &#183; qwen2.5/3 &#183; nous hermes</text>
+  <text class="tmz" x="14" y="146">&lt;tool_call&gt;{"name":"read_file",</text>
+  <text class="tmz" x="14" y="159">           "arguments":{"path":"main.py"}}&lt;/tool_call&gt;</text>
 
- <rect class="r" x="10" y="152" width="420" height="52" rx="6"/>
- <text class="m" x="28" y="175">Mistral</text>
- <text class="mm" x="28" y="195">[TOOL_CALLS][{"name":"read_file", ...}]</text>
+  <rect class="bx-d" x="4" y="172" width="352" height="44" rx="4"/>
+  <text class="tt" x="14" y="188">4 &#183; mistral</text>
+  <text class="tmz" x="14" y="206">[TOOL_CALLS][{"name":"read_file","arguments":{…}}]</text>
 
- <rect class="rr" x="10" y="212" width="420" height="62" rx="6"/>
- <text class="m" x="28" y="235" fill="#b03a52">Qwen XML &#8212; the nasty one</text>
- <text class="mm" x="28" y="255">&lt;parameter=content&gt;...a whole file...</text>
- <text class="s" x="28" y="272">and often no closing tag at all</text>
+  <rect class="bx-d" x="4" y="222" width="352" height="52" rx="4"/>
+  <text class="tt" x="14" y="238">5 &#183; llama 3.x &#8212; two spellings</text>
+  <text class="tmz" x="14" y="254">&lt;function=read_file&gt;{"path":"main.py"}&lt;/function&gt;</text>
+  <text class="tmz" x="14" y="267">&lt;|python_tag|&gt;{"path":"main.py"}</text>
 
- <text class="s" x="10" y="300">&#8230; plus DeepSeek, Llama and our own fallback &#8212; <tspan style="font-weight:650">seven in total</tspan></text>
+  <rect class="bx-r" x="4" y="280" width="352" height="64" rx="4"/>
+  <text class="tt" x="14" y="296" fill="#a8324a">6 &#183; qwen XML params &#8212; the nasty one</text>
+  <text class="tmz" x="14" y="312">&lt;function=write_file&gt;</text>
+  <text class="tmz" x="14" y="325">  &lt;parameter=path&gt;main.py&lt;/parameter&gt;</text>
+  <text class="tmz" x="14" y="338">  &lt;parameter=content&gt;…raw code…   &#8592; no closing tag</text>
 
- <path class="ln" d="M440,58  L556,150"/>
- <path class="ln" d="M440,118 L556,160"/>
- <path class="ln" d="M440,178 L556,172"/>
- <path class="ln" d="M440,240 L556,184"/>
+  <rect class="bx-d" x="4" y="350" width="352" height="44" rx="4"/>
+  <text class="tt" x="14" y="366">7 &#183; fenced JSON &#8212; our own fallback protocol</text>
+  <text class="tmz" x="14" y="384">```json {"tool":"read_file","input":{"path":"main.py"}} ```</text>
 
- <rect class="rp" x="560" y="126" width="200" height="80" rx="8"/>
- <text class="h" x="660" y="160" text-anchor="middle">One reader</text>
- <text class="s" x="660" y="184" text-anchor="middle">providers.py</text>
- <path class="ln" d="M760,166 L806,166"/>
+  <path class="ln" d="M358,28  L432,150"/>
+  <path class="ln" d="M358,82  L432,158"/>
+  <path class="ln" d="M358,140 L432,166"/>
+  <path class="ln" d="M358,194 L432,174"/>
+  <path class="ln" d="M358,248 L432,182"/>
+  <path class="ln-r" d="M358,312 L432,190"/>
+  <path class="ln" d="M358,372 L432,198"/>
 
- <rect class="rg" x="808" y="126" width="182" height="80" rx="8"/>
- <text class="h" x="899" y="160" text-anchor="middle">One shape</text>
- <text class="mm" x="899" y="184" text-anchor="middle">read_file(path=...)</text>
- <text class="s" x="899" y="232" text-anchor="middle">the rest of the code</text>
- <text class="s" x="899" y="252" text-anchor="middle">never learns there were seven</text>
+  <rect class="bx-b" x="436" y="132" width="146" height="76" rx="5"/>
+  <text class="tm" x="509" y="154" text-anchor="middle" style="font-weight:700">providers.py</text>
+  <text class="tms" x="509" y="172" text-anchor="middle">extract_text_</text>
+  <text class="tms" x="509" y="184" text-anchor="middle">tool_calls()</text>
+  <text class="tt" x="509" y="200" text-anchor="middle">detect &#183; extract &#183; coerce</text>
+
+  <path class="ln-b" d="M582,170 L606,170"/>
+
+  <rect class="bx-a" x="610" y="132" width="146" height="76" rx="5"/>
+  <text class="tm" x="683" y="154" text-anchor="middle" style="font-weight:700">tools.py</text>
+  <text class="ts" x="683" y="172" text-anchor="middle">normalize_tool_args()</text>
+  <text class="tt" x="683" y="192" text-anchor="middle">file_path &#8594; path</text>
+  <text class="tt" x="683" y="203" text-anchor="middle">old_string &#8594; old</text>
+
+  <path class="ln-g" d="M683,208 L683,242"/>
+  <rect class="bx-g" x="470" y="244" width="286" height="58" rx="5"/>
+  <text class="tb" x="613" y="266" text-anchor="middle">one clean call, every time</text>
+  <text class="tms" x="613" y="288" text-anchor="middle">read_file(path="main.py")</text>
+
+  <text class="ts" x="613" y="330" text-anchor="middle">the agent loop never learns which dialect arrived</text>
 </svg></figure></div>
     <div class="right">
       <div class="qa"><div class="q">Even after parsing, the option names are wrong</div>
@@ -916,8 +974,8 @@ args = json.loads(<span class="str">""</span>.join(slot[<span class="str">"args"
 </div>
 
 <div data-src="s12" class="slide">
-  <div class="sh"><span class="num">11</span><h2>Box 3 &#8212; keeping the chat small: the setup</h2>
-    <span class="tag">box 3 &#183; where context lives</span></div>
+  <div class="sh"><span class="num">11</span><h2>Box 5 &#8212; keeping the chat small: the setup</h2>
+    <span class="tag">where context lives, and how it's measured</span></div>
   <div class="body">
     <div class="left">
       <div class="qa"><div class="q">Where is "the context" stored?</div>
@@ -971,8 +1029,8 @@ budget = max(<span class="num">4_000</span>, base)            <span class="cmt">
 </div>
 
 <div data-src="s13" class="slide">
-  <div class="sh"><span class="num">12</span><h2>Box 3 &#8212; how a part of the context is taken out</h2>
-    <span class="tag">box 3 &#183; the trim, line by line</span></div>
+  <div class="sh"><span class="num">12</span><h2>Box 5 &#8212; how a part of the context is taken out</h2>
+    <span class="tag">the trim, line by line</span></div>
   <div class="body">
     <div class="left">
       <div class="qa"><div class="q">The idea in one sentence</div>
@@ -1031,65 +1089,62 @@ boundary = user_idxs[-<span class="num">1</span>]
 </div>
 
 <div data-src="s14" class="slide">
-  <div class="sh"><span class="num">13</span><h2>Box 3 &#8212; and when shortening isn't enough: summarising</h2>
-    <span class="tag">box 3 &#183; summarising</span></div>
+  <div class="sh"><span class="num">13</span><h2>Box 5 &#8212; and when shortening isn't enough: summarising</h2>
+    <span class="tag">compaction, and why it can be undone</span></div>
   <div class="body col">
-    <figure style="margin:0 auto 2mm auto;width:56%"><svg viewBox="0 0 1000 330" xmlns="http://www.w3.org/2000/svg">
- <defs>
-  <marker id="AR" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
-    <path d="M0,1 L9,5 L0,9 z" fill="#7d8b99"/></marker>
-  <marker id="ARr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
-    <path d="M0,1 L9,5 L0,9 z" fill="#b03a52"/></marker>
- </defs>
- <style>
-  .r{ fill:#fff; stroke:#c8d2dc; stroke-width:2; }
-  .rb{ fill:#eef5fd; stroke:#2563a8; stroke-width:2; }
-  .rg{ fill:#ecf8f2; stroke:#1d7a53; stroke-width:2; }
-  .ra{ fill:#fdf4ea; stroke:#b06a1d; stroke-width:2; }
-  .rp{ fill:#f5efFd; stroke:#6a3fa0; stroke-width:2; }
-  .rr{ fill:#fdeef1; stroke:#b03a52; stroke-width:2; }
-  .rd{ fill:#f3f6f9; stroke:#aab6c2; stroke-width:2; }
-  .ln{ stroke:#7d8b99; stroke-width:2.2; fill:none; marker-end:url(#AR); }
-  .lr{ stroke:#b03a52; stroke-width:2.2; fill:none; marker-end:url(#ARr); stroke-dasharray:7 5; }
-  .h{ font:600 20px Inter,Helvetica,Arial,sans-serif; fill:#101c27; }
-  .s{ font:15px Inter,Helvetica,Arial,sans-serif; fill:#5b6b7c; }
-  .m{ font:600 16px "SF Mono",Menlo,monospace; fill:#2c3d4e; }
-  .mm{ font:14px "SF Mono",Menlo,monospace; fill:#5b6b7c; }
-  .n{ font:700 17px "SF Mono",Menlo,monospace; fill:#fff; }
-  .lbl{ font:600 14px "SF Mono",Menlo,monospace; fill:#7d8b99; letter-spacing:.1em; }
- </style>
+    <figure style="margin:0 auto 2mm auto;width:44%"><svg viewBox="0 0 760 316" xmlns="http://www.w3.org/2000/svg">
+  <!-- col 1 -->
+  <text class="tt" x="118" y="16" text-anchor="middle">the raw chat</text>
+  <text class="ts" x="118" y="32" text-anchor="middle" style="font-weight:600">~55,000 words</text>
+  <rect class="bx-d" x="28" y="42" width="180" height="16" rx="2"/><text class="tmz" x="36" y="54">system prompt</text>
+  <rect class="bx-b" x="28" y="60" width="180" height="14" rx="2"/><text class="tmz" x="36" y="71">user: fix the parser</text>
+  <rect class="bx" x="28" y="76" width="180" height="14" rx="2"/><text class="tmz" x="36" y="87">assistant: tool_calls</text>
+  <rect class="bx-a" x="28" y="92" width="180" height="58" rx="2"/><text class="tmz" x="36" y="106">tool: read_file config.py</text><text class="tmz" x="36" y="126" style="fill:#a8611f">all 768 lines of it</text><text class="tmz" x="36" y="142" style="fill:#a8611f">re-sent on every turn</text>
+  <rect class="bx" x="28" y="152" width="180" height="14" rx="2"/><text class="tmz" x="36" y="163">assistant: tool_calls</text>
+  <rect class="bx-a" x="28" y="168" width="180" height="46" rx="2"/><text class="tmz" x="36" y="182">tool: run_bash pytest</text><text class="tmz" x="36" y="202" style="fill:#a8611f">full stdout</text>
+  <rect class="bx" x="28" y="216" width="180" height="14" rx="2"/><text class="tmz" x="36" y="227">assistant: tool_calls</text>
+  <rect class="bx-a" x="28" y="232" width="180" height="40" rx="2"/><text class="tmz" x="36" y="246">tool: repo_map</text><text class="tmz" x="36" y="264" style="fill:#a8611f">whole structure</text>
+  <rect class="bx-b" x="28" y="274" width="180" height="16" rx="2"/><text class="tmz" x="36" y="286">user: what happened?</text>
 
- <text class="h" x="10" y="24">Before</text>
- <text class="s" x="120" y="24">~55,000 words</text>
- <rect class="rd" x="10" y="38" width="440" height="26" rx="4"/><text class="mm" x="26" y="56">system instructions</text>
- <rect class="rb" x="10" y="68" width="440" height="26" rx="4"/><text class="mm" x="26" y="86">you: fix the parser</text>
- <rect class="r"  x="10" y="98" width="440" height="26" rx="4"/><text class="mm" x="26" y="116">model: asks to read config.py</text>
- <rect class="ra" x="10" y="128" width="440" height="60" rx="4"/>
- <text class="mm" x="26" y="150">result: all 768 lines of config.py</text>
- <text class="s"  x="26" y="174" fill="#b06a1d">re-sent in full, on every single turn</text>
- <rect class="r"  x="10" y="192" width="440" height="26" rx="4"/><text class="mm" x="26" y="210">model: asks to run the tests</text>
- <rect class="ra" x="10" y="222" width="440" height="52" rx="4"/>
- <text class="mm" x="26" y="244">result: the whole test output</text>
- <text class="s"  x="26" y="264" fill="#b06a1d">also re-sent, in full</text>
- <rect class="rb" x="10" y="278" width="440" height="26" rx="4"/><text class="mm" x="26" y="296">you: what happened?</text>
+  <path class="ln-o" d="M214,166 L246,166"/>
+  <text class="tt" x="230" y="158" text-anchor="middle" fill="#a8611f">trim</text>
 
- <path class="ln" d="M462,168 L536,168"/>
- <text class="lbl" x="499" y="156" text-anchor="middle">SHORTEN</text>
+  <!-- col 2 -->
+  <text class="tt" x="340" y="16" text-anchor="middle">after shortening</text>
+  <text class="ts" x="340" y="32" text-anchor="middle" style="font-weight:600">~12,000 words</text>
+  <rect class="bx-d" x="250" y="42" width="180" height="16" rx="2"/><text class="tmz" x="258" y="54">system prompt</text>
+  <rect class="bx-b" x="250" y="60" width="180" height="14" rx="2"/><text class="tmz" x="258" y="71">user: fix the parser</text>
+  <rect class="bx" x="250" y="76" width="180" height="14" rx="2"/><text class="tmz" x="258" y="87">assistant: tool_calls</text>
+  <rect class="bx-g" x="250" y="92" width="180" height="26" rx="2"/><text class="tmz" x="258" y="104">tool: first few lines,</text><text class="tmz" x="258" y="115" style="fill:#1d7a53">plus "ask if you need more"</text>
+  <rect class="bx" x="250" y="120" width="180" height="14" rx="2"/><text class="tmz" x="258" y="131">assistant: tool_calls</text>
+  <rect class="bx-g" x="250" y="136" width="180" height="26" rx="2"/><text class="tmz" x="258" y="148">tool: first few lines,</text><text class="tmz" x="258" y="159" style="fill:#1d7a53">plus "ask if you need more"</text>
+  <rect class="bx" x="250" y="164" width="180" height="14" rx="2"/><text class="tmz" x="258" y="175">assistant: tool_calls</text>
+  <rect class="bx-g" x="250" y="180" width="180" height="26" rx="2"/><text class="tmz" x="258" y="192">tool: first few lines,</text><text class="tmz" x="258" y="203" style="fill:#1d7a53">plus "ask if you need more"</text>
+  <rect class="bx-b" x="250" y="208" width="180" height="16" rx="2"/><text class="tmz" x="258" y="220">user: what happened?</text>
+  <text class="ts" x="340" y="244" text-anchor="middle">nothing removed, just made shorter</text>
+  <text class="ts" x="340" y="258" text-anchor="middle">no round trip &#8212; instant</text>
 
- <text class="h" x="550" y="24">After</text>
- <text class="s" x="650" y="24">~12,000 words</text>
- <rect class="rd" x="550" y="38" width="440" height="26" rx="4"/><text class="mm" x="566" y="56">system instructions</text>
- <rect class="rb" x="550" y="68" width="440" height="26" rx="4"/><text class="mm" x="566" y="86">you: fix the parser</text>
- <rect class="r"  x="550" y="98" width="440" height="26" rx="4"/><text class="mm" x="566" y="116">model: asks to read config.py</text>
- <rect class="rg" x="550" y="128" width="440" height="44" rx="4"/>
- <text class="mm" x="566" y="150">result: first few lines only</text>
- <text class="s"  x="566" y="166" fill="#1d7a53">+ "ask again if you need the rest"</text>
- <rect class="r"  x="550" y="176" width="440" height="26" rx="4"/><text class="mm" x="566" y="194">model: asks to run the tests</text>
- <rect class="rg" x="550" y="206" width="440" height="44" rx="4"/>
- <text class="mm" x="566" y="228">result: first few lines only</text>
- <text class="s"  x="566" y="244" fill="#1d7a53">+ "ask again if you need the rest"</text>
- <rect class="rb" x="550" y="254" width="440" height="26" rx="4"/><text class="mm" x="566" y="272">you: what happened?</text>
- <text class="s" x="550" y="300">Same entries, same order. Nothing removed &#8212; only shortened.</text>
+  <path class="ln-p" d="M436,92 L468,92"/>
+  
+
+  <!-- col 3 -->
+  <text class="tt" x="562" y="16" text-anchor="middle">after summarising</text>
+  <text class="ts" x="562" y="32" text-anchor="middle" style="font-weight:600">~5,000 words</text>
+  <rect class="bx-d" x="472" y="42" width="180" height="16" rx="2"/><text class="tmz" x="480" y="54">system prompt</text>
+  <rect class="bx-p" x="472" y="60" width="180" height="60" rx="2"/>
+  <text class="tmz" x="480" y="74" style="fill:#6a3fa0">a short note:</text>
+  <text class="tmz" x="480" y="88">decisions made, files</text>
+  <text class="tmz" x="480" y="100">touched, open tasks,</text>
+  <text class="tmz" x="480" y="112">— written by the model itself</text>
+  <rect class="bx-b" x="472" y="122" width="180" height="16" rx="2"/><text class="tmz" x="480" y="134">user: what happened?</text>
+  <text class="ts" x="562" y="158" text-anchor="middle">only the most recent exchange</text>
+  <text class="ts" x="562" y="172" text-anchor="middle">is kept word for word</text>
+  <rect class="bx-r" x="472" y="188" width="180" height="76" rx="3"/>
+  <text class="tt" x="482" y="204" fill="#a8324a">what if it barely helped?</text>
+  <text class="tmz" x="482" y="220">if it saved almost nothing</text>
+  <text class="tmz" x="482" y="234">&#8594; put the original back</text>
+  <text class="tmz" x="482" y="248">&#8594; don't try again until the</text>
+  <text class="tmz" x="482" y="260">chat has grown noticeably</text>
 </svg></figure>
     <div class="body" style="gap:5mm">
       <div class="left">
@@ -1134,8 +1189,8 @@ before, after = self.compact(keep_turns=<span class="num">1</span>)     <span cl
 </div>
 
 <div data-src="s15" class="slide">
-  <div class="sh"><span class="num">14</span><h2>Box 3 &#8212; never make the server re-read</h2>
-    <span class="tag">box 3 &#183; re-using the server&#8217;s work</span></div>
+  <div class="sh"><span class="num">14</span><h2>Box 6 &#8212; never make the server re-read</h2>
+    <span class="tag">why the list is append-only</span></div>
   <div class="body col">
     <div class="body" style="gap:5mm;flex:0 0 auto;margin-bottom:3mm">
       <div class="left">
@@ -1160,53 +1215,35 @@ before, after = self.compact(keep_turns=<span class="num">1</span>)     <span cl
     req_messages = self.messages          <span class="cmt"># later passes: unchanged</span></pre>
       </div>
     </div>
-    <figure style="margin:0 auto 2mm auto;width:66%"><svg viewBox="0 0 1000 300" xmlns="http://www.w3.org/2000/svg">
- <defs>
-  <marker id="AR" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
-    <path d="M0,1 L9,5 L0,9 z" fill="#7d8b99"/></marker>
-  <marker id="ARr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
-    <path d="M0,1 L9,5 L0,9 z" fill="#b03a52"/></marker>
- </defs>
- <style>
-  .r{ fill:#fff; stroke:#c8d2dc; stroke-width:2; }
-  .rb{ fill:#eef5fd; stroke:#2563a8; stroke-width:2; }
-  .rg{ fill:#ecf8f2; stroke:#1d7a53; stroke-width:2; }
-  .ra{ fill:#fdf4ea; stroke:#b06a1d; stroke-width:2; }
-  .rp{ fill:#f5efFd; stroke:#6a3fa0; stroke-width:2; }
-  .rr{ fill:#fdeef1; stroke:#b03a52; stroke-width:2; }
-  .rd{ fill:#f3f6f9; stroke:#aab6c2; stroke-width:2; }
-  .ln{ stroke:#7d8b99; stroke-width:2.2; fill:none; marker-end:url(#AR); }
-  .lr{ stroke:#b03a52; stroke-width:2.2; fill:none; marker-end:url(#ARr); stroke-dasharray:7 5; }
-  .h{ font:600 20px Inter,Helvetica,Arial,sans-serif; fill:#101c27; }
-  .s{ font:15px Inter,Helvetica,Arial,sans-serif; fill:#5b6b7c; }
-  .m{ font:600 16px "SF Mono",Menlo,monospace; fill:#2c3d4e; }
-  .mm{ font:14px "SF Mono",Menlo,monospace; fill:#5b6b7c; }
-  .n{ font:700 17px "SF Mono",Menlo,monospace; fill:#fff; }
-  .lbl{ font:600 14px "SF Mono",Menlo,monospace; fill:#7d8b99; letter-spacing:.1em; }
- </style>
+    <figure style="margin:0 auto 2mm auto;width:58%"><svg viewBox="0 0 760 268" xmlns="http://www.w3.org/2000/svg">
+  <text class="tt" x="20" y="16">&#10003; add it to the END &#8212; what we do</text>
+  <rect x="20" y="26" width="420" height="30" rx="3" fill="#ecf8f2" stroke="#1d7a53" stroke-width="1.4"/>
+  <text class="tms" x="30" y="46">everything so far, exactly as it was</text>
+  <rect x="442" y="26" width="120" height="30" rx="3" fill="#eef4fc" stroke="#1f5fa8" stroke-width="1.4"/>
+  <text class="tms" x="452" y="46">new user msg</text>
+  <rect x="564" y="26" width="130" height="30" rx="3" fill="#f4eefc" stroke="#6a3fa0" stroke-width="1.4" stroke-dasharray="4 3"/>
+  <text class="tms" x="574" y="46">recall note</text>
+  <text class="tt" x="230" y="72" text-anchor="middle" fill="#1d7a53">the server SKIPS re-reading all of this</text>
+  <text class="tt" x="568" y="72" text-anchor="middle" fill="#1f5fa8">only this is new</text>
+  <path class="ln-g" d="M20,80 L438,80"/>
+  <path class="ln-b" d="M442,80 L692,80"/>
 
- <text class="h" x="10" y="26" fill="#1d7a53">&#10003;  Add the new bit at the END</text>
- <rect x="10" y="40" width="640" height="56" rx="6" class="rg"/>
- <text class="m" x="36" y="66">everything so far</text>
- <text class="s" x="36" y="86">exactly the same as last time</text>
- <rect x="660" y="40" width="330" height="56" rx="6" class="rb"/>
- <text class="m" x="686" y="66">the new bit</text>
- <text class="s" x="686" y="86">your question + what we looked up</text>
- <text class="lbl" x="330" y="120" text-anchor="middle" fill="#1d7a53">SERVER SKIPS RE-READING ALL OF THIS</text>
- <text class="lbl" x="825" y="120" text-anchor="middle" fill="#2563a8">ONLY THIS IS NEW</text>
+  <text class="tt" x="20" y="130" fill="#a8324a">&#10007; squeeze it into the MIDDLE &#8212; the tempting mistake</text>
+  <rect x="20" y="140" width="150" height="30" rx="3" fill="#ecf8f2" stroke="#1d7a53" stroke-width="1.4"/>
+  <text class="tms" x="30" y="160">the first few messages</text>
+  <rect x="172" y="140" width="130" height="30" rx="3" fill="#fdeef1" stroke="#a8324a" stroke-width="1.4"/>
+  <text class="tms" x="182" y="160">recall note</text>
+  <rect x="304" y="140" width="258" height="30" rx="3" fill="#fdeef1" stroke="#a8324a" stroke-width="1.4"/>
+  <text class="tms" x="314" y="160">the same messages, now in a different place</text>
+  <rect x="564" y="140" width="130" height="30" rx="3" fill="#eef4fc" stroke="#1f5fa8" stroke-width="1.4"/>
+  <text class="tms" x="574" y="160">new user msg</text>
+  <text class="tt" x="95" y="186" text-anchor="middle" fill="#1d7a53">cached</text>
+  <text class="tt" x="430" y="186" text-anchor="middle" fill="#a8324a">everything from here must be read again from scratch</text>
+  <path class="ln-g" d="M20,194 L168,194"/>
+  <path class="ln-r" d="M172,194 L692,194"/>
 
- <text class="h" x="10" y="186" fill="#b03a52">&#10007;  Squeeze it into the MIDDLE</text>
- <rect x="10" y="200" width="230" height="56" rx="6" class="rg"/>
- <text class="m" x="36" y="226">the first part</text>
- <text class="s" x="36" y="246">still matches</text>
- <rect x="250" y="200" width="200" height="56" rx="6" class="rr"/>
- <text class="m" x="276" y="226">the new bit</text>
- <text class="s" x="276" y="246">inserted here</text>
- <rect x="460" y="200" width="530" height="56" rx="6" class="rr"/>
- <text class="m" x="486" y="226">everything after it &#8212; same words, new position</text>
- <text class="s" x="486" y="246">so the server must read all of it again, from scratch</text>
- <text class="lbl" x="125" y="280" text-anchor="middle" fill="#1d7a53">SKIPPED</text>
- <text class="lbl" x="620" y="280" text-anchor="middle" fill="#b03a52">ALL RE-READ &#8212; FOR NOTHING</text>
+  <text class="ts" x="380" y="226" text-anchor="middle">One message added near the front throws away the saved work for everything after it &#8212;</text>
+  <text class="ts" x="380" y="242" text-anchor="middle">even though not one of those words changed. Where it sits matters, not just what it says.</text>
 </svg></figure>
     <div class="two">
       <div class="key"><span class="t">Three wins from that one <code>+</code></span>
@@ -1226,8 +1263,8 @@ before, after = self.compact(keep_turns=<span class="num">1</span>)     <span cl
 </div>
 
 <div data-src="s16" class="slide">
-  <div class="sh"><span class="num">15</span><h2>Box 4 &#8212; the recall store: what is saved, and when</h2>
-    <span class="tag">box 4 &#183; memory.py</span></div>
+  <div class="sh"><span class="num">15</span><h2>Box 7 &#8212; the recall store: what is saved, and when</h2>
+    <span class="tag">memory.py</span></div>
   <div class="body">
     <div class="left">
       <div class="qa"><div class="q">What gets stored, and when</div>
@@ -1283,8 +1320,8 @@ before, after = self.compact(keep_turns=<span class="num">1</span>)     <span cl
 </div>
 
 <div data-src="s17" class="slide">
-  <div class="sh"><span class="num">16</span><h2>Box 4 &#8212; the word search: the index we build</h2>
-    <span class="tag">box 4 &#183; the word index</span></div>
+  <div class="sh"><span class="num">16</span><h2>Box 7 &#8212; the word search: the index we build</h2>
+    <span class="tag">BM25, by hand, no libraries</span></div>
   <div class="body">
     <div class="left">
       <div class="qa"><div class="q">First, every record is turned into a bag of words</div></div>
@@ -1321,69 +1358,45 @@ n       : int                  <span class="cmt"># how many records</span></pre>
     idf   = log(<span class="num">1</span> + (n - n_q + <span class="num">.5</span>) / (n_q + <span class="num">.5</span>))   <span class="cmt"># ① rare = valuable</span>
     denom = f + k1 * (<span class="num">1</span> - b + b * (dl / avgdl))    <span class="cmt"># ③ long = penalised</span>
     s    += idf * (f * (k1 + <span class="num">1</span>)) / denom            <span class="cmt"># ② repeats saturate</span></pre>
-      <figure style="margin:0 auto 2mm auto;width:100%"><svg viewBox="0 0 1000 330" xmlns="http://www.w3.org/2000/svg">
- <defs>
-  <marker id="AR" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
-    <path d="M0,1 L9,5 L0,9 z" fill="#7d8b99"/></marker>
-  <marker id="ARr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
-    <path d="M0,1 L9,5 L0,9 z" fill="#b03a52"/></marker>
- </defs>
- <style>
-  .r{ fill:#fff; stroke:#c8d2dc; stroke-width:2; }
-  .rb{ fill:#eef5fd; stroke:#2563a8; stroke-width:2; }
-  .rg{ fill:#ecf8f2; stroke:#1d7a53; stroke-width:2; }
-  .ra{ fill:#fdf4ea; stroke:#b06a1d; stroke-width:2; }
-  .rp{ fill:#f5efFd; stroke:#6a3fa0; stroke-width:2; }
-  .rr{ fill:#fdeef1; stroke:#b03a52; stroke-width:2; }
-  .rd{ fill:#f3f6f9; stroke:#aab6c2; stroke-width:2; }
-  .ln{ stroke:#7d8b99; stroke-width:2.2; fill:none; marker-end:url(#AR); }
-  .lr{ stroke:#b03a52; stroke-width:2.2; fill:none; marker-end:url(#ARr); stroke-dasharray:7 5; }
-  .h{ font:600 20px Inter,Helvetica,Arial,sans-serif; fill:#101c27; }
-  .s{ font:15px Inter,Helvetica,Arial,sans-serif; fill:#5b6b7c; }
-  .m{ font:600 16px "SF Mono",Menlo,monospace; fill:#2c3d4e; }
-  .mm{ font:14px "SF Mono",Menlo,monospace; fill:#5b6b7c; }
-  .n{ font:700 17px "SF Mono",Menlo,monospace; fill:#fff; }
-  .lbl{ font:600 14px "SF Mono",Menlo,monospace; fill:#7d8b99; letter-spacing:.1em; }
- </style>
+      <figure style="margin:3mm auto 2mm auto;width:100%"><svg viewBox="0 0 760 196" xmlns="http://www.w3.org/2000/svg">
+  <!-- panel 1: IDF -->
+  <text class="tt" x="20" y="14">1 &#183; rare words count for more</text>
+  <rect class="bx-d" x="14" y="22" width="216" height="150" rx="4"/>
+  <text class="ts" x="26" y="44">"the"</text>
+  <rect x="80" y="34" width="8" height="12" fill="#c3cedb"/>
+  <text class="tms" x="96" y="44">appears in everything &#8594; worthless</text>
+  <text class="ts" x="26" y="76">"config"</text>
+  <rect x="80" y="66" width="52" height="12" fill="#7ea9d4"/>
+  <text class="tms" x="140" y="76">appears in a few &#8594; useful</text>
+  <text class="ts" x="26" y="108">"_maybe_auto"</text>
+  <rect x="80" y="98" width="110" height="12" fill="#1f5fa8"/>
+  <text class="tms" x="80" y="126">appears in exactly one &#8594; gold</text>
+  <text class="ts" x="26" y="152">A word that is in everything</text>
+  <text class="ts" x="26" y="165">tells you nothing.</text>
 
- <text class="h" x="10" y="26">Three corrections over just counting matching words</text>
+  <!-- panel 2: saturation -->
+  <text class="tt" x="272" y="14">2 &#183; repeats count less and less</text>
+  <rect class="bx-d" x="266" y="22" width="216" height="150" rx="4"/>
+  <line x1="288" y1="150" x2="464" y2="150" stroke="#9fb0c2" stroke-width="1"/>
+  <line x1="288" y1="150" x2="288" y2="44" stroke="#9fb0c2" stroke-width="1"/>
+  <path d="M288,150 C310,86 340,68 380,62 C420,58 444,56 462,55" fill="none" stroke="#1d7a53" stroke-width="2"/>
+  <path d="M288,150 L462,46" fill="none" stroke="#c3cedb" stroke-width="1.4" stroke-dasharray="4 3"/>
+  <text class="tms" x="392" y="90" style="fill:#1d7a53">BM25</text>
+  <text class="tms" x="360" y="42" style="fill:#9fb0c2">naive counting</text>
+  <text class="tms" x="292" y="164">times the word appears &#8594;</text>
+  <text class="ts" x="276" y="185" transform="rotate(-90 276 185)">score</text>
 
- <rect class="r" x="10" y="44" width="315" height="262" rx="8"/>
- <text class="h" x="30" y="76">1 &#183; Rare words count more</text>
- <text class="s" x="30" y="108">"the"</text>
- <rect x="130" y="95" width="14" height="16" fill="#cfd8e2"/>
- <text class="s" x="156" y="108">in everything &#8212; worth 0</text>
- <text class="s" x="30" y="150">"config"</text>
- <rect x="130" y="137" width="76" height="16" fill="#8fb4da"/>
- <text class="s" x="218" y="150">in a few</text>
- <text class="s" x="30" y="192">"_maybe_auto"</text>
- <rect x="30" y="204" width="176" height="16" fill="#2563a8"/>
- <text class="s" x="218" y="218">in one &#8212; gold</text>
- <text class="s" x="30" y="262">A word that appears everywhere</text>
- <text class="s" x="30" y="282">tells you nothing about which</text>
- <text class="s" x="30" y="302">record you want.</text>
-
- <rect class="r" x="342" y="44" width="315" height="262" rx="8"/>
- <text class="h" x="362" y="76">2 &#183; Repeats count less</text>
- <line x1="382" y1="250" x2="628" y2="250" stroke="#aab6c2" stroke-width="2"/>
- <line x1="382" y1="250" x2="382" y2="110" stroke="#aab6c2" stroke-width="2"/>
- <path d="M382,250 C412,160 452,132 508,124 C560,118 598,116 624,114" fill="none" stroke="#1d7a53" stroke-width="3"/>
- <path d="M382,250 L624,104" fill="none" stroke="#cfd8e2" stroke-width="2" stroke-dasharray="6 4"/>
- <text class="s" x="536" y="158" fill="#1d7a53">what BM25 does</text>
- <text class="s" x="452" y="98" fill="#9aa7b4">just counting</text>
- <text class="s" x="392" y="272">times the word appears &#8594;</text>
- <text class="s" x="362" y="298">The 10th mention isn&#8217;t 10&#215; the 1st.</text>
-
- <rect class="r" x="674" y="44" width="316" height="262" rx="8"/>
- <text class="h" x="694" y="76">3 &#183; Long records are penalised</text>
- <rect x="694" y="100" width="80" height="34" rx="4" class="rg"/>
- <text class="s" x="790" y="115">short note, 1 match</text>
- <text class="s" x="790" y="134" fill="#1d7a53">strong signal</text>
- <rect x="694" y="156" width="270" height="52" rx="4" class="ra"/>
- <text class="s" x="710" y="178">huge file, 1 match</text>
- <text class="s" x="710" y="198" fill="#b06a1d">probably a coincidence</text>
- <text class="s" x="694" y="248">Finding a word in 20 lines means far</text>
- <text class="s" x="694" y="268">more than finding it in 2,000.</text>
+  <!-- panel 3: length -->
+  <text class="tt" x="524" y="14">3 &#183; long documents get a penalty</text>
+  <rect class="bx-d" x="518" y="22" width="228" height="150" rx="4"/>
+  <rect x="532" y="40" width="60" height="26" rx="2" class="bx-g"/>
+  <text class="tms" x="600" y="57">short note, 1 match</text>
+  <text class="tms" x="600" y="70" style="fill:#1d7a53">strong signal</text>
+  <rect x="532" y="86" width="200" height="40" rx="2" class="bx-a"/>
+  <text class="tms" x="540" y="102">huge file, 1 match</text>
+  <text class="tms" x="540" y="118" style="fill:#a8611f">probably coincidence</text>
+  <text class="ts" x="532" y="150">Finding a word in 20 lines means</text>
+  <text class="ts" x="532" y="163">more than finding it in 2,000.</text>
 </svg></figure>
       <div class="note"><span class="t">Why not just count matching words?</span>
       <p>Because every record contains "the", long records would win by sheer size, and the tenth
@@ -1396,8 +1409,8 @@ n       : int                  <span class="cmt"># how many records</span></pre>
 </div>
 
 <div data-src="s18" class="slide">
-  <div class="sh"><span class="num">17</span><h2>Box 4 &#8212; the meaning search, and the gate that usually skips it</h2>
-    <span class="tag">box 4 &#183; meaning search</span></div>
+  <div class="sh"><span class="num">17</span><h2>Box 7 &#8212; the meaning search, and the gate that usually skips it</h2>
+    <span class="tag">memory.py &#183; the hybrid rule</span></div>
   <div class="body">
     <div class="left">
       <div class="qa"><div class="q">What a vector actually is here</div>
@@ -1456,62 +1469,49 @@ ordered = bm25_idx <span class="kw">if not</span> embed_idx \
 </div>
 
 <div data-src="s19" class="slide">
-  <div class="sh"><span class="num">18</span><h2>Box 4 &#8212; where the vectors are stored</h2>
-    <span class="tag">box 4 &#183; the vector files</span></div>
+  <div class="sh"><span class="num">18</span><h2>Box 8 &#8212; where the vectors are stored</h2>
+    <span class="tag">two files, one checksum, no database</span></div>
   <div class="body col">
-    <figure style="margin:0 auto 2mm auto;width:74%"><svg viewBox="0 0 1000 300" xmlns="http://www.w3.org/2000/svg">
- <defs>
-  <marker id="AR" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
-    <path d="M0,1 L9,5 L0,9 z" fill="#7d8b99"/></marker>
-  <marker id="ARr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
-    <path d="M0,1 L9,5 L0,9 z" fill="#b03a52"/></marker>
- </defs>
- <style>
-  .r{ fill:#fff; stroke:#c8d2dc; stroke-width:2; }
-  .rb{ fill:#eef5fd; stroke:#2563a8; stroke-width:2; }
-  .rg{ fill:#ecf8f2; stroke:#1d7a53; stroke-width:2; }
-  .ra{ fill:#fdf4ea; stroke:#b06a1d; stroke-width:2; }
-  .rp{ fill:#f5efFd; stroke:#6a3fa0; stroke-width:2; }
-  .rr{ fill:#fdeef1; stroke:#b03a52; stroke-width:2; }
-  .rd{ fill:#f3f6f9; stroke:#aab6c2; stroke-width:2; }
-  .ln{ stroke:#7d8b99; stroke-width:2.2; fill:none; marker-end:url(#AR); }
-  .lr{ stroke:#b03a52; stroke-width:2.2; fill:none; marker-end:url(#ARr); stroke-dasharray:7 5; }
-  .h{ font:600 20px Inter,Helvetica,Arial,sans-serif; fill:#101c27; }
-  .s{ font:15px Inter,Helvetica,Arial,sans-serif; fill:#5b6b7c; }
-  .m{ font:600 16px "SF Mono",Menlo,monospace; fill:#2c3d4e; }
-  .mm{ font:14px "SF Mono",Menlo,monospace; fill:#5b6b7c; }
-  .n{ font:700 17px "SF Mono",Menlo,monospace; fill:#fff; }
-  .lbl{ font:600 14px "SF Mono",Menlo,monospace; fill:#7d8b99; letter-spacing:.1em; }
- </style>
+    <figure style="margin:0 auto 2mm auto;width:62%"><svg viewBox="0 0 700 250" xmlns="http://www.w3.org/2000/svg">
+  <text class="tt" x="10" y="14">in RAM</text>
+  <rect class="bx-p" x="10" y="22" width="320" height="56" rx="4"/>
+  <text class="tms" x="22" y="42">{"a7f3…": array('f', [0.13, -0.88, 0.04, …]),</text>
+  <text class="tms" x="22" y="58"> "b0c1…": array('f', [0.52,  0.19, -0.7, …])}</text>
+  <text class="tms" x="22" y="72" style="fill:#6a3fa0">4 bytes per number &#8212; not Python's bulky floats</text>
 
- <text class="lbl" x="10" y="22">TWO FILES, SIDE BY SIDE</text>
+  <path class="ln-p" d="M170,78 L170,100"/>
+  <text class="tt" x="180" y="94">save</text>
 
- <rect class="r" x="10" y="36" width="440" height="150" rx="8"/>
- <text class="m" x="34" y="66">&lt;project&gt;.memory.json</text>
- <text class="s" x="34" y="92">the readable one</text>
- <text class="mm" x="34" y="120">"text":  "Q: where is config? A: ..."</text>
- <text class="mm" x="34" y="142">"hash":  "a7f3c91b2e4d8006"</text>
- <text class="mm" x="34" y="164">"vector_sig": "4e11..."   &#8592; the proof</text>
+  <text class="tt" x="10" y="116">on disk &#8212; two files</text>
+  <rect class="bx" x="10" y="124" width="320" height="52" rx="4"/>
+  <text class="tms" x="22" y="142" style="font-weight:700">.memory.json</text>
+  <text class="tms" x="22" y="157">the text, plus a fingerprint of the numbers</text>
+  <text class="tms" x="22" y="171" style="fill:#7a8799">readable, and small</text>
 
- <rect class="rp" x="550" y="36" width="440" height="150" rx="8"/>
- <text class="m" x="574" y="66">&lt;project&gt;.memory.json.vec</text>
- <text class="s" x="574" y="92">just numbers, no labels</text>
- <rect x="574" y="108" width="126" height="40" rx="4" class="r"/>
- <text class="mm" x="590" y="133">3072 bytes</text>
- <rect x="708" y="108" width="126" height="40" rx="4" class="r"/>
- <text class="mm" x="724" y="133">3072 bytes</text>
- <rect x="842" y="108" width="126" height="40" rx="4" class="r"/>
- <text class="mm" x="858" y="133">3072 bytes</text>
- <text class="s" x="574" y="170">same order as the list on the left &#8212; so item 5 is just arithmetic</text>
+  <rect class="bx-p" x="10" y="186" width="320" height="52" rx="4"/>
+  <text class="tms" x="22" y="204" style="font-weight:700">.memory.json.vec</text>
+  <text class="tms" x="22" y="219">just the raw numbers, back to back</text>
+  <text class="tms" x="22" y="233" style="fill:#7a8799">all the same size &#8212; no labels, no punctuation</text>
 
- <path class="ln" d="M452,110 L544,110"/>
- <text class="lbl" x="498" y="100" text-anchor="middle">SAVED</text>
+  <!-- right: byte layout -->
+  <text class="tt" x="360" y="14">the .vec byte layout</text>
+  <rect x="360" y="24" width="96" height="30" rx="2" class="bx-p"/><text class="tmz" x="366" y="43">vector 0 &#183; 3072 B</text>
+  <rect x="458" y="24" width="96" height="30" rx="2" class="bx-p"/><text class="tmz" x="464" y="43">vector 1 &#183; 3072 B</text>
+  <rect x="556" y="24" width="96" height="30" rx="2" class="bx-p"/><text class="tmz" x="562" y="43">vector 2 &#183; 3072 B</text>
+  <text class="tms" x="654" y="43">…</text>
+  <text class="ts" x="360" y="70">same order as the list in the other file, so number 5 is easy to find</text>
 
- <rect class="rr" x="10" y="204" width="980" height="86" rx="8"/>
- <text class="h" x="34" y="234" fill="#b03a52">What if the power cuts between saving the two?</text>
- <text class="s" x="34" y="258">One file says 200 items, the other holds 140 &#8212; and every item quietly matches the wrong numbers.</text>
- <text class="s" x="34" y="280">So the left file stores a fingerprint of the right one. If it doesn&#8217;t match on load, we throw the numbers away and rebuild.</text>
-</svg></figure>
+  <rect class="bx-r" x="360" y="86" width="330" height="152" rx="4"/>
+  <text class="tt" x="372" y="104" fill="#a8324a">what if the power cuts halfway?</text>
+  <text class="ts" x="372" y="124">Two files can disagree. If we save one and not the other,</text>
+  <text class="ts" x="372" y="140">one says 200 items and the other holds 140 &#8212;</text>
+  <text class="ts" x="372" y="156">and every item quietly matches the WRONG numbers.</text>
+  <text class="ts" x="372" y="180" style="font-weight:600">Fix: save a fingerprint of the numbers file</text>
+  <text class="ts" x="372" y="196" style="font-weight:600">inside the other file. Check it on load.</text>
+  <text class="ts" x="372" y="216">If it doesn't match &#8594; throw the numbers away</text>
+  <text class="ts" x="372" y="230">and rebuild them. Slow once, never wrong.</text>
+</svg>
+</figure>
     <div class="body" style="gap:5mm">
       <div class="left">
         <div class="qa"><div class="q">Why not just put them in the JSON?</div>
@@ -1708,8 +1708,8 @@ answer = sub.run(task)                   <span class="cmt"># runs its own full l
 </div>
 
 <div data-src="s23" id="s-heat" class="slide">
-  <div class="sh"><span class="num">22</span><h2>Keeping the laptop cool</h2>
-    <span class="tag">cooldown.py &#183; gentle mode</span></div>
+  <div class="sh"><span class="num">22</span><h2>Box 10 &#8212; keeping the laptop cool</h2>
+    <span class="tag">box 10 &#183; cooldown.py &#183; gentle mode</span></div>
   <div class="body">
     <div class="left">
       <div class="wwh" style="flex-direction:column;margin-top:0">
